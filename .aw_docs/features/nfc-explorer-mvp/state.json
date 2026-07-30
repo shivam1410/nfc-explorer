@@ -234,14 +234,21 @@
     {
       "id": "D2",
       "item": "no ktlint/Detekt configured",
-      "rationale": "Kotlin rules call for it",
-      "owner_task": "6.2"
+      "rationale": "Attempted ktlint 12.1.2 and BACKED IT OUT. Default \"official\" ruleset produced 628 findings on this codebase: 247 multiline-expression-wrapping, 232 function-signature, 55 no-empty-first-line-in-class-body -- all pure style preference and no defects -- plus 29 function-naming flagging every @Composable for PascalCase, which is CORRECT Compose convention. Only 5 findings were real (2 unused imports, 3 import ordering). Disabling the offending rules via .editorconfig did not take effect with this plugin version, and the aggregate task failed while every source set reported NO-SOURCE, suggesting the plugin does not resolve Kotlin under src/main/java. A red build from a linter is worse than no linter, so it was reverted rather than left half-configured.",
+      "next_attempt_should": "Prefer Detekt: it targets code smells rather than formatting, so it will not fight Compose naming or produce hundreds of wrapping findings. If ktlint is retried, verify it resolves src/main/java sources first, and fix the 2 unused imports and 3 import-ordering findings by hand regardless -- those were genuine.",
+      "owner_task": "future"
     },
     {
       "id": "D3",
       "item": "ManufacturerTest is characterisation-only, not RED-first",
-      "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented",
+      "rationale": "lookup shipped with models in Task 1.1",
       "owner_task": "none - accepted"
+    },
+    {
+      "id": "D5",
+      "item": "2 unused imports and 3 import-ordering issues found by the reverted ktlint run",
+      "rationale": "genuine findings surfaced by tooling that was then backed out; worth fixing by hand",
+      "owner_task": "future"
     }
   ],
   "blockers": [],
