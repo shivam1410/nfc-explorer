@@ -7,6 +7,43 @@ package dev.shivam.nfcexplorer.domain.model
  * that the tag accepted but stored differently (OTP and lock bytes OR incoming bits rather than
  * replacing them) is a success with a different result, and the user needs to see which.
  */
+/**
+ * Result of writing a run of pages.
+ *
+ * [outcomes] covers only the pages actually **attempted**. A batch stops at the first page that
+ * does not succeed, because the usual causes — the tag left the field, or a page is locked — will
+ * affect every page after it too, and hammering a tag that is already refusing produces noise
+ * rather than information. [pagesRequested] is retained so a caller can see how far it got.
+ */
+data class WriteBatchResult(
+    val startPage: Int,
+    val pagesRequested: Int,
+    val outcomes: List<WriteOutcome>,
+) {
+    val writtenCount: Int get() = outcomes.count { it is WriteOutcome.Written }
+
+    /**
+     * True only when something was requested *and* all of it was written.
+     *
+     * The `pagesRequested > 0` guard matters: without it an empty batch would be vacuously
+     * successful and the UI would report a write that never happened.
+     */
+    val allSucceeded: Boolean
+        get() = pagesRequested > 0 &&
+            outcomes.size == pagesRequested &&
+            outcomes.all { it is WriteOutcome.Written }
+
+    /** The outcome that stopped the batch, or null if every page succeeded. */
+    val stoppedBy: WriteOutcome? get() = outcomes.firstOrNull { it !is WriteOutcome.Written }
+
+    /** True when at least one page was written but the batch did not finish. */
+    val isPartial: Boolean get() = writtenCount > 0 && !allSucceeded
+
+    companion object {
+        fun empty(startPage: Int) = WriteBatchResult(startPage, pagesRequested = 0, outcomes = emptyList())
+    }
+}
+
 sealed interface WriteOutcome {
 
     data class Written(

@@ -5,7 +5,7 @@ import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.model.ChipProfile
 import dev.shivam.nfcexplorer.domain.model.TagPresentation
 import dev.shivam.nfcexplorer.domain.model.TagReport
-import dev.shivam.nfcexplorer.domain.model.WriteOutcome
+import dev.shivam.nfcexplorer.domain.model.WriteBatchResult
 import dev.shivam.nfcexplorer.domain.repository.TagHandle
 import dev.shivam.nfcexplorer.domain.repository.TagRepository
 import dev.shivam.nfcexplorer.domain.transport.TagFieldLostException
@@ -43,12 +43,12 @@ class ScanViewModelTest {
             return requireNotNull(result) { "test did not arrange a result" }
         }
 
-        override suspend fun writePage(
+        override suspend fun writePages(
             handle: TagHandle,
-            page: Int,
-            data: ByteArray,
+            startPage: Int,
+            pages: List<ByteArray>,
             expertMode: Boolean,
-        ): Result<WriteOutcome> = Result.failure(NotImplementedError("not under test"))
+        ): Result<WriteBatchResult> = Result.failure(NotImplementedError("not under test"))
     }
 
     private val dispatcher = StandardTestDispatcher()

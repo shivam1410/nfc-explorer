@@ -1,7 +1,7 @@
 package dev.shivam.nfcexplorer.domain.repository
 
 import dev.shivam.nfcexplorer.domain.model.TagReport
-import dev.shivam.nfcexplorer.domain.model.WriteOutcome
+import dev.shivam.nfcexplorer.domain.model.WriteBatchResult
 
 /**
  * An opaque reference to the tag currently in the field.
@@ -27,13 +27,20 @@ interface TagRepository {
     suspend fun read(handle: TagHandle): Result<TagReport>
 
     /**
-     * @param expertMode when true, permits the irreversible writes that are otherwise gated.
-     *   It can never permit a write the guard blocks outright.
+     * Writes a consecutive run of pages starting at [startPage].
+     *
+     * Implementations re-read the tag's lock state as part of this call rather than accepting it
+     * from the caller. Lock state is what decides whether a write is permitted, and a value carried
+     * over from an earlier scan may be stale — the tag could have been locked in between. It must
+     * come from the tag being written, in the same session.
+     *
+     * @param expertMode when true, permits the irreversible writes that are otherwise gated. It can
+     *   never permit a write the guard blocks outright.
      */
-    suspend fun writePage(
+    suspend fun writePages(
         handle: TagHandle,
-        page: Int,
-        data: ByteArray,
+        startPage: Int,
+        pages: List<ByteArray>,
         expertMode: Boolean,
-    ): Result<WriteOutcome>
+    ): Result<WriteBatchResult>
 }

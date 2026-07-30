@@ -3,6 +3,8 @@ package dev.shivam.nfcexplorer.di
 import dev.shivam.nfcexplorer.data.repository.TagRepositoryImpl
 import dev.shivam.nfcexplorer.domain.repository.TagRepository
 import dev.shivam.nfcexplorer.domain.usecase.ReadTagUseCase
+import dev.shivam.nfcexplorer.domain.usecase.WritePageUseCase
+import dev.shivam.nfcexplorer.domain.usecase.WritePagesUseCase
 import dev.shivam.nfcexplorer.domain.writer.WriteGuard
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import dagger.Binds
@@ -33,6 +35,18 @@ object NfcProvidersModule {
     @Provides
     @Singleton
     fun provideReadTagUseCase(logger: SessionLogger): ReadTagUseCase = ReadTagUseCase(logger)
+
+    @Provides
+    @Singleton
+    fun provideWritePageUseCase(guard: WriteGuard, logger: SessionLogger): WritePageUseCase =
+        WritePageUseCase(guard, logger)
+
+    @Provides
+    @Singleton
+    fun provideWritePagesUseCase(
+        writePage: WritePageUseCase,
+        logger: SessionLogger,
+    ): WritePagesUseCase = WritePagesUseCase(writePage, logger)
 }
 
 @Module

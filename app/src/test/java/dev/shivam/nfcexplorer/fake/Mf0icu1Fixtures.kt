@@ -112,6 +112,33 @@ object Mf0icu1Fixtures {
         ),
     )
 
+    /**
+     * The real hotel card this app was built to investigate, byte for byte.
+     *
+     * Captured from hardware on 2026-07-30; see
+     * `.aw_docs/features/nfc-explorer-mvp/evidence/hotel-card-dump.md`. Worth having as a fixture
+     * because it is the combination that actually turns up in the wild and that synthetic cases
+     * miss: **completely unlocked** (`LOCK0 = LOCK1 = 0x00`) yet carrying a personalised payload,
+     * with a dirty OTP page that is not an NDEF capability container.
+     *
+     * The UID here is genuinely on the tag; it is a serial number, not a secret — it is broadcast
+     * unencrypted to any reader in range before authentication of any kind.
+     */
+    fun unlockedHotelCard(): ByteArray = image(
+        uid = bytes(0x04, 0x0E, 0x66, 0xA2, 0xF0, 0x7B, 0x81),
+        lock0 = 0x00,
+        lock1 = 0x00,
+        otp = bytes(0x46, 0x0D, 0xAE, 0x11),
+        userData = bytes(
+            0xE2, 0x42, 0x1B, 0x5E,
+            0x36, 0x56, 0x3A, 0x96,
+            0xCA, 0xC7, 0xC4, 0x88,
+            0xC2, 0xBD, 0xD7, 0x19,
+            0x67, 0x03, 0x03, 0xFC,
+            0x4D, 0xD4, 0xBF, 0x32,
+        ),
+    )
+
     /** Printable ASCII in the user area, for renderer tests. */
     fun withAsciiPayload(text: String): ByteArray =
         image(userData = text.toByteArray(Charsets.US_ASCII))
