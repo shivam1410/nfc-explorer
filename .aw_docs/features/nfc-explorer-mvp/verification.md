@@ -95,11 +95,11 @@ under `domain/` and tests its own detector so it cannot pass vacuously — prove
 
 ### AC8 — dark and light themes render every screen legibly
 
-**PARTIAL PASS.**
+**PASS.** All ten screen/theme combinations captured and inspected on device.
 
-- Dark: Tag, Memory, Locks, Write, Log all captured and inspected.
-- Light: Tag, Memory, Locks, Write captured and inspected.
-- **Not verified: the Log screen in light mode.** The device screen locked before it was captured.
+- Dark: Tag, Memory, Locks, Write, Log.
+- Light: Tag, Memory, Locks, Write, Log — the last closed by `evidence/h-log-light.png`, showing the
+  filter chips, both export actions and the empty state.
 
 This criterion is where verification paid for itself. Inspecting these screens found **11 defects
 with the suite green**, including one on the irreversible write path. Details in `execution.md`.
@@ -115,7 +115,7 @@ with the suite green**, including one on the irreversible write path. Details in
 | AC5 | PARTIAL | JVM complete; device success path only |
 | AC6 | PASS | device (TXT) + JVM |
 | AC7 | PASS | JVM |
-| AC8 | PARTIAL | 9 of 10 screen/theme combinations |
+| AC8 | PASS | all 10 screen/theme combinations |
 
 ## Invariants
 
@@ -134,7 +134,9 @@ with the suite green**, including one on the irreversible write path. Details in
 2. **Write refusals on hardware** (pages 0–1, a locked page, expert-mode gating). Would require
    irreversibly locking a real tag.
 3. **JSON export on device.** TXT confirmed end to end; JSON is JVM-tested only.
-4. **Log screen in light mode.**
+4. **Multi-window / split-screen.** Never a design target. An accidental capture during an
+   app-switcher transition showed the app rendering in a narrow window without crashing, but text
+   near the window edge appeared clipped. Not investigated, and not claimed either way.
 5. **I5 not instrumented.** No StrictMode or main-thread assertion; the guarantee is structural.
 6. **No instrumented or Compose UI tests at all.** No `androidTest` source set exists. The
    Activity-level tag routing — where the CRITICAL review finding lived — has no automated coverage

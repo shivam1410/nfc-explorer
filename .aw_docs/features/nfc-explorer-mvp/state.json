@@ -2,7 +2,7 @@
   "feature_slug": "nfc-explorer-mvp",
   "stage": "build",
   "mode": "code",
-  "status": "phases 0-5 complete; phase 6 in progress",
+  "status": "phases 0-6 complete; MVP closed out",
   "updated_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
@@ -26,9 +26,10 @@
     2,
     3,
     4,
-    5
+    5,
+    6
   ],
-  "current_phase": 6,
+  "current_phase": null,
   "phase_notes": {
     "0": "complete incl. device install proof",
     "1": "complete; all 6 kotlin-reviewer findings fixed",
@@ -204,12 +205,11 @@
     }
   ],
   "remaining_slices": [
-    "4.4 review gate (kotlin-reviewer over write path)",
-    "6.1 verification.md recording AC1-AC8 with evidence sources",
-    "6.2 README.md and docs/nfc-primer.md",
-    "D2 add ktlint or Detekt",
-    "HUMAN: export a file and confirm it opens",
-    "HUMAN: pull a card mid-read and confirm partial dump plus reject buzz"
+    "HUMAN: pull a card away mid-read and confirm a partial dump plus reject buzz (last untested hardware path)",
+    "FUTURE: Phase 2 chips (NTAG21x, Ultralight EV1, MIFARE Classic, DESFire, IsoDep)",
+    "FUTURE: NDEF encode/decode",
+    "FUTURE: raw transceive console",
+    "FUTURE: instrumented/Compose test source set - none exists, which is why the CRITICAL write-path finding needed review to catch"
   ],
   "parallel_execution": {
     "used": false,
@@ -224,7 +224,7 @@
   ],
   "test_totals": {
     "suite": "testDebugUnitTest",
-    "tests": 266,
+    "tests": 284,
     "failures": 0
   },
   "reviewer_agents_used": [
@@ -232,23 +232,10 @@
   ],
   "deferred_findings": [
     {
-      "id": "D2",
-      "item": "no ktlint/Detekt configured",
-      "rationale": "Attempted ktlint 12.1.2 and BACKED IT OUT. Default \"official\" ruleset produced 628 findings on this codebase: 247 multiline-expression-wrapping, 232 function-signature, 55 no-empty-first-line-in-class-body -- all pure style preference and no defects -- plus 29 function-naming flagging every @Composable for PascalCase, which is CORRECT Compose convention. Only 5 findings were real (2 unused imports, 3 import ordering). Disabling the offending rules via .editorconfig did not take effect with this plugin version, and the aggregate task failed while every source set reported NO-SOURCE, suggesting the plugin does not resolve Kotlin under src/main/java. A red build from a linter is worse than no linter, so it was reverted rather than left half-configured.",
-      "next_attempt_should": "Prefer Detekt: it targets code smells rather than formatting, so it will not fight Compose naming or produce hundreds of wrapping findings. If ktlint is retried, verify it resolves src/main/java sources first, and fix the 2 unused imports and 3 import-ordering findings by hand regardless -- those were genuine.",
-      "owner_task": "future"
-    },
-    {
       "id": "D3",
       "item": "ManufacturerTest is characterisation-only, not RED-first",
       "rationale": "lookup shipped with models in Task 1.1",
       "owner_task": "none - accepted"
-    },
-    {
-      "id": "D5",
-      "item": "2 unused imports and 3 import-ordering issues found by the reverted ktlint run",
-      "rationale": "genuine findings surfaced by tooling that was then backed out; worth fixing by hand",
-      "owner_task": "future"
     }
   ],
   "blockers": [],
@@ -295,8 +282,7 @@
     "fd4fe1e"
   ],
   "recommended_next_commands": [
-    "/aw:review (Task 4.4 write path)",
-    "/aw:build (Task 6.1-6.2 verification.md, README, ktlint)"
+    "no build work outstanding for the Phase 1 MVP"
   ],
   "ui_defects_found_by_visual_verification": [
     "access chip pushed off the right edge, hiding the write verdict",
@@ -305,5 +291,20 @@
     "cleared lock bits rendered as filled chips, reading as set",
     "colour was the sole carrier of set-vs-clear (bit_set/bit_clear strings unused)",
     "capability footnote rendered unconditionally, claiming \"not supported\" regardless"
-  ]
+  ],
+  "static_analysis": {
+    "tool": "Detekt 1.23.7",
+    "state": "gating the build, 0 findings",
+    "config": "config/detekt.yml"
+  },
+  "acceptance_criteria": {
+    "AC1": "PASS",
+    "AC2": "PASS",
+    "AC3": "PASS",
+    "AC4": "PASS",
+    "AC5": "PARTIAL - write refusals not device-verified; would require irreversibly locking a real tag",
+    "AC6": "PASS",
+    "AC7": "PASS",
+    "AC8": "PASS"
+  }
 }
