@@ -40,9 +40,18 @@ enum class WriteBlockReason {
  */
 sealed interface WriteDecision {
 
-    data object Allowed : WriteDecision
+    /**
+     * The write may proceed.
+     *
+     * [acknowledgedRisk] is non-null when this page is only writable because expert mode is
+     * on. Turning expert mode on must not make the danger invisible, so the reason travels
+     * with the approval and the UI keeps warning.
+     */
+    data class Allowed(val acknowledgedRisk: WriteRiskReason? = null) : WriteDecision
 
+    /** Irreversible, and expert mode is off. Enabling it turns this into [Allowed]. */
     data class RequiresExpertMode(val reason: WriteRiskReason) : WriteDecision
 
+    /** Not writable at all. Expert mode does not affect this outcome. */
     data class Blocked(val reason: WriteBlockReason) : WriteDecision
 }
