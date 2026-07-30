@@ -2,6 +2,7 @@ package dev.shivam.nfcexplorer.domain.usecase
 
 import dev.shivam.nfcexplorer.domain.decoder.StaticLockDecoder
 import dev.shivam.nfcexplorer.domain.decoder.UidDecoder
+import dev.shivam.nfcexplorer.domain.model.BccCheck
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.model.MemoryDump
 import dev.shivam.nfcexplorer.domain.model.PageSnapshot
@@ -12,6 +13,7 @@ import dev.shivam.nfcexplorer.domain.transport.TagFieldLostException
 import dev.shivam.nfcexplorer.domain.transport.TagNakException
 import dev.shivam.nfcexplorer.domain.transport.UltralightTransport
 import dev.shivam.nfcexplorer.logging.SessionLogger
+import dev.shivam.nfcexplorer.util.toHex
 import java.io.IOException
 
 /**
@@ -83,7 +85,48 @@ class ReadTagUseCase(
                 "complete" to memory.isComplete.toString(),
             ),
         )
+
+        // The image and lock state are logged as text on purpose. A dump that only exists on
+        // screen cannot be captured, diffed, or attached to a bug report, which is most of what
+        // makes this a debugging tool rather than a viewer.
+        if (memory.pages.isNotEmpty()) {
+            logger.info(
+                category = CATEGORY,
+                message = "memory image",
+                payload = mapOf("image" to renderImage(memory)),
+            )
+            logger.info(
+                category = CATEGORY,
+                message = "lock state",
+                payload = mapOf(
+                    "lockBytes" to (report.locks.staticLockBytes?.toString() ?: "unreadable"),
+                    "lockedPages" to report.locks.lockedPages.joinToString(),
+                    "writablePages" to report.locks.writablePages.joinToString(),
+                    "bcc0" to bccSummary(report.identity.bcc0),
+                    "bcc1" to bccSummary(report.identity.bcc1),
+                ),
+            )
+        }
         return report
+    }
+
+    /**
+     * `00:04 A2 55 71 | 01:18 39 FF 22 | ...`, with `??` for pages that did not read.
+     *
+     * Unreadable pages are marked rather than zero-filled so the text cannot be mistaken for a
+     * complete image — the same rule the UI follows.
+     */
+    private fun renderImage(memory: MemoryDump): String =
+        memory.pages.joinToString(" | ") { page ->
+            val index = page.index.toString(16).uppercase().padStart(2, '0')
+            val bytes = page.bytes?.toString() ?: "?? ?? ?? ??"
+            "$index:$bytes"
+        }
+
+    private fun bccSummary(check: BccCheck?): String = when {
+        check == null -> "not established"
+        check.isValid -> "valid"
+        else -> "MISMATCH stored=${check.stored.toHex()} computed=${check.computed.toHex()}"
     }
 
     private fun dump(

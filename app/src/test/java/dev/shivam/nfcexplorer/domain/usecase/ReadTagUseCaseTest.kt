@@ -245,6 +245,46 @@ class ReadTagUseCaseTest {
     }
 
     @Test
+    fun `the log carries the full memory image so a dump is recoverable from logcat`() {
+        // A debugging tool whose dump only exists on screen is much less useful: evidence has to
+        // survive as text that can be captured, diffed and attached to a report.
+        val source = transport(Mf0icu1Fixtures.hotelCardLike())
+
+        useCase(source, presentation())
+
+        val image = logger.entries.value
+            .firstNotNullOfOrNull { it.payload["image"] }
+            ?: error("no log entry carried the memory image")
+
+        // Every readable page's bytes must appear, in order.
+        assertTrue(image.contains("5A 11 03 7C"), "page 4 content missing from image: $image")
+        assertTrue(image.contains("21 08 14 06"), "page 6 content missing from image: $image")
+    }
+
+    @Test
+    fun `the log carries the decoded lock state`() {
+        useCase(transport(Mf0icu1Fixtures.hotelCardLike()), presentation())
+
+        val entry = logger.entries.value.firstOrNull { it.payload.containsKey("lockBytes") }
+            ?: error("no log entry carried the lock state")
+
+        assertEquals("F8 FF", entry.payload["lockBytes"])
+        assertEquals((3..15).joinToString(), entry.payload["lockedPages"])
+    }
+
+    @Test
+    fun `an unreadable page is marked in the logged image rather than shown as zeros`() {
+        useCase(transport(nakPages = setOf(6)), presentation())
+
+        val image = logger.entries.value
+            .firstNotNullOfOrNull { it.payload["image"] }
+            ?: error("no log entry carried the memory image")
+
+        // Pages 4-7 refused; they must not appear as plausible data.
+        assertTrue(image.contains("??"), "unreadable pages should be marked, got: $image")
+    }
+
+    @Test
     fun `pages are reported in ascending order with no duplicates`() {
         val report = useCase(transport(nakPages = setOf(6), failFromPage = 12), presentation())
 
