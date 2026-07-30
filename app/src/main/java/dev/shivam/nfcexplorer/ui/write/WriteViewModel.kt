@@ -34,7 +34,18 @@ data class WriteUiState(
 
     val capacityBytes: Int get() = PageEncoder.capacityBytes(pageCount)
 
-    val canArm: Boolean get() = problem == null && pageCount > 0 && !isWriting
+    /**
+     * Whether there is something reviewable to arm.
+     *
+     * An empty payload in [WriteMode.TEXT] or [WriteMode.HEX] is **not** armable. `fromText("")`
+     * encodes to all-zero pages, so without this an untouched field would arm a silent wipe of the
+     * whole target range. Zeroing pages is what [WriteMode.WIPE] is for, chosen deliberately.
+     */
+    val canArm: Boolean
+        get() = problem == null &&
+            pageCount > 0 &&
+            !isWriting &&
+            (mode == WriteMode.WIPE || input.isNotBlank())
 
     companion object {
         const val FIRST_USER_PAGE = 4
@@ -63,6 +74,13 @@ class WriteViewModel @Inject constructor(
 
     private val backingPreview = MutableStateFlow<List<ByteArray>?>(null)
     val encodedPreview: StateFlow<List<ByteArray>?> = backingPreview.asStateFlow()
+
+    init {
+        // Populate the preview up front. It is the review step that arming confirms, so it has to be
+        // on screen from the outset rather than appearing only once the user happens to edit
+        // something — otherwise the screen can be armed with nothing shown.
+        refresh { it }
+    }
 
     fun onModeChange(mode: WriteMode) = update { it.copy(mode = mode) }
 
@@ -117,7 +135,9 @@ class WriteViewModel @Inject constructor(
      * Every edit routes through here so there is exactly one place where "the payload changed"
      * implies "the previous confirmation no longer applies".
      */
-    private fun update(transform: (WriteUiState) -> WriteUiState) {
+    private fun update(transform: (WriteUiState) -> WriteUiState) = refresh(transform)
+
+    private fun refresh(transform: (WriteUiState) -> WriteUiState) {
         val next = transform(backing.value).copy(isArmed = false)
         val encoded = encode(next)
         backing.value = next.copy(problem = problemFor(next, encoded))

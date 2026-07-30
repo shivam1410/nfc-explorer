@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,10 +86,18 @@ private fun BccRow(label: String, check: BccCheck?) {
         KeyValueRow(label, stringResource(R.string.value_not_established))
         return
     }
+    // Label, then verdict, then the two values. The chip used to come first, which read backwards:
+    // a badge arriving before the thing it describes.
     Row(
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(64.dp),
+        )
         StatusChip(
             text = stringResource(
                 if (check.isValid) R.string.bcc_valid else R.string.bcc_mismatch,
@@ -96,7 +105,7 @@ private fun BccRow(label: String, check: BccCheck?) {
             tone = if (check.isValid) ChipTone.POSITIVE else ChipTone.NEGATIVE,
         )
         Text(
-            text = "$label  " + stringResource(
+            text = stringResource(
                 R.string.bcc_detail,
                 check.stored.toHex(),
                 check.computed.toHex(),

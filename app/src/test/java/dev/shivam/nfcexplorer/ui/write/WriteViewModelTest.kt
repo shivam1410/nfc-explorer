@@ -16,6 +16,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -72,6 +73,53 @@ class WriteViewModelTest {
         // Expert mode must never persist across launches; it gates irreversible writes.
         assertFalse(state.expertMode)
         assertFalse(state.isArmed)
+    }
+
+    @Test
+    fun `the byte preview is available before any edit`() {
+        // The preview is the review step that arming confirms. If it only appears after the user
+        // happens to touch a control, the screen can be armed with nothing shown.
+        assertNotNull(viewModel().encodedPreview.value)
+    }
+
+    @Test
+    fun `an empty text payload cannot be armed`() {
+        // PageEncoder.fromText("", 12) is 12 pages of zeros, so without this an untouched Text
+        // field would arm a silent 48-byte wipe. Erasing is what Wipe mode is for, explicitly.
+        val model = viewModel()
+
+        assertFalse(model.state.value.canArm, "empty text must not be armable")
+
+        model.onArm()
+        assertFalse(model.state.value.isArmed)
+    }
+
+    @Test
+    fun `an empty hex payload cannot be armed`() {
+        val model = viewModel()
+        model.onModeChange(WriteMode.HEX)
+
+        assertFalse(model.state.value.canArm)
+    }
+
+    @Test
+    fun `wipe mode can be armed with an empty input because zeroing is its whole purpose`() {
+        val model = viewModel()
+        model.onModeChange(WriteMode.WIPE)
+
+        assertTrue(model.state.value.canArm)
+    }
+
+    @Test
+    fun `typing then clearing the field disarms and blocks arming again`() {
+        val model = viewModel()
+        model.onInputChange("hi")
+        assertTrue(model.state.value.canArm)
+
+        model.onInputChange("")
+
+        assertFalse(model.state.value.canArm)
+        assertFalse(model.state.value.isArmed)
     }
 
     // --- Validation ---
