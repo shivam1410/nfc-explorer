@@ -1,0 +1,115 @@
+package dev.shivam.nfcexplorer.ui.component
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.dp
+import dev.shivam.nfcexplorer.ui.theme.HexSecondaryTextStyle
+import dev.shivam.nfcexplorer.ui.theme.HexTextStyle
+import dev.shivam.nfcexplorer.ui.theme.PageIndexTextStyle
+
+/**
+ * One page of tag memory, as a table row.
+ *
+ * [hex] is null for a page that could not be read; the caller passes the status wording as
+ * [statusText] instead. That split is what makes it impossible to render an unread page as
+ * `00 00 00 00`, which would be indistinguishable from a page of genuine zeros.
+ *
+ * Rows are at least 48 dp so they remain a usable touch target despite looking dense.
+ */
+@Composable
+fun HexPageRow(
+    pageIndex: Int,
+    hex: String?,
+    secondary: String?,
+    accessLabel: String,
+    accessTone: ChipTone,
+    modifier: Modifier = Modifier,
+    statusText: String? = null,
+    expandedDetail: String? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val hexColor: Color = if (hex == null) scheme.error else scheme.onSurface
+    val pageLabel = "%02X".format(pageIndex)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clearAndSetSemantics {
+                    contentDescription = describe(pageLabel, hex, statusText, accessLabel)
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = pageLabel,
+                style = PageIndexTextStyle,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.width(32.dp),
+            )
+            Text(
+                text = hex ?: (statusText ?: ""),
+                style = HexTextStyle,
+                color = hexColor,
+                modifier = Modifier.width(124.dp),
+            )
+            Text(
+                text = secondary.orEmpty(),
+                style = HexSecondaryTextStyle,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            StatusChip(text = accessLabel, tone = accessTone)
+        }
+
+        AnimatedVisibility(visible = expandedDetail != null) {
+            Text(
+                text = expandedDetail.orEmpty(),
+                style = HexSecondaryTextStyle,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 32.dp, top = 2.dp, bottom = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Reads as "page 0 4, bytes 0 4, A 2, 5 5, 7 1, writable" rather than letting the screen reader
+ * guess at hex pairs.
+ */
+private fun describe(
+    pageLabel: String,
+    hex: String?,
+    statusText: String?,
+    accessLabel: String,
+): String {
+    val spokenPage = pageLabel.toCharArray().joinToString(" ")
+    val body = when {
+        hex != null -> "bytes " + spellOutHex("", hex).removePrefix(": ")
+        statusText != null -> statusText
+        else -> ""
+    }
+    return "page $spokenPage, $body, $accessLabel"
+}

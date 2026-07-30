@@ -1,6 +1,124 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NFC Explorer</string>
-    <string name="placeholder_title">NFC Explorer</string>
-    <string name="placeholder_subtitle">Toolchain verified. Scan pipeline lands in Phase 2.</string>
+
+    <!-- Actions -->
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_open_nfc_settings">Open NFC settings</string>
+
+    <!-- Navigation -->
+    <string name="nav_tag">Tag</string>
+    <string name="nav_memory">Memory</string>
+    <string name="nav_locks">Locks</string>
+    <string name="nav_log">Log</string>
+
+    <!-- Scan states -->
+    <string name="scan_starting">Starting…</string>
+    <string name="scan_unsupported_title">No NFC hardware</string>
+    <string name="scan_unsupported_body">This device has no NFC adapter, so there is nothing to scan with.</string>
+    <string name="scan_disabled_title">NFC is switched off</string>
+    <string name="scan_disabled_body">Turn NFC on to scan tags.</string>
+    <string name="scan_waiting_title">Ready to scan</string>
+    <string name="scan_waiting_body">Hold a tag against the back of the device.</string>
+    <string name="scan_reading">Reading page %1$d of %2$d…</string>
+    <string name="scan_failed_title">Read failed</string>
+    <string name="scan_captured">Tag captured</string>
+    <string name="scan_no_tag_yet">No tag scanned yet. Hold a tag against the back of the device.</string>
+
+    <!-- Tag info -->
+    <string name="section_identity">Identity</string>
+    <string name="section_chip">Chip</string>
+    <string name="section_capabilities">Capabilities</string>
+    <string name="section_technologies">Technologies</string>
+    <string name="label_uid">UID</string>
+    <string name="label_uid_length">UID length</string>
+    <string name="label_cascade_levels">Cascade levels</string>
+    <string name="label_manufacturer">Manufacturer</string>
+    <string name="label_atqa">ATQA</string>
+    <string name="label_sak">SAK</string>
+    <string name="label_bcc0">BCC0</string>
+    <string name="label_bcc1">BCC1</string>
+    <string name="label_vendor">Vendor</string>
+    <string name="label_chip">Chip</string>
+    <string name="label_family">Family</string>
+    <string name="label_total_bytes">Total memory</string>
+    <string name="label_page_count">Pages</string>
+    <string name="label_page_size">Page size</string>
+    <string name="label_max_transceive">Max transceive</string>
+    <string name="label_timeout">Timeout</string>
+
+    <string name="value_bytes">%1$d bytes</string>
+    <string name="value_pages_of_size">%1$d pages × %2$d B</string>
+    <string name="value_millis">%1$d ms</string>
+    <string name="value_not_established">not established</string>
+    <string name="value_unknown">unknown</string>
+    <string name="value_not_confirmed">not confirmed</string>
+    <string name="value_none">none</string>
+
+    <string name="bcc_valid">valid</string>
+    <string name="bcc_mismatch">mismatch</string>
+    <string name="bcc_detail">stored %1$s · computed %2$s</string>
+
+    <string name="geometry_confirmed">confirmed</string>
+    <string name="geometry_unconfirmed">floor, unconfirmed</string>
+    <string name="geometry_unconfirmed_explanation">Android reports the same technology, ATQA and SAK for MIFARE Ultralight, Ultralight EV1 and every NTAG21x. Telling them apart needs GET_VERSION, which the original Ultralight does not implement, so this is the smallest memory any of them has. The tag may hold more.</string>
+
+    <!-- Capabilities -->
+    <string name="capability_supported">supported</string>
+    <string name="capability_absent">not supported by this chip</string>
+    <string name="capability_fast_read">FAST_READ</string>
+    <string name="capability_get_version">GET_VERSION</string>
+    <string name="capability_pwd_auth">PWD_AUTH</string>
+    <string name="capability_dynamic_lock_bits">Dynamic lock bits</string>
+    <string name="capability_counters">Counters</string>
+    <string name="capability_ndef">NDEF</string>
+
+    <!-- Memory -->
+    <string name="memory_title">Memory</string>
+    <string name="memory_pages_read">%1$d of %2$d pages read</string>
+    <string name="memory_column_page">PAGE</string>
+    <string name="memory_column_hex">HEX</string>
+    <string name="memory_view_ascii">ASCII</string>
+    <string name="memory_view_binary">Binary</string>
+    <string name="memory_view_decimal">Decimal</string>
+
+    <!-- Read status -->
+    <string name="read_status_nak">refused by tag</string>
+    <string name="read_status_io_error">I/O error</string>
+    <string name="read_status_tag_lost">tag left field</string>
+    <string name="read_status_not_attempted">not attempted</string>
+
+    <!-- Write verdicts -->
+    <string name="verdict_writable">writable</string>
+    <string name="verdict_locked">locked</string>
+    <string name="verdict_otp">OTP, one way</string>
+    <string name="verdict_read_only">read only</string>
+    <string name="verdict_lock_control">lock control</string>
+    <string name="verdict_unknown">lock state unknown</string>
+    <string name="verdict_locked_by">locked by %1$s; there is no unlock path on this chip</string>
+
+    <!-- Locks -->
+    <string name="locks_title">Lock analysis</string>
+    <string name="section_lock_bytes">Lock bytes</string>
+    <string name="section_page_access">Page access</string>
+    <string name="section_block_locking">Block locking</string>
+    <string name="section_dynamic_lock">Dynamic lock bits</string>
+    <string name="label_lock0">LOCK0</string>
+    <string name="label_lock1">LOCK1</string>
+    <string name="lock_bytes_unreadable">Page 0x02 could not be read, so no lock state is known. No page is reported as writable, because guessing would invite a write that silently fails.</string>
+    <string name="block_lock_freezes">freezes pages %1$d–%2$d</string>
+    <string name="block_lock_otp_freezes">freezes the OTP lock bit</string>
+    <string name="bit_set">set</string>
+    <string name="bit_clear">clear</string>
+    <string name="lock_bit_frozen">frozen</string>
+    <string name="dynamic_lock_unsupported">Not supported by this chip. Dynamic lock bits arrived with %1$s.</string>
+    <string name="locks_summary">%1$d locked · %2$d writable</string>
+
+    <!-- Log -->
+    <string name="log_title">Session log</string>
+    <string name="log_empty">Nothing logged yet.</string>
+    <string name="log_filter_all">All</string>
+    <string name="log_entry_count">%1$d entries</string>
 </resources>
