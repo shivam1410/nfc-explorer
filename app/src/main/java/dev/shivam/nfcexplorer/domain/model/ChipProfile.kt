@@ -28,6 +28,17 @@ data class ChipProfile(
     val pageCount: Int,
     val pageSize: Int,
     val capabilities: Set<ChipCapability>,
+    /**
+     * True when this geometry is known to match the physical tag.
+     *
+     * False means the numbers are a **safe floor**, not a measurement. Android reports
+     * `TYPE_ULTRALIGHT` for MF0ICU1, Ultralight EV1 *and* NTAG213/215/216 — they share
+     * ATQA `0x0044` and SAK `0x00`, and telling them apart needs `GET_VERSION`, which the
+     * original Ultralight does not implement. Claiming 16 pages for an NTAG216 would
+     * silently hide 852 bytes, so an unconfirmed profile is flagged as such and the UI says
+     * so rather than presenting a floor as a fact.
+     */
+    val geometryConfirmed: Boolean,
 ) {
     fun supports(capability: ChipCapability): Boolean = capability in capabilities
 
@@ -45,6 +56,45 @@ data class ChipProfile(
             pageCount = 16,
             pageSize = 4,
             capabilities = emptySet(),
+            // A datasheet fact about this chip. Whether a given tag *is* this chip is a
+            // separate question, answered by identification rather than by this constant.
+            geometryConfirmed = true,
+        )
+
+        /**
+         * MIFARE Ultralight C — 192 bytes in 48 pages, with 3DES authentication.
+         *
+         * Geometry is confirmed because the platform identifies Ultralight C by an actual
+         * authentication probe rather than by ATQA/SAK alone.
+         */
+        val ULTRALIGHT_C = ChipProfile(
+            vendor = "NXP Semiconductors",
+            chipName = "MF0ICU2",
+            family = "MIFARE Ultralight C",
+            totalBytes = 192,
+            pageCount = 48,
+            pageSize = 4,
+            capabilities = emptySet(),
+            geometryConfirmed = true,
+        )
+
+        /**
+         * The safe floor for anything exposing `MifareUltralight`: 16 pages.
+         *
+         * Every member of the family has at least this much memory, so a dump bounded by it
+         * can never read past the end of a tag. It may well *under*-read — an NTAG216 has 231
+         * pages — which is why [geometryConfirmed] is false. Phase 2 narrows this with a
+         * `GET_VERSION` probe, where a NAK is itself evidence of an original Ultralight.
+         */
+        val ULTRALIGHT_FAMILY_MINIMUM = ChipProfile(
+            vendor = "NXP Semiconductors",
+            chipName = "",
+            family = "MIFARE Ultralight",
+            totalBytes = 64,
+            pageCount = 16,
+            pageSize = 4,
+            capabilities = emptySet(),
+            geometryConfirmed = false,
         )
 
         /**
@@ -59,6 +109,7 @@ data class ChipProfile(
             pageCount = 0,
             pageSize = 0,
             capabilities = emptySet(),
+            geometryConfirmed = false,
         )
     }
 }

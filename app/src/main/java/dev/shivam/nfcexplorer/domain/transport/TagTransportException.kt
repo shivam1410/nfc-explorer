@@ -35,6 +35,20 @@ class TagNakException(
 ) : TagTransportException(message, cause)
 
 /**
+ * An I/O failure the transport could not classify further.
+ *
+ * Android surfaces both a tag NAK and a general transport fault as a bare
+ * [java.io.IOException] with no distinguishing detail, so a real device usually lands here
+ * rather than on [TagNakException]. That is reported honestly as an I/O error instead of being
+ * relabelled a refusal — callers that *do* know better (a write to a page the lock analysis
+ * says is locked, for instance) can explain it from context they already hold.
+ */
+class TagIoException(
+    message: String,
+    cause: Throwable? = null,
+) : TagTransportException(message, cause)
+
+/**
  * The transport was used out of order — an exchange before `connect()`, or after `close()`.
  * A bug in the caller rather than a tag condition.
  */

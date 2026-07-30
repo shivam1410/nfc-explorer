@@ -20,6 +20,29 @@ class ChipProfileTest {
         // Geometry must be self-consistent: the read pipeline strides by pageSize over
         // pageCount and would run off the end of memory if these disagreed.
         assertEquals(profile.totalBytes, profile.pageCount * profile.pageSize)
+        // A datasheet fact about this specific chip.
+        assertTrue(profile.geometryConfirmed)
+    }
+
+    @Test
+    fun `the family floor is flagged as unconfirmed geometry`() {
+        val floor = ChipProfile.ULTRALIGHT_FAMILY_MINIMUM
+
+        // It is a safe lower bound, not a measurement: an NTAG216 has 231 pages and reports
+        // the same ATQA and SAK. Presenting the floor as fact would hide 852 bytes.
+        assertFalse(floor.geometryConfirmed)
+        assertEquals(16, floor.pageCount)
+        assertEquals("", floor.chipName)
+        assertEquals("MIFARE Ultralight", floor.family)
+    }
+
+    @Test
+    fun `Ultralight C geometry is confirmed and self consistent`() {
+        val profile = ChipProfile.ULTRALIGHT_C
+
+        assertTrue(profile.geometryConfirmed)
+        assertEquals(48, profile.pageCount)
+        assertEquals(profile.totalBytes, profile.pageCount * profile.pageSize)
     }
 
     @Test
@@ -57,5 +80,6 @@ class ChipProfileTest {
         assertEquals(0, profile.pageSize)
         assertEquals(0, profile.totalBytes)
         assertTrue(profile.capabilities.isEmpty())
+        assertFalse(profile.geometryConfirmed)
     }
 }
