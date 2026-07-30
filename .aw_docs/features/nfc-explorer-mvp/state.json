@@ -2,7 +2,7 @@
   "feature_slug": "nfc-explorer-mvp",
   "stage": "build",
   "mode": "code",
-  "status": "phase_2_blocked_on_device_tap; 4.1 done out of order",
+  "status": "phases 0-3 complete; 4.1 done; next 4.2",
   "updated_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
@@ -22,14 +22,17 @@
   ],
   "completed_phases": [
     0,
-    1
+    1,
+    2,
+    3
   ],
-  "current_phase": 2,
+  "current_phase": 4,
   "phase_notes": {
-    "0": "complete incl. Task 0.3 device install proof on Pixel 10",
+    "0": "complete incl. device install proof on Pixel 10",
     "1": "complete; all 6 reviewer findings fixed",
-    "2": "2.1-2.4 done; 2.5 blocked on human action (phone locked)",
-    "4": "4.1 done out of plan order (only slice with JVM proof available while 2.5 is blocked)"
+    "2": "complete; 2.5 device read proof captured from the hotel card",
+    "3": "complete; nav shell + 4 screens, installed and launched with no crash. VISUAL verification by the user still outstanding.",
+    "4": "4.1 done out of order; next 4.2 write sheet + expert mode"
   },
   "completed_slices": [
     {
@@ -137,28 +140,46 @@
       "red": "15/15 NotImplementedError",
       "validation": "15/15 green; refused writes proven never to reach transport",
       "commit": "61e9f12"
+    },
+    {
+      "task": "2.5",
+      "title": "Device read proof - hotel card",
+      "validation": "16/16 pages read, complete=true; LOCK0=LOCK1=0x00; evidence/hotel-card-dump.md",
+      "commit": "f4a53da"
+    },
+    {
+      "task": "3.1",
+      "title": "M3 theme and shared components",
+      "validation": "assembleDebug green",
+      "commit": "4c407d0"
+    },
+    {
+      "task": "3.2",
+      "title": "Nav shell, scan screen and all four destinations",
+      "red": "ScanViewModel 13/13 NotImplementedError",
+      "validation": "191/191 green; installed and launched, no crash",
+      "commit": "fd4fe1e"
+    },
+    {
+      "task": "haptics",
+      "title": "Scan haptic feedback (user request, out of plan)",
+      "validation": "assembleDebug green",
+      "commit": "f4a53da"
     }
   ],
   "remaining_slices": [
-    "2.5 device read proof",
-    "3.1 theme + components",
-    "3.2 nav shell + scan screen",
-    "3.3 tag info",
-    "3.4 memory explorer",
-    "3.5 lock analysis",
-    "3.6 session log",
     "4.2 write sheet + expert mode",
     "4.3 device write proof",
     "4.4 review gate",
     "5.1 exporters",
     "5.2 SAF export",
-    "6.1 full verification",
+    "6.1 full verification incl. dark/light visual check",
     "6.2 README and closeout"
   ],
   "parallel_execution": {
     "used": false,
     "cap": 3,
-    "note": "decoders wave ran sequentially; slices were small and the review gate sits at phase end. ui-screens wave (3.3-3.6) still planned as parallel."
+    "note": "ui-screens wave folded into 3.2; sequential was cheaper than coordinating disjoint write scopes for small screens sharing one contract"
   },
   "validation_commands": [
     "./gradlew --version",
@@ -168,7 +189,7 @@
   ],
   "test_totals": {
     "suite": "testDebugUnitTest",
-    "tests": 175,
+    "tests": 191,
     "failures": 0
   },
   "reviewer_agents_used": [
@@ -186,16 +207,15 @@
       "item": "ManufacturerTest is characterisation-only, not RED-first",
       "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented as TDD",
       "owner_task": "none - accepted"
-    }
-  ],
-  "blockers": [
+    },
     {
-      "id": "B2",
-      "item": "Task 2.5 device read proof blocked: phone screen locked (mScreenState=ON_LOCKED)",
-      "impact": "reader mode only runs while RESUMED, so no tag can be read; no device evidence claimed",
-      "next_action": "unlock phone with NFC Explorer in front, tap tag on upper-middle back for ~2s, then `adb logcat -d -s NfcExplorer:V` (ring buffer retains it)"
+      "id": "D4",
+      "item": "Phase 3 screens have no visual verification yet (device screen locked at capture time)",
+      "rationale": "compile + launch + no-crash proven; dark/light and layout check needs the user or an unlocked device",
+      "owner_task": "6.1"
     }
   ],
+  "blockers": [],
   "spec_deviations": [
     "ByteBlock replaces raw ByteArray in domain models (immutability + value equality)",
     "domain transport exception types added so TAG_LOST is distinguishable from NAK_REFUSED",
@@ -213,7 +233,10 @@
     "ChipProfile.geometryConfirmed added; resolver returns a 16-page family floor rather than claiming MF0ICU1, since TYPE_ULTRALIGHT is shared with EV1 and all NTAG21x",
     "TagIoException added: Android cannot distinguish a NAK from a general transport fault",
     "WriteOutcome.Written carries readBack so success is demonstrated; verified is null (not false) when read-back could not run",
-    "MainActivity is a temporary Phase 2 device-proof harness, replaced by Task 3.2"
+    "MainActivity is a temporary Phase 2 device-proof harness, replaced by Task 3.2",
+    "Tasks 3.3-3.6 folded into 3.2 rather than run as a parallel wave: screens are small and share the nav contract",
+    "ChipProfile.geometryConfirmed surfaced in the UI with an explanation string rather than a bare badge",
+    "Log filtering is by minimum level, not exact level"
   ],
   "save_point_commits": [
     "3f4454d",
@@ -231,10 +254,12 @@
     "58c6434",
     "351c937",
     "a182824",
-    "61e9f12"
+    "61e9f12",
+    "4c407d0",
+    "fd4fe1e"
   ],
   "recommended_next_commands": [
-    "clear blocker B2 (unlock phone, tap tag), then /aw:build for Task 2.5",
-    "/aw:build (Phase 3 Task 3.1) once device verification is available"
+    "visual check of the four screens in dark and light on device",
+    "/aw:build (Phase 4 Task 4.2 - write sheet and expert mode)"
   ]
 }
