@@ -8,4 +8,27 @@
     <style name="Theme.NfcExplorer" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
+
+    <!--
+      The trigger activity's theme: draws nothing, but is NOT Theme.NoDisplay.
+
+      NoDisplay carries a contract the trigger cannot keep - finish() must be called before
+      onResume() returns - and it enforces it by throwing:
+
+        IllegalStateException: Activity ... did not call finish() prior to onResume() completing
+
+      The trigger has to read the assignment store and ask the tag to answer before it knows whether
+      to act, both of which suspend, so finish() always lands after onResume. It crashed on every tap
+      of an assigned tag.
+
+      Translucent instead: same invisibility, no such contract. Nothing is drawn because the activity
+      never calls setContent, and these four items make sure the window itself contributes nothing -
+      no background, no dimming behind it, and no open or close animation to flash on screen.
+    -->
+    <style name="Theme.NfcExplorer.Trigger" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
