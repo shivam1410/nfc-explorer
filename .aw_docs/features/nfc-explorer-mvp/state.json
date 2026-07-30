@@ -2,7 +2,7 @@
   "feature_slug": "nfc-explorer-mvp",
   "stage": "build",
   "mode": "code",
-  "status": "phases 0-3 complete; 4.1 done; next 4.2",
+  "status": "phases 0-5 complete; phase 6 in progress",
   "updated_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
@@ -24,15 +24,19 @@
     0,
     1,
     2,
-    3
+    3,
+    4,
+    5
   ],
-  "current_phase": 4,
+  "current_phase": 6,
   "phase_notes": {
-    "0": "complete incl. device install proof on Pixel 10",
-    "1": "complete; all 6 reviewer findings fixed",
-    "2": "complete; 2.5 device read proof captured from the hotel card",
-    "3": "complete; nav shell + 4 screens, installed and launched with no crash. VISUAL verification by the user still outstanding.",
-    "4": "4.1 done out of order; next 4.2 write sheet + expert mode"
+    "0": "complete incl. device install proof",
+    "1": "complete; all 6 kotlin-reviewer findings fixed",
+    "2": "complete; hotel card read proof captured",
+    "3": "complete; visually verified in dark and light on device, 6 UI defects found and fixed",
+    "4": "complete; 4.1 write use case, 4.2 write screen, 4.3 device write proof. 4.4 review gate outstanding",
+    "5": "complete; JSON+TXT exporters and SAF wiring. End-to-end export not yet confirmed by a human",
+    "6": "in progress: verification.md and README.md outstanding"
   },
   "completed_slices": [
     {
@@ -165,16 +169,47 @@
       "title": "Scan haptic feedback (user request, out of plan)",
       "validation": "assembleDebug green",
       "commit": "f4a53da"
+    },
+    {
+      "task": "4.2",
+      "title": "Write screen, arm-and-confirm, text/hex/wipe",
+      "red": "WriteViewModel 17/17 NotImplementedError",
+      "validation": "237/237 green; installed, no crash",
+      "commit": "b0dee53"
+    },
+    {
+      "task": "4.3",
+      "title": "Device write proof",
+      "validation": "wrote \"Shivam Garg\" to pages 04-06, read-back verified; evidence/write-proof.md",
+      "commit": "75ed753"
+    },
+    {
+      "task": "5.1",
+      "title": "JSON and TXT exporters",
+      "red": "Json 14/14 + SessionExporter 13/14 NotImplementedError",
+      "validation": "266/266 green",
+      "commit": "75ed753"
+    },
+    {
+      "task": "5.2",
+      "title": "SAF export wiring",
+      "validation": "assembleDebug green; installed, no crash. End-to-end file open not yet human-confirmed",
+      "commit": "75ed753"
+    },
+    {
+      "task": "6.1a",
+      "title": "Visual verification pass, dark and light",
+      "validation": "6 UI defects found and fixed; evidence/f-*.png",
+      "commit": "411a89c"
     }
   ],
   "remaining_slices": [
-    "4.2 write sheet + expert mode",
-    "4.3 device write proof",
-    "4.4 review gate",
-    "5.1 exporters",
-    "5.2 SAF export",
-    "6.1 full verification incl. dark/light visual check",
-    "6.2 README and closeout"
+    "4.4 review gate (kotlin-reviewer over write path)",
+    "6.1 verification.md recording AC1-AC8 with evidence sources",
+    "6.2 README.md and docs/nfc-primer.md",
+    "D2 add ktlint or Detekt",
+    "HUMAN: export a file and confirm it opens",
+    "HUMAN: pull a card mid-read and confirm partial dump plus reject buzz"
   ],
   "parallel_execution": {
     "used": false,
@@ -189,7 +224,7 @@
   ],
   "test_totals": {
     "suite": "testDebugUnitTest",
-    "tests": 191,
+    "tests": 266,
     "failures": 0
   },
   "reviewer_agents_used": [
@@ -199,20 +234,14 @@
     {
       "id": "D2",
       "item": "no ktlint/Detekt configured",
-      "rationale": "Kotlin rules call for it; adding a linter mid-phase would expand slice scope",
-      "owner_task": "1.8 or 6.1"
+      "rationale": "Kotlin rules call for it",
+      "owner_task": "6.2"
     },
     {
       "id": "D3",
       "item": "ManufacturerTest is characterisation-only, not RED-first",
-      "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented as TDD",
+      "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented",
       "owner_task": "none - accepted"
-    },
-    {
-      "id": "D4",
-      "item": "Phase 3 screens have no visual verification yet (device screen locked at capture time)",
-      "rationale": "compile + launch + no-crash proven; dark/light and layout check needs the user or an unlocked device",
-      "owner_task": "6.1"
     }
   ],
   "blockers": [],
@@ -259,7 +288,15 @@
     "fd4fe1e"
   ],
   "recommended_next_commands": [
-    "visual check of the four screens in dark and light on device",
-    "/aw:build (Phase 4 Task 4.2 - write sheet and expert mode)"
+    "/aw:review (Task 4.4 write path)",
+    "/aw:build (Task 6.1-6.2 verification.md, README, ktlint)"
+  ],
+  "ui_defects_found_by_visual_verification": [
+    "access chip pushed off the right edge, hiding the write verdict",
+    "memory table column header never rendered (strings defined in Task 3.1)",
+    "wasted row padding: only 14 of 16 pages visible",
+    "cleared lock bits rendered as filled chips, reading as set",
+    "colour was the sole carrier of set-vs-clear (bit_set/bit_clear strings unused)",
+    "capability footnote rendered unconditionally, claiming \"not supported\" regardless"
   ]
 }
