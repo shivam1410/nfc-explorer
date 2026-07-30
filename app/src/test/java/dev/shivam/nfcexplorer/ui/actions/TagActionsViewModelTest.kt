@@ -1,11 +1,14 @@
 package dev.shivam.nfcexplorer.ui.actions
 
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
+import dev.shivam.nfcexplorer.domain.action.AppCatalog
+import dev.shivam.nfcexplorer.domain.action.InstalledApp
 import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -44,12 +47,28 @@ class TagActionsViewModelTest {
         }
     }
 
+    /** Every write fails, the way a full disk does. */
+    private class FailingRepository : TagActionRepository {
+        override fun observeAll(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
+        override suspend fun find(uid: ByteBlock): TagAssignment? = null
+        override suspend fun save(assignment: TagAssignment): Unit = throw IOException("disk full")
+        override suspend fun delete(uid: ByteBlock): Unit = throw IOException("disk full")
+    }
+
     private class RecordingPerformer(private val result: Result<Unit> = Result.success(Unit)) :
         ActionPerformer {
         val performed = mutableListOf<TagAction>()
         override fun perform(action: TagAction): Result<Unit> {
             performed += action
             return result
+        }
+    }
+
+    private class FakeCatalog(private val apps: List<InstalledApp>) : AppCatalog {
+        var queryCount = 0
+        override suspend fun launchable(): List<InstalledApp> {
+            queryCount++
+            return apps
         }
     }
 
@@ -62,7 +81,14 @@ class TagActionsViewModelTest {
 
     @AfterTest fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = TagActionsViewModel(repository, performer)
+    private val catalog = FakeCatalog(
+        listOf(
+            InstalledApp("com.google.android.apps.youtube.music", "YouTube Music"),
+            InstalledApp("com.toggl.giskard", "Toggl Track"),
+        ),
+    )
+
+    private fun viewModel() = TagActionsViewModel(repository, performer, catalog)
 
     // --- Draft lifecycle ---
 
@@ -244,7 +270,7 @@ class TagActionsViewModelTest {
     @Test
     fun `a failing test reports a message rather than throwing`() {
         val failing = RecordingPerformer(Result.failure(IllegalStateException("no such app")))
-        val model = TagActionsViewModel(repository, failing)
+        val model = TagActionsViewModel(repository, failing, catalog)
 
         model.onTest(TagAction.LaunchApp("com.absent"))
 
@@ -274,6 +300,140 @@ class TagActionsViewModelTest {
         model.onTestDraft()
 
         assertTrue(performer.performed.isEmpty())
+    }
+
+    // --- A message describes one moment, and must not outlive it ---
+
+    @Test
+    fun `cancelling clears a message left over from a test run`() = runTest(dispatcher) {
+        // "Action performed." still on screen after the editor closes describes something the user has
+        // since walked away from, and there is no way to dismiss it.
+        val model = viewModel()
+        model.onTest(TagAction.MediaCommand(MediaKey.NEXT))
+
+        model.onCancel()
+
+        assertNull(model.state.value.message)
+    }
+
+    @Test
+    fun `deleting clears a message left over from another assignment`() = runTest(dispatcher) {
+        repository.save(TagAssignment(uid, "Desk", TagAction.LaunchApp("a.b")))
+        val model = viewModel()
+        model.onTest(TagAction.LaunchApp("a.b"))
+
+        model.onDelete(uid)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(model.state.value.message)
+    }
+
+    @Test
+    fun `saving clears a message left over from a test run`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Desk", packageName = "com.example.notes"))
+        model.onTestDraft()
+
+        model.onSave()
+        testScheduler.advanceUntilIdle()
+
+        assertNull(model.state.value.message)
+    }
+
+    @Test
+    fun `a save that fails is reported rather than taking the app down`() = runTest(dispatcher) {
+        // DataStore writes can fail on a full or unreadable disk. Every other failure in this feature
+        // reports itself; an unhandled one here would crash the app on a button press.
+        val model = TagActionsViewModel(FailingRepository(), performer, catalog)
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Desk", packageName = "com.example.notes"))
+
+        model.onSave()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(
+            model.state.value.message?.contains("disk full") == true,
+            "got: ${model.state.value.message}",
+        )
+        assertTrue(model.state.value.isEditing, "the editor stays open so the save can be retried")
+    }
+
+    // --- Choosing an app rather than typing its package name ---
+
+    @Test
+    fun `opening the editor offers the installed apps`() = runTest(dispatcher) {
+        // A package name is not something anyone knows by heart, so the editor has to offer the list.
+        val model = viewModel()
+
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf("YouTube Music", "Toggl Track"),
+            model.state.value.apps.map { it.label },
+        )
+    }
+
+    @Test
+    fun `picking an app fills in its package`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        model.onPickApp(InstalledApp("com.toggl.giskard", "Toggl Track"))
+
+        assertEquals("com.toggl.giskard", model.state.value.draft?.packageName)
+    }
+
+    @Test
+    fun `picking an app names the assignment when the label is still empty`() = runTest(dispatcher) {
+        // Having just told the app which app to open, being asked to type its name again is busywork.
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        model.onPickApp(InstalledApp("com.toggl.giskard", "Toggl Track"))
+
+        assertEquals("Toggl Track", model.state.value.draft?.label)
+        assertNull(model.state.value.problem, "a picked app should be immediately saveable")
+    }
+
+    @Test
+    fun `picking an app leaves a label the user chose alone`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+        model.onDraftChange(draft(model, label = "Desk card"))
+
+        model.onPickApp(InstalledApp("com.toggl.giskard", "Toggl Track"))
+
+        assertEquals("Desk card", model.state.value.draft?.label)
+    }
+
+    @Test
+    fun `the app list is filtered by the search query`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        model.onAppQueryChange("toggl")
+
+        assertEquals(listOf("Toggl Track"), model.state.value.visibleApps.map { it.label })
+    }
+
+    @Test
+    fun `the app list is read once and reused`() = runTest(dispatcher) {
+        // Enumerating installed apps hits PackageManager; reopening the editor should not repeat it.
+        val model = viewModel()
+
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+        model.onCancel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, catalog.queryCount)
     }
 
     /** Copies the open draft with overrides, mirroring how the editor mutates it field by field. */

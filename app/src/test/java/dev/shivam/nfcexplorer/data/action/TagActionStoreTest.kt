@@ -5,6 +5,8 @@ import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import dev.shivam.nfcexplorer.logging.LogLevel
+import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,11 +46,15 @@ class TagActionStoreTest {
     private fun bedsideCard() =
         TagAssignment(uidB, "Bedside", TagAction.MediaCommand(MediaKey.PLAY_PAUSE))
 
+    private val logger = SessionLogger { 0L }
+
+    private fun warnings() = logger.entries.value.filter { it.level == LogLevel.WARN }
+
     // --- Save and find ---
 
     @Test
     fun `a saved assignment can be found by its UID`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
 
         store.save(deskCard())
 
@@ -57,7 +63,7 @@ class TagActionStoreTest {
 
     @Test
     fun `an unassigned UID is not found`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
         store.save(deskCard())
 
         assertNull(store.find(uidB))
@@ -65,7 +71,7 @@ class TagActionStoreTest {
 
     @Test
     fun `find matches on UID bytes, not on object identity`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
         store.save(deskCard())
 
         // A freshly constructed ByteBlock with the same bytes must match — on the dispatch path the
@@ -76,7 +82,7 @@ class TagActionStoreTest {
 
     @Test
     fun `saving the same UID replaces rather than duplicates`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
 
         store.save(deskCard(label = "Old"))
         store.save(deskCard(label = "New"))
@@ -88,7 +94,7 @@ class TagActionStoreTest {
 
     @Test
     fun `saving one assignment leaves the others intact`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
 
         store.save(deskCard())
         store.save(bedsideCard())
@@ -102,7 +108,7 @@ class TagActionStoreTest {
 
     @Test
     fun `delete removes only the named assignment`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
         store.save(deskCard())
         store.save(bedsideCard())
 
@@ -115,7 +121,7 @@ class TagActionStoreTest {
     @Test
     fun `deleting an unknown UID is a no-op, not an error`() = runTest {
         val documents = FakeDocumentStore()
-        val store = TagActionStore(documents)
+        val store = TagActionStore(documents, logger)
         store.save(deskCard())
         val writesAfterSave = documents.writeCount
 
@@ -130,7 +136,7 @@ class TagActionStoreTest {
 
     @Test
     fun `observeAll emits the current list and then each change`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
 
         store.observeAll().test {
             assertTrue(awaitItem().isEmpty())
@@ -152,7 +158,7 @@ class TagActionStoreTest {
 
     @Test
     fun `an empty store reports no assignments`() = runTest {
-        val store = TagActionStore(FakeDocumentStore())
+        val store = TagActionStore(FakeDocumentStore(), logger)
 
         assertTrue(store.observeAll().first().isEmpty())
         assertNull(store.find(uidA))
@@ -161,7 +167,7 @@ class TagActionStoreTest {
     @Test
     fun `a corrupt document behaves as though nothing were assigned`() = runTest {
         val documents = FakeDocumentStore()
-        val store = TagActionStore(documents)
+        val store = TagActionStore(documents, logger)
         store.save(deskCard())
 
         documents.corrupt()
@@ -175,12 +181,57 @@ class TagActionStoreTest {
     @Test
     fun `saving over a corrupt document recovers the store`() = runTest {
         val documents = FakeDocumentStore()
-        val store = TagActionStore(documents)
+        val store = TagActionStore(documents, logger)
         documents.corrupt()
 
         store.save(deskCard())
 
         assertEquals("Desk", store.find(uidA)?.label)
+    }
+
+    @Test
+    fun `an unreadable document is reported rather than passing quietly as empty`() = runTest {
+        // Degrading to "nothing assigned" is the right behaviour on the dispatch path, but doing it
+        // silently means a user whose tags all stopped working has nothing to look at. Every other
+        // failure in this app reaches the session log; this one has to as well.
+        val documents = FakeDocumentStore()
+        val store = TagActionStore(documents, logger)
+        store.save(deskCard())
+        documents.corrupt()
+
+        store.find(uidA)
+
+        assertTrue(
+            warnings().any { it.message.contains("could not be read", ignoreCase = true) },
+            "expected a warning, got ${logger.entries.value.map { it.message }}",
+        )
+    }
+
+    @Test
+    fun `overwriting an unreadable document records that something was replaced`() = runTest {
+        // save() merges onto what it can read, so an unreadable document means the new assignment
+        // replaces whatever was there. Recovering the store is worth more than refusing forever, but
+        // the replacement must not be invisible.
+        val documents = FakeDocumentStore()
+        val store = TagActionStore(documents, logger)
+        documents.corrupt()
+
+        store.save(deskCard())
+
+        assertTrue(
+            warnings().any { it.message.contains("could not be read", ignoreCase = true) },
+            "expected a warning, got ${logger.entries.value.map { it.message }}",
+        )
+    }
+
+    @Test
+    fun `an absent document is not reported as a failure`() = runTest {
+        // Nothing assigned yet is the normal state on first run, not a problem to warn about.
+        val store = TagActionStore(FakeDocumentStore(), logger)
+
+        store.find(uidA)
+
+        assertTrue(warnings().isEmpty(), "got ${warnings().map { it.message }}")
     }
 }
 

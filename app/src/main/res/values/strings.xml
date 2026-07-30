@@ -22,7 +22,12 @@
     <string name="scan_disabled_body">Turn NFC on to scan tags.</string>
     <string name="scan_waiting_title">Ready to scan</string>
     <string name="scan_waiting_body">Hold a tag against the back of the device.</string>
-    <string name="scan_reading">Reading page %1$d of %2$d…</string>
+    <!--
+      No page counter: the read pipeline reports no progress, and a format string with arguments
+      nobody supplies renders its own placeholders on screen. If per-page progress is ever plumbed
+      through, the counter comes back with it rather than waiting here for it.
+    -->
+    <string name="scan_reading">Reading tag…</string>
     <string name="scan_failed_title">Read failed</string>
     <string name="scan_captured">Tag captured</string>
     <string name="scan_no_tag_yet">No tag scanned yet. Hold a tag against the back of the device.</string>
@@ -157,7 +162,11 @@
     <string name="actions_type_uri">Open link</string>
     <string name="actions_type_intent">Send intent</string>
     <string name="actions_type_media">Media</string>
-    <string name="actions_package">Package name, e.g. com.google.android.apps.youtube.music</string>
+    <string name="actions_app_search">Search installed apps</string>
+    <string name="actions_app_none">No installed app matches that.</string>
+    <string name="actions_app_loading">Reading installed apps…</string>
+    <string name="actions_app_capped">Showing %1$d of %2$d — keep typing to narrow it down.</string>
+    <string name="actions_app_chosen">Opens %1$s</string>
     <string name="actions_uri">Link, including scheme, e.g. https://…</string>
     <string name="actions_uri_optional">Data URI (optional)</string>
     <string name="actions_intent_action">Intent action, e.g. com.example.DO_THING</string>
@@ -173,6 +182,9 @@
     <string name="actions_problem_no_tag">Scan a tag first.</string>
     <string name="actions_problem_blank_label">Give it a label so you can tell your tags apart.</string>
     <string name="actions_problem_missing_target">This action needs a target.</string>
+    <string name="actions_media_play_pause">Play / pause</string>
+    <string name="actions_media_next">Next track</string>
+    <string name="actions_media_previous">Previous track</string>
     <string name="actions_problem_invalid_uri">Include a scheme, e.g. https:// or myapp://</string>
 
     <!-- Log -->

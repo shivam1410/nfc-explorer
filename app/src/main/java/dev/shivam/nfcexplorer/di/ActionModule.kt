@@ -2,10 +2,13 @@ package dev.shivam.nfcexplorer.di
 
 import dev.shivam.nfcexplorer.data.action.AssignmentDocumentStore
 import dev.shivam.nfcexplorer.data.action.DataStoreAssignmentDocuments
+import dev.shivam.nfcexplorer.data.action.InstalledAppCatalog
 import dev.shivam.nfcexplorer.data.action.TagActionRunner
 import dev.shivam.nfcexplorer.data.action.TagActionStore
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
+import dev.shivam.nfcexplorer.domain.action.AppCatalog
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.logging.SessionLogger
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -24,6 +27,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindActionPerformer(impl: TagActionRunner): ActionPerformer
+
+    @Binds
+    abstract fun bindAppCatalog(impl: InstalledAppCatalog): AppCatalog
 }
 
 @Module
@@ -32,6 +38,8 @@ object ActionProvidersModule {
 
     @Provides
     @Singleton
-    fun provideTagActionRepository(documents: AssignmentDocumentStore): TagActionRepository =
-        TagActionStore(documents)
+    fun provideTagActionRepository(
+        documents: AssignmentDocumentStore,
+        logger: SessionLogger,
+    ): TagActionRepository = TagActionStore(documents, logger)
 }

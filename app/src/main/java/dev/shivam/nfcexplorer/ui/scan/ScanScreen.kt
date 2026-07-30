@@ -73,7 +73,10 @@ fun ScanScreen(
 
             ScanUiState.Reading -> {
                 ScanPulse()
-                Text(stringResource(R.string.scan_captured))
+                // Not "Tag captured": the read is still in flight and may yet fail. Saying it
+                // succeeded while it is running is wrong even when it goes on to succeed, and if the
+                // read stalls the screen sits there claiming a result it never got.
+                Text(stringResource(R.string.scan_reading))
             }
 
             is ScanUiState.Captured -> Text(stringResource(R.string.scan_captured))

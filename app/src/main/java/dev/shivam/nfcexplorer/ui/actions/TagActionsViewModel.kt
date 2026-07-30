@@ -4,15 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
+import dev.shivam.nfcexplorer.domain.action.AppCatalog
+import dev.shivam.nfcexplorer.domain.action.InstalledApp
 import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.action.matching
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 /** Which kind of action the editor is composing. */
@@ -44,9 +48,14 @@ data class TagActionsUiState(
     val draft: ActionDraft? = null,
     val problem: DraftProblem? = null,
     val message: String? = null,
+    val apps: List<InstalledApp> = emptyList(),
+    val appQuery: String = "",
 ) {
     val isEditing: Boolean get() = draft != null
     val canSave: Boolean get() = draft != null && problem == null
+
+    /** The apps worth showing for what has been typed so far. Derived, so it cannot fall out of step. */
+    val visibleApps: List<InstalledApp> get() = apps.matching(appQuery)
 }
 
 /**
@@ -61,6 +70,7 @@ data class TagActionsUiState(
 class TagActionsViewModel @Inject constructor(
     private val repository: TagActionRepository,
     private val performer: ActionPerformer,
+    private val catalog: AppCatalog,
 ) : ViewModel() {
 
     private val backing = MutableStateFlow(TagActionsUiState())
@@ -82,15 +92,49 @@ class TagActionsViewModel @Inject constructor(
         }
         val draft = ActionDraft(uid = uid)
         backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
+        loadApps()
     }
 
     fun onEdit(assignment: TagAssignment) {
         val draft = assignment.toDraft()
         backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
+        loadApps()
+    }
+
+    fun onAppQueryChange(query: String) {
+        backing.value = backing.value.copy(appQuery = query)
+    }
+
+    /**
+     * Points the draft at [app].
+     *
+     * Also names the assignment after it when the label is still empty: having just chosen which app to
+     * open, being asked to type its name again is busywork. A label the user typed is left alone.
+     */
+    fun onPickApp(app: InstalledApp) {
+        val draft = backing.value.draft ?: return
+        val picked = draft.copy(
+            packageName = app.packageName,
+            label = draft.label.ifBlank { app.label },
+        )
+        backing.value = backing.value.copy(draft = picked, problem = problemOf(picked))
+    }
+
+    /**
+     * Reads the app list once and keeps it.
+     *
+     * Enumerating launchable apps is hundreds of `PackageManager` round trips, and it cannot change
+     * while the editor is open in front of the user.
+     */
+    private fun loadApps() {
+        if (backing.value.apps.isNotEmpty()) return
+        viewModelScope.launch {
+            backing.value = backing.value.copy(apps = catalog.launchable())
+        }
     }
 
     fun onCancel() {
-        backing.value = backing.value.copy(draft = null, problem = null)
+        backing.value = backing.value.copy(draft = null, problem = null, message = null)
     }
 
     fun onDraftChange(draft: ActionDraft) {
@@ -104,13 +148,43 @@ class TagActionsViewModel @Inject constructor(
         val uid = draft.uid ?: return
 
         viewModelScope.launch {
-            repository.save(TagAssignment(uid = uid, label = draft.label.trim(), action = action))
-            backing.value = backing.value.copy(draft = null, problem = null)
+            val assignment = TagAssignment(uid = uid, label = draft.label.trim(), action = action)
+            report({ repository.save(assignment) }) {
+                backing.value = backing.value.copy(draft = null, problem = null, message = null)
+            }
         }
     }
 
     fun onDelete(uid: ByteBlock) {
-        viewModelScope.launch { repository.delete(uid) }
+        viewModelScope.launch {
+            report({ repository.delete(uid) }) {
+                // Any message on screen described the assignment that is now gone.
+                backing.value = backing.value.copy(message = null)
+            }
+        }
+    }
+
+    /**
+     * Runs a store write, reporting a failure instead of letting it escape.
+     *
+     * A `DataStore` write can fail on a full or unreadable disk. Unhandled, that leaves
+     * `viewModelScope` with nothing to catch it and the app dies on a button press — so it is reported
+     * the same way a failed action is, and the editor stays open so the save can be retried.
+     *
+     * [IOException] and no wider. A store that fails any other way is a bug in this app rather than a
+     * condition of the device, and turning that into a line of text on screen would hide it. Nothing
+     * needs to be done about [kotlinx.coroutines.CancellationException] either — it is not an
+     * [IOException], so it propagates and structured concurrency still works.
+     */
+    private suspend fun report(write: suspend () -> Unit, onSuccess: () -> Unit) {
+        try {
+            write()
+            onSuccess()
+        } catch (failure: IOException) {
+            backing.value = backing.value.copy(
+                message = "${failure::class.simpleName}: ${failure.message}",
+            )
+        }
     }
 
     fun onTest(action: TagAction) {
