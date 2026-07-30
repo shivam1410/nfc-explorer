@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import dev.shivam.nfcexplorer.R
 import dev.shivam.nfcexplorer.ui.theme.HexSecondaryTextStyle
 import dev.shivam.nfcexplorer.ui.theme.HexTextStyle
 import dev.shivam.nfcexplorer.ui.theme.PageIndexTextStyle
@@ -49,13 +51,10 @@ fun HexPageRow(
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = 4.dp),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .clearAndSetSemantics {
                     contentDescription = describe(pageLabel, hex, statusText, accessLabel)
@@ -66,22 +65,24 @@ fun HexPageRow(
                 text = pageLabel,
                 style = PageIndexTextStyle,
                 color = scheme.onSurfaceVariant,
-                modifier = Modifier.width(32.dp),
+                modifier = Modifier.width(PAGE_COLUMN_WIDTH),
             )
             Text(
                 text = hex ?: (statusText ?: ""),
                 style = HexTextStyle,
                 color = hexColor,
-                modifier = Modifier.width(124.dp),
+                modifier = Modifier.width(HEX_COLUMN_WIDTH),
             )
+            // The access verdict sits before the secondary column, not after it. It decides whether
+            // the user may write this page, so it has to stay on screen without horizontal
+            // scrolling — the binary view is wide enough to push a trailing chip out of sight.
+            StatusChip(text = accessLabel, tone = accessTone)
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = secondary.orEmpty(),
                 style = HexSecondaryTextStyle,
                 color = scheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            StatusChip(text = accessLabel, tone = accessTone)
         }
 
         AnimatedVisibility(visible = expandedDetail != null) {
@@ -89,9 +90,42 @@ fun HexPageRow(
                 text = expandedDetail.orEmpty(),
                 style = HexSecondaryTextStyle,
                 color = scheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 32.dp, top = 2.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = PAGE_COLUMN_WIDTH, bottom = 8.dp),
             )
         }
+    }
+}
+
+/** Column widths, shared with [HexPageHeader] so the header lines up with the rows exactly. */
+val PAGE_COLUMN_WIDTH = 34.dp
+val HEX_COLUMN_WIDTH = 128.dp
+
+/**
+ * Column captions for the memory table.
+ *
+ * Without these the leading two-digit column reads as data rather than as an address, which is a
+ * genuine ambiguity in a table where every cell is hex.
+ */
+@Composable
+fun HexPageHeader(secondaryLabel: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = stringResource(R.string.memory_column_page),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(PAGE_COLUMN_WIDTH),
+        )
+        Text(
+            text = stringResource(R.string.memory_column_hex),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(HEX_COLUMN_WIDTH),
+        )
+        Text(
+            text = secondaryLabel.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

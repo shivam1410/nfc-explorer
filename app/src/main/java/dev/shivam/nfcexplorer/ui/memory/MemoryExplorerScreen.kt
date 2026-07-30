@@ -28,6 +28,7 @@ import dev.shivam.nfcexplorer.domain.decoder.MemoryRenderer
 import dev.shivam.nfcexplorer.domain.model.PageSnapshot
 import dev.shivam.nfcexplorer.domain.model.TagReport
 import dev.shivam.nfcexplorer.ui.component.ChipTone
+import dev.shivam.nfcexplorer.ui.component.HexPageHeader
 import dev.shivam.nfcexplorer.ui.component.HexPageRow
 import dev.shivam.nfcexplorer.ui.labels.labelRes
 import dev.shivam.nfcexplorer.ui.labels.tone
@@ -83,6 +84,12 @@ fun MemoryExplorerScreen(report: TagReport, modifier: Modifier = Modifier) {
                 .horizontalScroll(rememberScrollState()),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
         ) {
+            item {
+                HexPageHeader(
+                    secondaryLabel = stringResource(view.labelRes),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
             items(report.memory.pages, key = PageSnapshot::index) { page ->
                 val access = report.locks.accessFor(page.index)
                 HexPageRow(
@@ -102,7 +109,6 @@ fun MemoryExplorerScreen(report: TagReport, modifier: Modifier = Modifier) {
                     onClick = {
                         expandedPage = if (expandedPage == page.index) null else page.index
                     },
-                    modifier = Modifier.width(TABLE_WIDTH),
                 )
             }
         }
@@ -120,5 +126,3 @@ private fun detailFor(page: PageSnapshot, view: SecondaryView): String? {
     }
     return lines.joinToString("\n").ifEmpty { null }
 }
-
-private val TABLE_WIDTH = 560.dp
