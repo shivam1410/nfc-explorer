@@ -29,6 +29,9 @@ import dev.shivam.nfcexplorer.domain.decoder.MemoryRenderer
 import dev.shivam.nfcexplorer.domain.model.TagReport
 import dev.shivam.nfcexplorer.domain.repository.TagRepository
 import dev.shivam.nfcexplorer.logging.SessionLogcatMirror
+import dev.shivam.nfcexplorer.ui.haptics.ScanFeedback
+import dev.shivam.nfcexplorer.ui.haptics.ScanHapticFeedback
+import dev.shivam.nfcexplorer.ui.haptics.ScanHapticSignal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -52,6 +55,15 @@ class MainActivity : ComponentActivity() {
 
     private val probeState = MutableStateFlow<ProbeState>(ProbeState.Starting)
 
+    private val hapticSignal = MutableStateFlow<ScanHapticSignal?>(null)
+
+    /**
+     * Monotonic, so two identical scans of the same card still produce two distinct signals.
+     * Without it the second tap would feel dead: `ProbeState.Captured` is a data class and would
+     * compare equal across identical dumps.
+     */
+    private var hapticToken = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -68,6 +80,10 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Scaffold { innerPadding ->
                     val state by probeState.collectAsStateWithLifecycle()
+                    val signal by hapticSignal.collectAsStateWithLifecycle()
+
+                    ScanHapticFeedback(signal)
+
                     ProbeContent(
                         state = state,
                         modifier = Modifier
@@ -90,12 +106,23 @@ class MainActivity : ComponentActivity() {
                 probeState.value = ProbeState.WaitingForTag
                 readerMode.tagHandles(this@MainActivity).collect { handle ->
                     probeState.value = ProbeState.Reading
+                    buzz(ScanFeedback.DETECTED)
                     repository.read(handle)
-                        .onSuccess { probeState.value = ProbeState.Captured(it) }
-                        .onFailure { probeState.value = ProbeState.Failed(it) }
+                        .onSuccess {
+                            probeState.value = ProbeState.Captured(it)
+                            buzz(ScanFeedback.CAPTURED)
+                        }
+                        .onFailure {
+                            probeState.value = ProbeState.Failed(it)
+                            buzz(ScanFeedback.FAILED)
+                        }
                 }
             }
         }
+    }
+
+    private fun buzz(feedback: ScanFeedback) {
+        hapticSignal.value = ScanHapticSignal(feedback, token = hapticToken++)
     }
 
     private sealed interface ProbeState {
