@@ -302,6 +302,104 @@ class TagActionsViewModelTest {
         assertTrue(performer.performed.isEmpty())
     }
 
+    // --- A link needs a scheme, so the editor supplies one ---
+
+    @Test
+    fun `choosing open link starts the URI with https`() = runTest(dispatcher) {
+        // Every link needs a scheme and https is the right default, so requiring it to be typed only
+        // creates the "include a scheme" error the user then has to read and fix.
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.OPEN_URI)
+
+        assertEquals("https://", model.state.value.draft?.uri)
+    }
+
+    @Test
+    fun `choosing open link leaves a URI that is already there alone`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, type = ActionType.OPEN_URI, uri = "myapp://thing"))
+
+        model.onTypeChange(ActionType.OPEN_URI)
+
+        assertEquals("myapp://thing", model.state.value.draft?.uri)
+    }
+
+    @Test
+    fun `choosing launch app does not invent a URI`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.LAUNCH_APP)
+
+        assertEquals("", model.state.value.draft?.uri)
+    }
+
+    @Test
+    fun `switching the scheme rewrites it and keeps the rest of the link`() = runTest(dispatcher) {
+        // The wa.me lesson: http bounces through a browser redirect that can drop the ?text= payload,
+        // and retyping the whole link to change four characters is busywork.
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(
+            draft(model, type = ActionType.OPEN_URI, uri = "https://wa.me/91?text=Hi%20there"),
+        )
+
+        model.onSchemeChange("http://")
+
+        assertEquals("http://wa.me/91?text=Hi%20there", model.state.value.draft?.uri)
+    }
+
+    @Test
+    fun `switching the scheme adds one to a link that has none`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, type = ActionType.OPEN_URI, uri = "wa.me/91"))
+
+        model.onSchemeChange("https://")
+
+        assertEquals("https://wa.me/91", model.state.value.draft?.uri)
+    }
+
+    // --- The chosen app is named, not spelled out as a package ---
+
+    @Test
+    fun `the chosen app is described by its name`() = runTest(dispatcher) {
+        // A package name is what gets stored, not what should be read back to the user.
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        model.onPickApp(InstalledApp("com.toggl.giskard", "Toggl Track"))
+
+        assertEquals("Toggl Track", model.state.value.labelFor("com.toggl.giskard"))
+    }
+
+    @Test
+    fun `the app list is ready before any editor is opened`() = runTest(dispatcher) {
+        // The assignment cards name the app too, and they are on screen before anything is edited. If
+        // the list only loaded with the editor, every card would read as a raw package until the user
+        // happened to open one.
+        val model = viewModel()
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Toggl Track", model.state.value.labelFor("com.toggl.giskard"))
+    }
+
+    @Test
+    fun `an app that is no longer installed falls back to its package`() = runTest(dispatcher) {
+        // An assignment outlives an uninstall, and showing nothing would be worse than showing the
+        // package it still points at.
+        val model = viewModel()
+        model.onCreateFor(uid)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("com.gone.app", model.state.value.labelFor("com.gone.app"))
+    }
+
     // --- A message describes one moment, and must not outlive it ---
 
     @Test

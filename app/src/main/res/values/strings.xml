@@ -165,8 +165,8 @@
     <string name="actions_app_search">Search installed apps</string>
     <string name="actions_app_none">No installed app matches that.</string>
     <string name="actions_app_loading">Reading installed apps…</string>
-    <string name="actions_app_capped">Showing %1$d of %2$d — keep typing to narrow it down.</string>
     <string name="actions_app_chosen">Opens %1$s</string>
+    <string name="actions_app_none_chosen">Tap to choose an app.</string>
     <string name="actions_uri">Link, including scheme, e.g. https://…</string>
     <string name="actions_uri_optional">Data URI (optional)</string>
     <string name="actions_intent_action">Intent action, e.g. com.example.DO_THING</string>

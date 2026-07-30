@@ -165,6 +165,8 @@ fun NfcExplorerNavHost(
                     onTestDraft = actionsViewModel::onTestDraft,
                     onAppQueryChange = actionsViewModel::onAppQueryChange,
                     onPickApp = actionsViewModel::onPickApp,
+                    onTypeChange = actionsViewModel::onTypeChange,
+                    onSchemeChange = actionsViewModel::onSchemeChange,
                 )
             }
             composable(Destination.LOG.route) {
