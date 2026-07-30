@@ -2,7 +2,9 @@ package dev.shivam.nfcexplorer.di
 
 import dev.shivam.nfcexplorer.data.action.AssignmentDocumentStore
 import dev.shivam.nfcexplorer.data.action.DataStoreAssignmentDocuments
+import dev.shivam.nfcexplorer.data.action.TagActionRunner
 import dev.shivam.nfcexplorer.data.action.TagActionStore
+import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dagger.Binds
 import dagger.Module
@@ -19,6 +21,9 @@ abstract class ActionBindingsModule {
     abstract fun bindAssignmentDocuments(
         impl: DataStoreAssignmentDocuments,
     ): AssignmentDocumentStore
+
+    @Binds
+    abstract fun bindActionPerformer(impl: TagActionRunner): ActionPerformer
 }
 
 @Module
