@@ -12,23 +12,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * Semantic tone of a chip. Maps to the app-wide colour roles.
- */
-enum class ChipTone {
-    /** Writable, valid, supported. */
-    POSITIVE,
-
-    /** Locked, invalid, failed. */
-    NEGATIVE,
-
-    /** One-way or irreversible — caution rather than failure. */
-    CAUTION,
-
-    /** Read-only, absent, not established. Deliberately quiet. */
-    NEUTRAL,
-}
-
-/**
  * A compact status label.
  *
  * [NEUTRAL] renders outlined rather than filled, so "not supported by this chip" reads as an

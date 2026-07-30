@@ -4,6 +4,22 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.detekt)
+}
+
+/**
+ * Detekt rather than ktlint, chosen after ktlint was tried and reverted.
+ *
+ * ktlint's default ruleset produced 628 findings here, of which 5 were real: 479 were pure wrapping
+ * and signature preference, and 29 flagged every @Composable for being PascalCase, which is the
+ * correct Compose convention. Detekt targets code smells rather than formatting, so it does not
+ * fight the framework's naming or generate hundreds of layout opinions.
+ */
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("$rootDir/config/detekt.yml"))
+    // Kotlin lives under src/main/java in an Android project.
+    source.setFrom(files("src/main/java", "src/test/java"))
 }
 
 android {
