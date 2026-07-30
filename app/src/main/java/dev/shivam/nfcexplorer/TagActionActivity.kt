@@ -19,7 +19,9 @@ import dev.shivam.nfcexplorer.domain.action.TagPresence
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.transport.TagTransport
 import dev.shivam.nfcexplorer.logging.SessionLogger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -66,51 +68,75 @@ class TagActionActivity : ComponentActivity() {
             return
         }
 
-        // Proven before the store is even consulted, so a caller that cannot produce a live tag learns
-        // nothing about what is assigned.
-        val presence = TagPresence.check(transportFor(tag))
-
         lifecycleScope.launch {
-            val assignment = repository.find(uid)
-            val permitted = TagActionDispatch.shouldAct(
-                intentAction = intent?.action,
-                presence = presence,
-                assignment = assignment,
-            )
+            act(tag, uid)
+            finish()
+        }
+    }
 
-            if (permitted && assignment != null) {
+    /**
+     * Decides whether this launch may run an action, and runs it.
+     *
+     * Separate from `onCreate` so the guard, the store lookup and the three outcomes read as one
+     * sequence instead of being buried in lifecycle code.
+     */
+    private suspend fun act(tag: Tag, uid: ByteBlock) {
+        // Proven before the store is even consulted, so a caller that cannot produce a live tag learns
+        // nothing about what is assigned. On Dispatchers.IO because this is a blocking exchange with
+        // the tag, the same as every other read in this app.
+        val presence = withContext(Dispatchers.IO) { TagPresence.check(transportFor(tag)) }
+        val assignment = repository.find(uid)
+        val permitted = TagActionDispatch.shouldAct(
+            intentAction = intent?.action,
+            presence = presence,
+            assignment = assignment,
+        )
+
+        when {
+            permitted && assignment != null -> {
                 logger.info(
                     category = CATEGORY,
                     message = "running assigned action",
                     payload = mapOf("uid" to uid.toString(), "label" to assignment.label),
                 )
-                performer.perform(assignment.action)
-                    .onFailure { failure ->
-                        logger.error(
-                            category = CATEGORY,
-                            message = "action failed",
-                            payload = mapOf(
-                                "label" to assignment.label,
-                                "exception" to (failure::class.simpleName ?: "Throwable"),
-                                "message" to (failure.message ?: ""),
-                            ),
-                        )
-                    }
-            } else {
-                // Unassigned tag, or a caller that is not a genuine dispatch. Silent either way.
-                logger.info(
-                    category = CATEGORY,
-                    message = "no action taken",
-                    payload = mapOf(
-                        "uid" to uid.toString(),
-                        "action" to (intent?.action ?: "none"),
-                        "assigned" to (assignment != null).toString(),
-                        "tagAnswered" to (presence is TagPresence.Answer.Live).toString(),
-                        "presence" to presenceDetail(presence),
-                    ),
-                )
+                performer.perform(assignment.action).onFailure { failure ->
+                    logger.error(
+                        category = CATEGORY,
+                        message = "action failed",
+                        payload = mapOf(
+                            "label" to assignment.label,
+                            "exception" to (failure::class.simpleName ?: "Throwable"),
+                            "message" to (failure.message ?: ""),
+                        ),
+                    )
+                }
             }
-            finish()
+
+            // An assignment existed and was refused, so presence failed. Distinguished from the
+            // unassigned case and raised to a warning on purpose: this is the one way the presence
+            // check can spoil a legitimate tap, and it must be obvious in the log rather than
+            // inferable from it.
+            assignment != null -> logger.warn(
+                category = CATEGORY,
+                message = "refused a tag that has an assignment",
+                payload = mapOf(
+                    "uid" to uid.toString(),
+                    "label" to assignment.label,
+                    "action" to (intent?.action ?: "none"),
+                    "presence" to presenceDetail(presence),
+                ),
+            )
+
+            // Unassigned tag, or a caller that is not a genuine dispatch. Silent either way.
+            else -> logger.info(
+                category = CATEGORY,
+                message = "no action taken",
+                payload = mapOf(
+                    "uid" to uid.toString(),
+                    "action" to (intent?.action ?: "none"),
+                    "presence" to presenceDetail(presence),
+                ),
+            )
         }
     }
 

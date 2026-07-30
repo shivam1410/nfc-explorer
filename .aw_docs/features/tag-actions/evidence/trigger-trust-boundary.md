@@ -71,3 +71,48 @@ configured themselves. They cannot introduce a new one.
 instant it was discovered will fail it and the action will not run. Accepted: the failure mode is
 "nothing happened", it is logged with the cause, and a second tap fixes it. The alternative was a guard
 that could not tell a tap from a hostile intent.
+
+---
+
+# The crash this exposed — `Theme.NoDisplay`
+
+Reported from the field on the first real tap of an assigned tag: a buzz, then "NFC Explorer keeps
+stopping".
+
+```
+java.lang.RuntimeException: Unable to resume activity {dev.shivam.nfcexplorer/.TagActionActivity}
+Caused by: java.lang.IllegalStateException: Activity {…TagActionActivity}
+    did not call finish() prior to onResume() completing
+    at android.app.Activity.performResume(Activity.java:9516)
+```
+
+`Theme.NoDisplay` is not merely "draw nothing" — it is a contract that `finish()` happens before
+`onResume()` returns, and the platform enforces it by throwing. The trigger has to read the assignment
+store before it knows whether to act, which suspends, so `finish()` always landed after `onResume`.
+
+**This was latent from the moment the activity was written.** The presence check did not cause it; it
+widened the pre-suspension window enough to make it fire every time. The reason nobody saw it earlier is
+that every test of this activity used a launch with *no* tag, which returns and finishes synchronously —
+the one path that satisfies the contract. Phase 5, the tap on a real assigned tag, had never been run.
+
+Fixed by `Theme.NfcExplorer.Trigger`, a translucent theme: same invisibility, no such contract.
+
+Verified: the trigger launched over the app drawer draws no frame at all — the drawer stays fully
+visible, no NFC Explorer UI, and the crash buffer is empty afterwards. Not yet verified: the async
+finish itself, because reproducing it needs a real tag in the field. That is the tap this file is
+waiting on.
+
+Also moved the tag exchange to `Dispatchers.IO`. It was running on the main thread, which is wrong for
+a blocking NFC exchange regardless of the crash.
+
+## The log line to look for next
+
+A refused tap and an unassigned tap used to log the same way, so a failed tap could not be told from a
+tap on the wrong card. Presence failing on an assigned tag now logs at WARN:
+
+```
+refused a tag that has an assignment  {uid=…, label=…, presence=did not answer: …}
+```
+
+That is the signal that decides whether the presence check is affordable on real hardware. If it appears
+on ordinary taps, the gate is too strict and the trade-off recorded above has to be revisited.

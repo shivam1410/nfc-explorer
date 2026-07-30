@@ -45,8 +45,10 @@
           exported="true" is REQUIRED for NFC dispatch to reach it, which also means any app can
           start it. TagActionDispatch.shouldAct is the guard; see TagActionDispatchTest.
 
-          NoDisplay + excludeFromRecents + noHistory so a tap never shows a frame or leaves a task
-          behind. The tech filter is narrowed to NfcA/MifareUltralight rather than using
+          Theme.NfcExplorer.Trigger + excludeFromRecents + noHistory so a tap never shows a frame or
+          leaves a task behind. NOT Theme.NoDisplay: that requires finish() before onResume() returns,
+          which an activity that must read a store and connect to a tag first cannot do — see the
+          theme's own comment. The tech filter is narrowed to NfcA/MifareUltralight rather than using
           TAG_DISCOVERED, so the app claims fewer unrelated tags.
         -->
         <activity
@@ -55,7 +57,7 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:taskAffinity=""
-            android:theme="@android:style/Theme.NoDisplay">
+            android:theme="@style/Theme.NfcExplorer.Trigger">
             <intent-filter>
                 <action android:name="android.nfc.action.TECH_DISCOVERED" />
             </intent-filter>
