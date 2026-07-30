@@ -180,6 +180,33 @@ class SessionExporterTest {
         assertTrue(output.isNotBlank())
     }
 
+    @Test
+    fun `text export does not leak kotlin data class toString`() {
+        // The TXT format is the human-readable one. "Known(code=4, name=...)" and
+        // "NotSupportedByChip(introducedIn=...)" are debug representations that happen to compile,
+        // not output anyone wants to read in a file.
+        val output = text()
+
+        assertFalse(output.contains("Known("), output)
+        assertFalse(output.contains("Unknown("), output)
+        assertFalse(output.contains("NotSupportedByChip("), output)
+        assertFalse(output.contains("Present("), output)
+    }
+
+    @Test
+    fun `text export has no trailing whitespace on any line`() {
+        // Column padding left ragged spaces at end of line, which shows up as soon as the file is
+        // opened in an editor that highlights it, and breaks naive diffing between two exports.
+        val offenders = text().lines().filter { it != it.trimEnd() }
+
+        assertTrue(offenders.isEmpty(), "lines with trailing whitespace: $offenders")
+    }
+
+    @Test
+    fun `text export names the manufacturer readably`() {
+        assertTrue(text().contains("NXP Semiconductors (0x04)"), text())
+    }
+
     // --- Format metadata ---
 
     @Test

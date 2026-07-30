@@ -1,0 +1,82 @@
+NFC Explorer — session export
+exportedAtMillis  1785419822255
+
+IDENTITY
+------------------------------------------------------------------------
+UID           04 1C 4E 52 CE 7C 80
+UID length    7 bytes
+Cascade       2
+Manufacturer  Known(code=4, name=NXP Semiconductors)
+ATQA          44 00
+SAK           00
+BCC0          valid (DE)
+BCC1          valid (60)
+
+CHIP
+------------------------------------------------------------------------
+Vendor        NXP Semiconductors
+Chip          not confirmed
+Family        MIFARE Ultralight
+Geometry      16 pages x 4 B (floor, unconfirmed)
+
+MEMORY  16/16 pages read
+------------------------------------------------------------------------
+00  04 1C 4E DE    ··N·  
+01  52 CE 7C 80    R·|·  
+02  60 48 00 00    `H··  
+03  8E 00 1C 0C    ····  
+04  53 68 69 76    Shiv  
+05  61 6D 20 47    am G  
+06  61 72 67 00    arg·  
+07  00 00 00 00    ····  
+08  00 00 00 00    ····  
+09  00 00 00 00    ····  
+0A  00 00 00 00    ····  
+0B  00 00 00 00    ····  
+0C  00 00 00 00    ····  
+0D  00 00 00 00    ····  
+0E  00 00 00 00    ····  
+0F  00 00 00 00    ····  
+
+LOCK ANALYSIS
+------------------------------------------------------------------------
+Lock bytes    00 00
+Locked pages  none
+Writable      [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  L_OTP    page 03  clear
+  L_4      page 04  clear
+  L_5      page 05  clear
+  L_6      page 06  clear
+  L_7      page 07  clear
+  L_8      page 08  clear
+  L_9      page 09  clear
+  L_10     page 0A  clear
+  L_11     page 0B  clear
+  L_12     page 0C  clear
+  L_13     page 0D  clear
+  L_14     page 0E  clear
+  L_15     page 0F  clear
+  BL_OTP   freezes 03-03  clear
+  BL_9_4   freezes 04-09  clear
+  BL_15_10 freezes 0A-0F  clear
+Dynamic lock  NotSupportedByChip(introducedIn=MIFARE Ultralight EV1 / NTAG21x)
+
+SESSION LOG
+------------------------------------------------------------------------
+[0] 1785419601618 INFO session: tag discovered
+        uid = 04 1C 4E 52 CE 7C 80
+        technologies = 2
+        chip = MIFARE Ultralight
+        geometryConfirmed = false
+[1] 1785419601703 INFO read: dump finished
+        pagesRead = 16
+        pagesTotal = 16
+        complete = true
+[2] 1785419601705 INFO read: memory image
+        image = 00:04 1C 4E DE | 01:52 CE 7C 80 | 02:60 48 00 00 | 03:8E 00 1C 0C | 04:53 68 69 76 | 05:61 6D 20 47 | 06:61 72 67 00 | 07:00 00 00 00 | 08:00 00 00 00 | 09:00 00 00 00 | 0A:00 00 00 00 | 0B:00 00 00 00 | 0C:00 00 00 00 | 0D:00 00 00 00 | 0E:00 00 00 00 | 0F:00 00 00 00
+[3] 1785419601706 INFO read: lock state
+        lockBytes = 00 00
+        lockedPages = 
+        writablePages = 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+        bcc0 = valid
+        bcc1 = valid

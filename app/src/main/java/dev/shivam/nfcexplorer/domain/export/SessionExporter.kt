@@ -197,7 +197,11 @@ object TextSessionExporter : SessionExporter {
         } else {
             entries.forEach { entry ->
                 appendLine("[${entry.sequence}] ${entry.timestampMillis} ${entry.level} ${entry.category}: ${entry.message}")
-                entry.payload.forEach { (key, value) -> appendLine("        $key = $value") }
+                // trimEnd because a payload value can legitimately be empty (an empty locked-page
+                // list, say). The exporter guarantees clean lines whatever it is handed.
+                entry.payload.forEach { (key, value) ->
+                    appendLine("        $key = $value".trimEnd())
+                }
             }
         }
     }
@@ -209,7 +213,7 @@ object TextSessionExporter : SessionExporter {
         appendLine("UID           ${identity.uid}")
         appendLine("UID length    ${identity.uidLength} bytes")
         appendLine("Cascade       ${identity.cascadeLevels ?: "unknown"}")
-        appendLine("Manufacturer  ${identity.manufacturer}")
+        appendLine("Manufacturer  ${readable(identity.manufacturer)}")
         appendLine("ATQA          ${identity.atqa ?: "not established"}")
         appendLine(
             "SAK           " +
@@ -218,6 +222,21 @@ object TextSessionExporter : SessionExporter {
         appendLine("BCC0          ${bccLine(identity.bcc0)}")
         appendLine("BCC1          ${bccLine(identity.bcc1)}")
         appendLine()
+    }
+
+    /**
+     * TXT is the human-readable format, so nothing may fall through to a data class `toString`.
+     * `Known(code=4, name=NXP Semiconductors)` compiles fine and reads terribly.
+     */
+    private fun readable(manufacturer: Manufacturer): String = when (manufacturer) {
+        is Manufacturer.Known -> "${manufacturer.name} (0x%02X)".format(manufacturer.code)
+        is Manufacturer.Unknown -> "unregistered (0x%02X)".format(manufacturer.code)
+    }
+
+    private fun readable(support: DynamicLockSupport): String = when (support) {
+        is DynamicLockSupport.NotSupportedByChip ->
+            "not supported by this chip (introduced with ${support.introducedIn})"
+        is DynamicLockSupport.Present -> support.bytes.toString()
     }
 
     private fun bccLine(check: BccCheck?): String = when {
@@ -248,7 +267,7 @@ object TextSessionExporter : SessionExporter {
             val hex = MemoryRenderer.hex(page) ?: "?? ?? ?? ??"
             val ascii = MemoryRenderer.ascii(page) ?: ""
             val note = if (page.isReadable) "" else "  (${page.status})"
-            appendLine("%02X  %-14s %-6s%s".format(page.index, hex, ascii, note))
+            appendLine("%02X  %-14s %-6s%s".format(page.index, hex, ascii, note).trimEnd())
         }
         appendLine()
     }
@@ -278,7 +297,7 @@ object TextSessionExporter : SessionExporter {
                 ),
             )
         }
-        appendLine("Dynamic lock  ${locks.dynamicLockSupport}")
+        appendLine("Dynamic lock  ${readable(locks.dynamicLockSupport)}")
         appendLine()
     }
 }
