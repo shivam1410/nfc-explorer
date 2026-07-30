@@ -1,7 +1,8 @@
 package dev.shivam.nfcexplorer.ui.actions
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -11,15 +12,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
@@ -30,6 +44,7 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.ui.component.SectionCard
 import dev.shivam.nfcexplorer.ui.theme.HexTextStyle
+import androidx.core.graphics.drawable.toBitmap
 
 /**
  * Manage which tag does what.
@@ -51,6 +66,8 @@ fun TagActionsScreen(
     onTestDraft: () -> Unit,
     onAppQueryChange: (String) -> Unit,
     onPickApp: (InstalledApp) -> Unit,
+    onTypeChange: (ActionType) -> Unit,
+    onSchemeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -90,6 +107,8 @@ fun TagActionsScreen(
                 onTestDraft = onTestDraft,
                 onAppQueryChange = onAppQueryChange,
                 onPickApp = onPickApp,
+                onTypeChange = onTypeChange,
+                onSchemeChange = onSchemeChange,
             )
         }
 
@@ -111,6 +130,7 @@ fun TagActionsScreen(
             state.assignments.forEach { assignment ->
                 AssignmentCard(
                     assignment = assignment,
+                    appNameOf = state::labelFor,
                     onEdit = { onEdit(assignment) },
                     onDelete = { onDelete(assignment.uid) },
                     onTest = { onTest(assignment.action) },
@@ -123,11 +143,12 @@ fun TagActionsScreen(
 @Composable
 private fun AssignmentCard(
     assignment: TagAssignment,
+    appNameOf: (String) -> String,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onTest: () -> Unit,
 ) {
-    SectionCard(title = assignment.label, subtitle = summarise(assignment.action)) {
+    SectionCard(title = assignment.label, subtitle = summarise(assignment.action, appNameOf)) {
         Text(text = assignment.uid.toString(), style = HexTextStyle)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onTest) { Text(stringResource(R.string.actions_test)) }
@@ -147,6 +168,8 @@ private fun DraftEditor(
     onTestDraft: () -> Unit,
     onAppQueryChange: (String) -> Unit,
     onPickApp: (InstalledApp) -> Unit,
+    onTypeChange: (ActionType) -> Unit,
+    onSchemeChange: (String) -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -170,7 +193,7 @@ private fun DraftEditor(
             ActionType.entries.forEach { type ->
                 FilterChip(
                     selected = draft.type == type,
-                    onClick = { onDraftChange(draft.copy(type = type)) },
+                    onClick = { onTypeChange(type) },
                     label = { Text(stringResource(type.labelRes())) },
                 )
             }
@@ -184,14 +207,28 @@ private fun DraftEditor(
                 onPick = onPickApp,
             )
 
-            ActionType.OPEN_URI -> OutlinedTextField(
-                value = draft.uri,
-                onValueChange = { onDraftChange(draft.copy(uri = it)) },
-                label = { Text(stringResource(R.string.actions_uri)) },
-                isError = state.problem == DraftProblem.MISSING_TARGET ||
-                    state.problem == DraftProblem.INVALID_URI,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            ActionType.OPEN_URI -> {
+                // Offered rather than typed. https is the default and http is one tap away, which is
+                // the difference between a wa.me link that carries its ?text= payload and one that
+                // loses it to a redirect.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LINK_SCHEMES.forEach { scheme ->
+                        FilterChip(
+                            selected = draft.uri.startsWith(scheme),
+                            onClick = { onSchemeChange(scheme) },
+                            label = { Text(scheme) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = draft.uri,
+                    onValueChange = { onDraftChange(draft.copy(uri = it)) },
+                    label = { Text(stringResource(R.string.actions_uri)) },
+                    isError = state.problem == DraftProblem.MISSING_TARGET ||
+                        state.problem == DraftProblem.INVALID_URI,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             ActionType.SEND_INTENT -> {
                 OutlinedTextField(
@@ -255,10 +292,16 @@ private fun DraftEditor(
  * anything a person knows. Picking from the launchable apps also makes an unlaunchable target
  * unreachable rather than merely discouraged.
  *
- * The list is capped rather than scrolled: this sits inside the screen's own `verticalScroll`, where a
- * lazy list has unbounded height and would crash. The cap is stated rather than silent, because a list
- * that quietly stops short reads as "your app is not installed".
+ * A floating menu rather than an inline list, which the first version was. Inline, it could not scroll
+ * (a lazy list has unbounded height inside the screen's own `verticalScroll`, so it had to be a capped
+ * `Column`), it pushed the Save button off the screen, and it sat there open before anyone asked for it.
+ * A menu solves all three at once: it scrolls, it costs no layout space because it floats, and it
+ * appears on a tap.
+ *
+ * Rows show an icon and a name and nothing else. The package name is what gets *stored*, not what
+ * anyone wants to read down a list of forty apps.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppPicker(
     state: TagActionsUiState,
@@ -266,91 +309,104 @@ private fun AppPicker(
     onQueryChange: (String) -> Unit,
     onPick: (InstalledApp) -> Unit,
 ) {
-    OutlinedTextField(
-        value = state.appQuery,
-        onValueChange = onQueryChange,
-        label = { Text(stringResource(R.string.actions_app_search)) },
-        // Not marked as an error when no app is chosen yet: what is missing is the selection, not the
-        // query. Painting the search box red reads as "that search is invalid" and sends the user to
-        // fix the one thing that was fine. The problem line below already says what is needed.
-        modifier = Modifier.fillMaxWidth(),
-    )
-
-    if (chosen.isNotBlank()) {
-        Text(
-            text = stringResource(R.string.actions_app_chosen, chosen),
-            style = HexTextStyle,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-
+    var isOpen by remember { mutableStateOf(false) }
     val matches = state.visibleApps
-    when {
-        state.apps.isEmpty() -> Text(
-            text = stringResource(R.string.actions_app_loading),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
-        matches.isEmpty() -> Text(
-            text = stringResource(R.string.actions_app_none),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
-
-        else -> {
-            matches.take(APP_LIST_LIMIT).forEach { app ->
-                AppRow(app = app, isChosen = app.packageName == chosen, onPick = onPick)
-            }
-            if (matches.size > APP_LIST_LIMIT) {
+    ExposedDropdownMenuBox(
+        expanded = isOpen && matches.isNotEmpty(),
+        onExpandedChange = { isOpen = it },
+    ) {
+        OutlinedTextField(
+            value = state.appQuery,
+            onValueChange = {
+                onQueryChange(it)
+                // Typing means looking for something, so the list should already be open.
+                isOpen = true
+            },
+            label = { Text(stringResource(R.string.actions_app_search)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isOpen) },
+            supportingText = {
                 Text(
-                    text = stringResource(
-                        R.string.actions_app_capped,
-                        APP_LIST_LIMIT,
-                        matches.size,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = if (chosen.isBlank()) {
+                        stringResource(R.string.actions_app_none_chosen)
+                    } else {
+                        stringResource(R.string.actions_app_chosen, state.labelFor(chosen))
+                    },
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryEditable),
+        )
+
+        ExposedDropdownMenu(
+            expanded = isOpen && matches.isNotEmpty(),
+            onDismissRequest = { isOpen = false },
+        ) {
+            matches.forEach { app ->
+                DropdownMenuItem(
+                    text = { Text(app.label) },
+                    leadingIcon = { AppIcon(app.packageName) },
+                    onClick = {
+                        onPick(app)
+                        isOpen = false
+                    },
                 )
             }
         }
     }
-}
 
-@Composable
-private fun AppRow(app: InstalledApp, isChosen: Boolean, onPick: (InstalledApp) -> Unit) {
-    HorizontalDivider()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onPick(app) }
-            .padding(vertical = 8.dp),
-    ) {
+    if (state.apps.isEmpty()) {
         Text(
-            text = app.label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isChosen) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
-        // Kept visible: it is what actually gets stored, and two apps can share a label.
-        Text(
-            text = app.packageName,
-            style = HexTextStyle,
+            text = stringResource(R.string.actions_app_loading),
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-/** How many matches to show before asking for a narrower search. */
-private const val APP_LIST_LIMIT = 8
-
+/**
+ * The app's launcher icon, or nothing.
+ *
+ * Loaded in composition and remembered per package: only the rows the menu actually shows pay for it,
+ * and each pays once. An app whose icon cannot be loaded renders empty space rather than a placeholder
+ * that would read as a real, blank-looking app.
+ */
 @Composable
-private fun summarise(action: TagAction): String = when (action) {
-    is TagAction.LaunchApp -> stringResource(R.string.actions_summary_launch, action.packageName)
+private fun AppIcon(packageName: String) {
+    val context = LocalContext.current
+    val icon: ImageBitmap? = remember(packageName) {
+        runCatching {
+            context.packageManager
+                .getApplicationIcon(packageName)
+                .toBitmap(width = ICON_PIXELS, height = ICON_PIXELS)
+                .asImageBitmap()
+        }.getOrNull()
+    }
+
+    Box(modifier = Modifier.size(ICON_SIZE), contentAlignment = Alignment.Center) {
+        icon?.let {
+            Image(bitmap = it, contentDescription = null, modifier = Modifier.size(ICON_SIZE))
+        }
+    }
+}
+
+/** Rendered at [ICON_SIZE]; rasterised a little larger so it stays sharp. */
+private const val ICON_PIXELS = 96
+
+private val ICON_SIZE = 28.dp
+
+/**
+ * One line describing what a tag will do.
+ *
+ * [appNameOf] resolves a package to its app name, because the package is what gets *stored* and not
+ * what belongs on a card the user reads. It stays a lookup rather than a stored field so an app that
+ * gets renamed or uninstalled is described by what is true now.
+ */
+@Composable
+private fun summarise(action: TagAction, appNameOf: (String) -> String): String = when (action) {
+    is TagAction.LaunchApp ->
+        stringResource(R.string.actions_summary_launch, appNameOf(action.packageName))
     is TagAction.OpenUri -> stringResource(R.string.actions_summary_uri, action.uri)
     is TagAction.SendIntent -> stringResource(R.string.actions_summary_intent, action.action)
     is TagAction.MediaCommand ->

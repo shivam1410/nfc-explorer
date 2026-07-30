@@ -56,7 +56,22 @@ data class TagActionsUiState(
 
     /** The apps worth showing for what has been typed so far. Derived, so it cannot fall out of step. */
     val visibleApps: List<InstalledApp> get() = apps.matching(appQuery)
+
+    /**
+     * The name of an app, for showing back to the user.
+     *
+     * A package name is what gets *stored*; it is not what anyone wants to read. Falls back to the
+     * package when the app is gone, because an assignment outlives an uninstall and showing nothing
+     * would be worse than showing what it still points at.
+     */
+    fun labelFor(packageName: String): String =
+        apps.firstOrNull { it.packageName == packageName }?.label ?: packageName
 }
+
+/** Schemes offered when editing a link. `https` first, because it should be the default. */
+val LINK_SCHEMES = listOf("https://", "http://")
+
+private val SCHEME_PREFIX = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 /**
  * Manages tag-to-action assignments.
@@ -82,6 +97,10 @@ class TagActionsViewModel @Inject constructor(
                 backing.value = backing.value.copy(assignments = assignments)
             }
         }
+        // Eagerly, not when the editor opens: the assignment cards name the app too, and they are on
+        // screen first. Loading it later meant every card read as a raw package name until the user
+        // happened to open an editor.
+        loadApps()
     }
 
     fun onCreateFor(uid: ByteBlock?) {
@@ -92,13 +111,11 @@ class TagActionsViewModel @Inject constructor(
         }
         val draft = ActionDraft(uid = uid)
         backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
-        loadApps()
     }
 
     fun onEdit(assignment: TagAssignment) {
         val draft = assignment.toDraft()
         backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
-        loadApps()
     }
 
     fun onAppQueryChange(query: String) {
@@ -124,7 +141,7 @@ class TagActionsViewModel @Inject constructor(
      * Reads the app list once and keeps it.
      *
      * Enumerating launchable apps is hundreds of `PackageManager` round trips, and it cannot change
-     * while the editor is open in front of the user.
+     * while this screen is open in front of the user.
      */
     private fun loadApps() {
         if (backing.value.apps.isNotEmpty()) return
@@ -139,6 +156,37 @@ class TagActionsViewModel @Inject constructor(
 
     fun onDraftChange(draft: ActionDraft) {
         backing.value = backing.value.copy(draft = draft, problem = problemOf(draft))
+    }
+
+    /**
+     * Switches which kind of action the draft describes.
+     *
+     * Seeds a blank link with `https://` rather than leaving the field empty. Every link needs a
+     * scheme, so an empty field's only possible next state is the "include a scheme" error — which the
+     * user then has to read and fix for no reason. An existing link is never touched.
+     */
+    fun onTypeChange(type: ActionType) {
+        val draft = backing.value.draft ?: return
+        val seeded = when {
+            type == ActionType.OPEN_URI && draft.uri.isBlank() -> draft.copy(
+                type = type,
+                uri = LINK_SCHEMES.first(),
+            )
+            else -> draft.copy(type = type)
+        }
+        onDraftChange(seeded)
+    }
+
+    /**
+     * Replaces the link's scheme, keeping everything after it.
+     *
+     * Learned from a `wa.me` link: `http` bounces through a redirect that can drop the `?text=`
+     * payload, and retyping a whole link to change four characters is busywork.
+     */
+    fun onSchemeChange(scheme: String) {
+        val draft = backing.value.draft ?: return
+        val withoutScheme = SCHEME_PREFIX.replace(draft.uri.trim(), "")
+        onDraftChange(draft.copy(uri = scheme + withoutScheme))
     }
 
     fun onSave() {
