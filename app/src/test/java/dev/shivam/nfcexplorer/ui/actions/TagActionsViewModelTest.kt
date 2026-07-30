@@ -252,6 +252,30 @@ class TagActionsViewModelTest {
         assertTrue(message?.contains("no such app") == true, "got: $message")
     }
 
+    @Test
+    fun `the open draft can be tested before it is saved`() {
+        // Trying an action before committing it is the more useful moment: a wrong package name is
+        // obvious immediately rather than after a tap that silently does nothing.
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Music", type = ActionType.OPEN_URI, uri = "https://x.test"))
+
+        model.onTestDraft()
+
+        assertEquals(listOf<TagAction>(TagAction.OpenUri("https://x.test")), performer.performed.toList())
+    }
+
+    @Test
+    fun `testing an invalid draft performs nothing`() {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "", packageName = ""))
+
+        model.onTestDraft()
+
+        assertTrue(performer.performed.isEmpty())
+    }
+
     /** Copies the open draft with overrides, mirroring how the editor mutates it field by field. */
     private fun draft(
         model: TagActionsViewModel,

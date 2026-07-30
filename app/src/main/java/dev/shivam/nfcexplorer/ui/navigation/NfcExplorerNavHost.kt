@@ -34,6 +34,8 @@ import dev.shivam.nfcexplorer.ui.log.SessionLogViewModel
 import dev.shivam.nfcexplorer.ui.memory.MemoryExplorerScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanUiState
+import dev.shivam.nfcexplorer.ui.actions.TagActionsScreen
+import dev.shivam.nfcexplorer.ui.actions.TagActionsViewModel
 import dev.shivam.nfcexplorer.ui.taginfo.TagInfoScreen
 import dev.shivam.nfcexplorer.ui.write.WriteScreen
 import dev.shivam.nfcexplorer.ui.write.WriteViewModel
@@ -47,6 +49,7 @@ private enum class Destination(
     MEMORY("memory", R.string.nav_memory, R.drawable.ic_nav_memory),
     LOCKS("locks", R.string.nav_locks, R.drawable.ic_nav_lock),
     WRITE("write", R.string.nav_write, R.drawable.ic_nav_write),
+    ACTIONS("actions", R.string.nav_actions, R.drawable.ic_nav_actions),
     LOG("log", R.string.nav_log, R.drawable.ic_nav_log),
 }
 
@@ -144,6 +147,22 @@ fun NfcExplorerNavHost(
                     onExpertModeChange = writeViewModel::onExpertModeChange,
                     onArm = writeViewModel::onArm,
                     onDisarm = writeViewModel::onDisarm,
+                )
+            }
+            composable(Destination.ACTIONS.route) {
+                val actionsViewModel: TagActionsViewModel = hiltViewModel()
+                val actionsState by actionsViewModel.state.collectAsStateWithLifecycle()
+                TagActionsScreen(
+                    state = actionsState,
+                    lastScannedUid = lastReport?.identity?.uid,
+                    onCreateFor = actionsViewModel::onCreateFor,
+                    onEdit = actionsViewModel::onEdit,
+                    onDraftChange = actionsViewModel::onDraftChange,
+                    onSave = actionsViewModel::onSave,
+                    onCancel = actionsViewModel::onCancel,
+                    onDelete = actionsViewModel::onDelete,
+                    onTest = actionsViewModel::onTest,
+                    onTestDraft = actionsViewModel::onTestDraft,
                 )
             }
             composable(Destination.LOG.route) {
