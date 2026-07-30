@@ -27,12 +27,6 @@ class ByteBlock private constructor(private val bytes: ByteArray) {
 
     fun asList(): List<Byte> = bytes.toList()
 
-    fun slice(fromIndex: Int, toIndex: Int): ByteBlock =
-        ByteBlock(bytes.copyOfRange(fromIndex, toIndex))
-
-    /** True when every bit of [mask] is set in the byte at [index]. */
-    fun hasMask(index: Int, mask: Int): Boolean = (unsignedAt(index) and mask) == mask
-
     override fun equals(other: Any?): Boolean =
         this === other || (other is ByteBlock && bytes.contentEquals(other.bytes))
 

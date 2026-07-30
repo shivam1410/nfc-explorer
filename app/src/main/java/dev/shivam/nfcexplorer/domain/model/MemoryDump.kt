@@ -56,6 +56,18 @@ data class MemoryDump(
     val pages: List<PageSnapshot>,
     val pageSize: Int,
 ) {
+    init {
+        // readableBytes() concatenates in list order, so ordering is an invariant rather than
+        // an assumption. Enforced here so it cannot silently produce a scrambled image.
+        require(pages.zipWithNext().all { (first, second) -> first.index < second.index }) {
+            "pages must be ordered by ascending index with no duplicates, got " +
+                pages.map { it.index }
+        }
+        require(pages.all { page -> page.bytes == null || page.bytes.size == pageSize }) {
+            "every readable page must hold exactly pageSize ($pageSize) bytes"
+        }
+    }
+
     val readableCount: Int get() = pages.count { it.isReadable }
 
     val isComplete: Boolean get() = pages.isNotEmpty() && pages.all { it.isReadable }

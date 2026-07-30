@@ -18,8 +18,11 @@ import dev.shivam.nfcexplorer.domain.transport.UltralightTransport
  *
  *  - expert mode can only turn [WriteDecision.RequiresExpertMode] into
  *    [WriteDecision.Allowed]. It never touches a [WriteDecision.Blocked].
- *  - a page whose lock state is unknown is never writable. Guessing would either invite a
- *    write that silently fails, or one that unexpectedly succeeds.
+ *  - a page carrying [WriteVerdict.UNKNOWN_LOCK_STATE] is never writable. Guessing would
+ *    either invite a write that silently fails, or one that unexpectedly succeeds. When page
+ *    `0x02` could not be read, that covers the lock page itself as well as OTP and user
+ *    pages — setting lock bits from an unknown starting state could permanently close pages
+ *    the app never managed to read.
  *
  * The payload is checked for width only. Its contents never influence the decision, so no
  * caller can smuggle a different outcome through the bytes.

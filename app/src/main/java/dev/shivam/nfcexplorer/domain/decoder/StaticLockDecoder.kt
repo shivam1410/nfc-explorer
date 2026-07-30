@@ -39,6 +39,7 @@ object StaticLockDecoder {
     private const val OTP_PAGE = 3
     private const val FIRST_USER_PAGE = 4
     private const val LAST_PAGE = 15
+    private const val LOCK0_LAST_USER_PAGE = 7
     private const val LOCK1_FIRST_PAGE = 8
 
     /** Dynamic lock bits are an EV1/NTAG feature; this chip predates them entirely. */
@@ -94,15 +95,27 @@ object StaticLockDecoder {
             staticLockBytes = lockBytes,
             lockBits = lockBits,
             blockLockBits = blockLockBits,
-            pageAccess = ALL_PAGES.map { page -> accessFor(page, bitsByPage[page]) },
+            pageAccess = ALL_PAGES.map { page ->
+                accessFor(page, bitsByPage[page], lockStateKnown = true)
+            },
             dynamicLockSupport = DynamicLockSupport.NotSupportedByChip(DYNAMIC_LOCK_INTRODUCED_IN),
         )
     }
 
-    private fun accessFor(page: Int, lockBit: LockBit?): PageAccess = when {
+    private fun accessFor(page: Int, lockBit: LockBit?, lockStateKnown: Boolean): PageAccess = when {
         page in UID_PAGES -> PageAccess(page, PageRole.UID, WriteVerdict.HARDWARE_READ_ONLY)
 
-        page == LOCK_PAGE -> PageAccess(page, PageRole.LOCK_CONTROL, WriteVerdict.LOCK_CONTROL)
+        // Lock bits are OR-only, so writing them blind cannot clear anything — but it can
+        // permanently close pages that were never successfully read. Not something to offer.
+        page == LOCK_PAGE -> PageAccess(
+            page = page,
+            role = PageRole.LOCK_CONTROL,
+            verdict = if (lockStateKnown) {
+                WriteVerdict.LOCK_CONTROL
+            } else {
+                WriteVerdict.UNKNOWN_LOCK_STATE
+            },
+        )
 
         page == OTP_PAGE -> when {
             lockBit == null -> PageAccess(page, PageRole.OTP, WriteVerdict.UNKNOWN_LOCK_STATE)
@@ -125,7 +138,7 @@ object StaticLockDecoder {
      * occupy `LOCK1` from bit 0 upward.
      */
     private fun isUserPageLocked(page: Int, lock0: Int, lock1: Int): Boolean = when (page) {
-        in FIRST_USER_PAGE..7 -> lock0 and (1 shl page) != 0
+        in FIRST_USER_PAGE..LOCK0_LAST_USER_PAGE -> lock0 and (1 shl page) != 0
         in LOCK1_FIRST_PAGE..LAST_PAGE -> lock1 and (1 shl (page - LOCK1_FIRST_PAGE)) != 0
         else -> false
     }
@@ -134,14 +147,17 @@ object StaticLockDecoder {
         blockLockBits.any { it.isSet && page in it.freezesPages }
 
     /**
-     * Structural roles are still known when page `0x02` is unreadable — the UID pages and the
-     * lock page are fixed by the chip's layout — but nothing about locking is asserted.
+     * Structural *roles* are still known when page `0x02` is unreadable — the UID pages and the
+     * lock page are fixed by the chip's layout — but no write verdict that depends on lock state
+     * is asserted, including for the lock page itself.
      */
     private fun withUnknownLockState() = LockAnalysis(
         staticLockBytes = null,
         lockBits = emptyList(),
         blockLockBits = emptyList(),
-        pageAccess = ALL_PAGES.map { page -> accessFor(page, lockBit = null) },
+        pageAccess = ALL_PAGES.map { page ->
+            accessFor(page, lockBit = null, lockStateKnown = false)
+        },
         dynamicLockSupport = DynamicLockSupport.NotSupportedByChip(DYNAMIC_LOCK_INTRODUCED_IN),
     )
 }

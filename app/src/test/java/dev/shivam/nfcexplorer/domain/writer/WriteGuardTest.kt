@@ -149,6 +149,31 @@ class WriteGuardTest {
         )
     }
 
+    @Test
+    fun `the lock page is blocked when the lock state could not be read`() {
+        // Lock bits are OR-only, so writing them from an unknown starting state cannot clear
+        // anything -- but it can still permanently close pages the app never managed to read.
+        // Setting lock bits blind is not a thing this tool should offer.
+        listOf(false, true).forEach { expertMode ->
+            assertEquals(
+                WriteDecision.Blocked(WriteBlockReason.LOCK_STATE_UNKNOWN),
+                evaluate(page = 2, locks = unknownLocks, expertMode = expertMode),
+                "expertMode=$expertMode",
+            )
+        }
+    }
+
+    @Test
+    fun `the OTP page is blocked when the lock state could not be read`() {
+        listOf(false, true).forEach { expertMode ->
+            assertEquals(
+                WriteDecision.Blocked(WriteBlockReason.LOCK_STATE_UNKNOWN),
+                evaluate(page = 3, locks = unknownLocks, expertMode = expertMode),
+                "expertMode=$expertMode",
+            )
+        }
+    }
+
     // --- Malformed input ---
 
     @Test
@@ -197,7 +222,9 @@ class WriteGuardTest {
                             "locked page $page was allowed (expert=$expertMode)",
                         )
                     }
-                    if (locks === unknownLocks && page >= 3) {
+                    // Page 2 included: the lock-control page must not be writable blind
+                    // either, which the earlier version of this sweep failed to assert.
+                    if (locks === unknownLocks && page >= 2) {
                         assertTrue(
                             !isAllowed,
                             "page $page allowed with unknown locks (expert=$expertMode)",

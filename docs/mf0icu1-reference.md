@@ -114,8 +114,8 @@ readPages(14) -> page 14, page 15, page 0, page 1
 ```
 
 A reader that appends blindly will report pages 0 and 1 as pages 16 and 17. The dump
-pipeline must clamp to `pageCount` and discard the wrapped tail. This is covered by
-`ReadTagUseCaseTest`.
+pipeline must clamp to `pageCount` and discard the wrapped tail. This will be covered by `ReadTagUseCaseTest`
+(Phase 2, Task 2.2), which does not exist yet.
 
 ## Behaviour on refusal
 

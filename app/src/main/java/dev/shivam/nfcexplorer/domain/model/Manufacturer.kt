@@ -49,6 +49,9 @@ sealed interface Manufacturer {
             0x41 to "Renesas Electronics",
         )
 
+        /** Registered codes this table knows. Exposed so tests can verify the table itself. */
+        val knownCodes: Set<Int> get() = NAMES.keys
+
         fun fromUidByte0(value: Byte): Manufacturer {
             val code = value.toInt() and 0xFF
             val name = NAMES[code]

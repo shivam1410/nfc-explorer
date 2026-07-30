@@ -2,6 +2,9 @@ package dev.shivam.nfcexplorer.domain.decoder
 
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.model.DynamicLockSupport
+import dev.shivam.nfcexplorer.domain.model.LockAnalysis
+import dev.shivam.nfcexplorer.domain.model.LockBit
+import dev.shivam.nfcexplorer.domain.model.PageAccess
 import dev.shivam.nfcexplorer.domain.model.PageRole
 import dev.shivam.nfcexplorer.domain.model.WriteVerdict
 import dev.shivam.nfcexplorer.fake.FakeUltralightTransport
@@ -25,6 +28,18 @@ class StaticLockDecoderTest {
     private fun decode(lock0: Int, lock1: Int) =
         StaticLockDecoder.decode(ByteBlock.ofInts(lock0, lock1))
 
+    /**
+     * Named lookup instead of `!!`. A missing page is a contract bug in [LockAnalysis], and
+     * this reports which page was missing rather than throwing a context-free NPE.
+     */
+    private fun LockAnalysis.access(page: Int): PageAccess =
+        requireNotNull(accessFor(page)) { "no PageAccess for page $page" }
+
+    private fun LockAnalysis.lockBitFor(page: Int): LockBit =
+        requireNotNull(lockBits.singleOrNull { it.protectedPage == page }) {
+            "no unique LockBit for page $page"
+        }
+
     // --- Structural roles, independent of lock state ---
 
     @Test
@@ -32,7 +47,7 @@ class StaticLockDecoderTest {
         val analysis = decode(0x00, 0x00)
 
         listOf(0, 1).forEach { page ->
-            val access = analysis.accessFor(page)!!
+            val access = analysis.access(page)
             assertEquals(PageRole.UID, access.role)
             assertEquals(WriteVerdict.HARDWARE_READ_ONLY, access.verdict)
             assertNull(access.lockedBy)
@@ -41,7 +56,7 @@ class StaticLockDecoderTest {
 
     @Test
     fun `the lock page is reported as lock control`() {
-        val access = decode(0x00, 0x00).accessFor(2)!!
+        val access = decode(0x00, 0x00).access(2)
 
         assertEquals(PageRole.LOCK_CONTROL, access.role)
         assertEquals(WriteVerdict.LOCK_CONTROL, access.verdict)
@@ -61,9 +76,9 @@ class StaticLockDecoderTest {
         val analysis = decode(0x00, 0x00)
 
         (4..15).forEach { page ->
-            assertEquals(WriteVerdict.WRITABLE, analysis.accessFor(page)!!.verdict, "page $page")
+            assertEquals(WriteVerdict.WRITABLE, analysis.access(page).verdict, "page $page")
         }
-        assertEquals(WriteVerdict.OTP_ONE_WAY, analysis.accessFor(3)!!.verdict)
+        assertEquals(WriteVerdict.OTP_ONE_WAY, analysis.access(3).verdict)
         assertEquals((4..15).toList(), analysis.writablePages)
     }
 
@@ -76,7 +91,7 @@ class StaticLockDecoderTest {
         (3..15).forEach { page ->
             assertEquals(
                 WriteVerdict.PERMANENTLY_LOCKED,
-                analysis.accessFor(page)!!.verdict,
+                analysis.access(page).verdict,
                 "page $page",
             )
         }
@@ -90,8 +105,8 @@ class StaticLockDecoderTest {
     fun `L_OTP locks only the OTP page`() {
         val analysis = decode(0x08, 0x00)
 
-        assertEquals(WriteVerdict.PERMANENTLY_LOCKED, analysis.accessFor(3)!!.verdict)
-        assertEquals("L_OTP", analysis.accessFor(3)!!.lockedBy)
+        assertEquals(WriteVerdict.PERMANENTLY_LOCKED, analysis.access(3).verdict)
+        assertEquals("L_OTP", analysis.access(3).lockedBy)
         assertEquals(listOf(3), analysis.lockedPages)
     }
 
@@ -100,8 +115,8 @@ class StaticLockDecoderTest {
         val analysis = decode(0x10, 0x00)
 
         assertEquals(listOf(4), analysis.lockedPages)
-        assertEquals("L_4", analysis.accessFor(4)!!.lockedBy)
-        assertEquals(WriteVerdict.WRITABLE, analysis.accessFor(5)!!.verdict)
+        assertEquals("L_4", analysis.access(4).lockedBy)
+        assertEquals(WriteVerdict.WRITABLE, analysis.access(5).verdict)
     }
 
     @Test
@@ -109,7 +124,7 @@ class StaticLockDecoderTest {
         val analysis = decode(0x80, 0x00)
 
         assertEquals(listOf(7), analysis.lockedPages)
-        assertEquals("L_7", analysis.accessFor(7)!!.lockedBy)
+        assertEquals("L_7", analysis.access(7).lockedBy)
     }
 
     @Test
@@ -117,7 +132,7 @@ class StaticLockDecoderTest {
         val analysis = decode(0x00, 0x01)
 
         assertEquals(listOf(8), analysis.lockedPages)
-        assertEquals("L_8", analysis.accessFor(8)!!.lockedBy)
+        assertEquals("L_8", analysis.access(8).lockedBy)
     }
 
     @Test
@@ -125,7 +140,7 @@ class StaticLockDecoderTest {
         val analysis = decode(0x00, 0x80)
 
         assertEquals(listOf(15), analysis.lockedPages)
-        assertEquals("L_15", analysis.accessFor(15)!!.lockedBy)
+        assertEquals("L_15", analysis.access(15).lockedBy)
     }
 
     @Test
@@ -152,14 +167,14 @@ class StaticLockDecoderTest {
 
         // Still writable - and now permanently so, since the lock bits can never change.
         (4..9).forEach { page ->
-            assertEquals(WriteVerdict.WRITABLE, analysis.accessFor(page)!!.verdict, "page $page")
+            assertEquals(WriteVerdict.WRITABLE, analysis.access(page).verdict, "page $page")
         }
         (4..9).forEach { page ->
-            assertTrue(analysis.lockBits.single { it.protectedPage == page }.isFrozen, "page $page")
+            assertTrue(analysis.lockBitFor(page).isFrozen, "page $page")
         }
         // Pages outside the range are untouched.
         (10..15).forEach { page ->
-            assertFalse(analysis.lockBits.single { it.protectedPage == page }.isFrozen, "page $page")
+            assertFalse(analysis.lockBitFor(page).isFrozen, "page $page")
         }
     }
 
@@ -168,10 +183,10 @@ class StaticLockDecoderTest {
         val analysis = decode(0x04, 0x00)
 
         (10..15).forEach { page ->
-            assertTrue(analysis.lockBits.single { it.protectedPage == page }.isFrozen, "page $page")
+            assertTrue(analysis.lockBitFor(page).isFrozen, "page $page")
         }
         (4..9).forEach { page ->
-            assertFalse(analysis.lockBits.single { it.protectedPage == page }.isFrozen, "page $page")
+            assertFalse(analysis.lockBitFor(page).isFrozen, "page $page")
         }
     }
 
@@ -179,7 +194,7 @@ class StaticLockDecoderTest {
     fun `BL_OTP freezes the OTP lock bit`() {
         val analysis = decode(0x01, 0x00)
 
-        assertTrue(analysis.lockBits.single { it.protectedPage == 3 }.isFrozen)
+        assertTrue(analysis.lockBitFor(3).isFrozen)
     }
 
     @Test
@@ -187,9 +202,9 @@ class StaticLockDecoderTest {
         val analysis = decode(0x07, 0x00)
 
         val byName = analysis.blockLockBits.associateBy { it.name }
-        assertEquals(3..3, byName["BL_OTP"]!!.freezesPages)
-        assertEquals(4..9, byName["BL_9_4"]!!.freezesPages)
-        assertEquals(10..15, byName["BL_15_10"]!!.freezesPages)
+        assertEquals(3..3, byName.getValue("BL_OTP").freezesPages)
+        assertEquals(4..9, byName.getValue("BL_9_4").freezesPages)
+        assertEquals(10..15, byName.getValue("BL_15_10").freezesPages)
         assertTrue(analysis.blockLockBits.all { it.isSet })
     }
 
@@ -216,10 +231,11 @@ class StaticLockDecoderTest {
         val analysis = StaticLockDecoder.decode(null)
 
         assertNull(analysis.staticLockBytes)
-        (3..15).forEach { page ->
+        // Page 2 included: its verdict depends on lock state just as much as pages 3-15.
+        (2..15).forEach { page ->
             assertEquals(
                 WriteVerdict.UNKNOWN_LOCK_STATE,
-                analysis.accessFor(page)!!.verdict,
+                analysis.access(page).verdict,
                 "page $page",
             )
         }
@@ -229,11 +245,17 @@ class StaticLockDecoderTest {
     }
 
     @Test
-    fun `structural roles survive an unreadable lock page`() {
+    fun `structural roles survive an unreadable lock page but lock verdicts do not`() {
         val analysis = StaticLockDecoder.decode(null)
 
-        assertEquals(WriteVerdict.HARDWARE_READ_ONLY, analysis.accessFor(0)!!.verdict)
-        assertEquals(WriteVerdict.LOCK_CONTROL, analysis.accessFor(2)!!.verdict)
+        // Roles are fixed by chip layout, so they remain known.
+        assertEquals(PageRole.UID, analysis.access(0).role)
+        assertEquals(PageRole.LOCK_CONTROL, analysis.access(2).role)
+        assertEquals(WriteVerdict.HARDWARE_READ_ONLY, analysis.access(0).verdict)
+
+        // The lock page's own verdict does depend on lock state: writing lock bits blind
+        // could permanently close pages that were never read, so it is not offered.
+        assertEquals(WriteVerdict.UNKNOWN_LOCK_STATE, analysis.access(2).verdict)
     }
 
     // --- Cross-check against the chip emulation ---
@@ -251,7 +273,7 @@ class StaticLockDecoderTest {
                 ).apply { connect() }
 
                 (4..15).forEach { page ->
-                    val verdict = analysis.accessFor(page)!!.verdict
+                    val verdict = analysis.access(page).verdict
                     val rejected = runCatching {
                         transport.writePage(page, ByteArray(4) { 0x11 })
                     }.isFailure

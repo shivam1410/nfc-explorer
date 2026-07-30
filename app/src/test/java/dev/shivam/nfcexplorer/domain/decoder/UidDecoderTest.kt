@@ -61,8 +61,8 @@ class UidDecoderTest {
             storedBcc1 = Mf0icu1Fixtures.bcc1(Mf0icu1Fixtures.SAMPLE_UID),
         )
 
-        assertTrue(identity.bcc0!!.isValid)
-        assertTrue(identity.bcc1!!.isValid)
+        assertTrue(requireNotNull(identity.bcc0) { "bcc0 not computed" }.isValid)
+        assertTrue(requireNotNull(identity.bcc1) { "bcc1 not computed" }.isValid)
         assertEquals(7, identity.uidLength)
         assertEquals(2, identity.cascadeLevels)
         assertEquals(Manufacturer.Known(0x04, "NXP Semiconductors"), identity.manufacturer)
@@ -76,12 +76,12 @@ class UidDecoderTest {
             storedBcc1 = Mf0icu1Fixtures.bcc1(Mf0icu1Fixtures.SAMPLE_UID),
         )
 
-        val bcc0 = identity.bcc0!!
+        val bcc0 = requireNotNull(identity.bcc0) { "bcc0 not computed" }
         assertFalse(bcc0.isValid)
         // Both sides retained: the difference is the diagnostic, not just the failure.
         assertEquals(0x00, bcc0.stored.toInt() and 0xFF)
         assertEquals(0x7B, bcc0.computed.toInt() and 0xFF)
-        assertTrue(identity.bcc1!!.isValid)
+        assertTrue(requireNotNull(identity.bcc1) { "bcc1 not computed" }.isValid)
     }
 
     @Test
