@@ -124,11 +124,21 @@ Verdict was BLOCK on 3 MEDIUM findings. All six findings fixed:
 |---|---|---|---|---|
 | 2.1 Session logger | done | **11/11 failed** on `NotImplementedError` | 11/11 | `c916557` |
 | 2.2 Read pipeline (I2) | done | **16/16 failed** on `NotImplementedError` | 16/16 | `58c6434` |
-| 2.3 Android transport adapters | not started | — | — | — |
-| 2.4 Reader mode controller | not started | — | — | — |
-| 2.5 Device read proof | not started | — | — | — |
+| 2.3 Android transport adapters | done | ChipProfileResolver **10/10 failed** on `NotImplementedError` | 160/160, `assembleDebug` green, Hilt codegen OK | `351c937` |
+| 2.4 Reader mode controller | done | n/a (framework wiring) | `assembleDebug` green, installed and launched | `a182824` |
+| 2.5 Device read proof | **blocked** | — | needs the phone unlocked and a tag tapped | — |
 
-**Suite: 148 tests, 0 failures. `assembleDebug` green.**
+## Phase 4 — Guarded write (started out of plan order)
+
+| Task | Status | RED proof | GREEN | Commit |
+|---|---|---|---|---|
+| 4.1 Write use case | done | **15/15 failed** on `NotImplementedError` | 15/15 | `61e9f12` |
+
+Taken out of order deliberately: Task 2.5 is blocked on human action and every Phase 3 slice is
+UI whose verification also needs the phone unlocked. Task 4.1 is pure JVM logic with full proof
+available now, so it was the only remaining slice that could be finished honestly.
+
+**Suite: 175 tests, 0 failures. `assembleDebug` green.**
 
 **Invariant I2 closed.** The wrap-around clamp is tested with chip profiles claiming 14 and 15
 pages over the 16-page fake — striding by 4 across exactly 16 pages never wraps, so an
@@ -144,8 +154,32 @@ no "failed" variant — a partial answer is still an answer.
 Phase 2 Tasks 2.3–2.5, Phase 3 (UI), Phase 4 (guarded write), Phase 5 (export), Phase 6
 (verification and closeout).
 
+## Blocker B2 — Task 2.5 needs human action
+
+The app is installed and running on the Pixel 10 (PID 13904) with reader mode wired, but
+`dumpsys nfc` reports `mScreenState=ON_LOCKED`. Reader mode is only enabled while the activity is
+RESUMED, which a locked screen prevents, so no tag can be read. Nothing has been captured and no
+device evidence is claimed.
+
+To clear it: unlock the phone with NFC Explorer in front, hold the tag against the upper-middle
+back for ~2 seconds. Logcat has a ring buffer, so `adb logcat -d -s NfcExplorer:V` recovers the
+dump afterwards — no live capture needs to be running.
+
+Also recorded: a first attempt at a live capture used `timeout`, which does not exist on macOS,
+so it produced an empty file. Superseded by the ring-buffer approach above.
+
+## Chip identification honesty (Task 2.3)
+
+`ChipProfileResolver` deliberately does **not** claim MF0ICU1. Android reports `TYPE_ULTRALIGHT`
+for MF0ICU1, Ultralight EV1 *and* every NTAG21x — same ATQA `0x0044`, same SAK `0x00` — and
+separating them needs `GET_VERSION`, which the original Ultralight does not implement. So it
+returns a 16-page **floor** with `geometryConfirmed = false`. Sixteen pages is readable on every
+family member so a dump can never over-read; it may under-read an NTAG216, which is exactly what
+the flag tells the UI to say. Claiming MF0ICU1 outright would have silently hidden 852 bytes on
+an NTAG216. Phase 2's `GET_VERSION` probe resolves it, and a NAK from that probe is itself
+evidence of an original Ultralight.
+
 ## Next
 
-Phase 2 Task 2.3 — Android transport adapters (`AndroidUltralightTransport`,
-`TagTechnologyInspector`, `TagRepositoryImpl`, Hilt wiring), then 2.4 reader mode and 2.5 the
-first real dump of the hotel card.
+Task 2.5 once the phone is unlocked and a tag is tapped. Then Phase 3 (UI), the rest of Phase 4,
+and Phase 5.

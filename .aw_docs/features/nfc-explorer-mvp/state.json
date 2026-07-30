@@ -2,7 +2,7 @@
   "feature_slug": "nfc-explorer-mvp",
   "stage": "build",
   "mode": "code",
-  "status": "phase_1_complete_reviewed; phase_2_in_progress",
+  "status": "phase_2_blocked_on_device_tap; 4.1 done out of order",
   "updated_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
@@ -28,7 +28,8 @@
   "phase_notes": {
     "0": "complete incl. Task 0.3 device install proof on Pixel 10",
     "1": "complete; all 6 reviewer findings fixed",
-    "2": "2.1 and 2.2 done; next 2.3 Android transport adapters"
+    "2": "2.1-2.4 done; 2.5 blocked on human action (phone locked)",
+    "4": "4.1 done out of plan order (only slice with JVM proof available while 2.5 is blocked)"
   },
   "completed_slices": [
     {
@@ -116,11 +117,29 @@
       "red": "16/16 NotImplementedError",
       "validation": "16/16 green; clamp tested at pageCount 14 and 15",
       "commit": "58c6434"
+    },
+    {
+      "task": "2.3",
+      "title": "Android transport adapters, chip resolver, tag repository",
+      "red": "ChipProfileResolver 10/10 NotImplementedError",
+      "validation": "160/160 green, assembleDebug green, Hilt codegen OK",
+      "commit": "351c937"
+    },
+    {
+      "task": "2.4",
+      "title": "Reader mode controller and device-proof harness",
+      "validation": "assembleDebug green; installed and launched on device",
+      "commit": "a182824"
+    },
+    {
+      "task": "4.1",
+      "title": "Write page use case with read-back verification",
+      "red": "15/15 NotImplementedError",
+      "validation": "15/15 green; refused writes proven never to reach transport",
+      "commit": "61e9f12"
     }
   ],
   "remaining_slices": [
-    "2.3 Android transport adapters",
-    "2.4 reader mode controller",
     "2.5 device read proof",
     "3.1 theme + components",
     "3.2 nav shell + scan screen",
@@ -128,7 +147,6 @@
     "3.4 memory explorer",
     "3.5 lock analysis",
     "3.6 session log",
-    "4.1 write use case",
     "4.2 write sheet + expert mode",
     "4.3 device write proof",
     "4.4 review gate",
@@ -150,7 +168,7 @@
   ],
   "test_totals": {
     "suite": "testDebugUnitTest",
-    "tests": 148,
+    "tests": 175,
     "failures": 0
   },
   "reviewer_agents_used": [
@@ -170,7 +188,14 @@
       "owner_task": "none - accepted"
     }
   ],
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "B2",
+      "item": "Task 2.5 device read proof blocked: phone screen locked (mScreenState=ON_LOCKED)",
+      "impact": "reader mode only runs while RESUMED, so no tag can be read; no device evidence claimed",
+      "next_action": "unlock phone with NFC Explorer in front, tap tag on upper-middle back for ~2s, then `adb logcat -d -s NfcExplorer:V` (ring buffer retains it)"
+    }
+  ],
   "spec_deviations": [
     "ByteBlock replaces raw ByteArray in domain models (immutability + value equality)",
     "domain transport exception types added so TAG_LOST is distinguishable from NAK_REFUSED",
@@ -184,7 +209,11 @@
     "TagReport/TagPresentation added to carry identity+dump+locks as one value, with no failed variant (partial answers are still answers)",
     "lock page (0x02) reports UNKNOWN_LOCK_STATE when lock bytes are unreadable, so lock bits cannot be set blind",
     "MemoryDump enforces page ordering and page width via init requires",
-    "Manufacturer.knownCodes exposed so the vendor table itself is testable"
+    "Manufacturer.knownCodes exposed so the vendor table itself is testable",
+    "ChipProfile.geometryConfirmed added; resolver returns a 16-page family floor rather than claiming MF0ICU1, since TYPE_ULTRALIGHT is shared with EV1 and all NTAG21x",
+    "TagIoException added: Android cannot distinguish a NAK from a general transport fault",
+    "WriteOutcome.Written carries readBack so success is demonstrated; verified is null (not false) when read-back could not run",
+    "MainActivity is a temporary Phase 2 device-proof harness, replaced by Task 3.2"
   ],
   "save_point_commits": [
     "3f4454d",
@@ -199,9 +228,13 @@
     "86030ea",
     "c916557",
     "81eec6c",
-    "58c6434"
+    "58c6434",
+    "351c937",
+    "a182824",
+    "61e9f12"
   ],
   "recommended_next_commands": [
-    "/aw:build  (continue at Phase 2 Task 2.3 - Android transport adapters)"
+    "clear blocker B2 (unlock phone, tap tag), then /aw:build for Task 2.5",
+    "/aw:build (Phase 3 Task 3.1) once device verification is available"
   ]
 }
