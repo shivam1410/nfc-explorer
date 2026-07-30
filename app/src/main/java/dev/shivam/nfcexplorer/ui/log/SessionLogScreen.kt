@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
+import dev.shivam.nfcexplorer.domain.export.ExportFormat
 import dev.shivam.nfcexplorer.logging.LogEntry
 import dev.shivam.nfcexplorer.logging.LogLevel
 import dev.shivam.nfcexplorer.ui.component.StatusChip
@@ -44,6 +46,8 @@ import java.util.Locale
 @Composable
 fun SessionLogScreen(
     entries: List<LogEntry>,
+    exportResult: ExportResult?,
+    onExport: (ExportFormat) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var minimumLevel by remember { mutableStateOf<LogLevel?>(null) }
@@ -75,6 +79,36 @@ fun SessionLogScreen(
                     label = { Text(level.name) },
                 )
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = { onExport(ExportFormat.JSON) }) {
+                Text(stringResource(R.string.export_json))
+            }
+            OutlinedButton(onClick = { onExport(ExportFormat.TEXT) }) {
+                Text(stringResource(R.string.export_txt))
+            }
+        }
+
+        exportResult?.let { result ->
+            Text(
+                text = when (result) {
+                    is ExportResult.Written ->
+                        stringResource(R.string.export_written, result.bytes, result.format.extension)
+                    is ExportResult.Failed -> stringResource(R.string.export_failed, result.reason)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = when (result) {
+                    is ExportResult.Written -> MaterialTheme.colorScheme.primary
+                    is ExportResult.Failed -> MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
         }
 
         Text(

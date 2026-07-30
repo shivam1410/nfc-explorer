@@ -10,6 +10,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -23,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.shivam.nfcexplorer.R
+import dev.shivam.nfcexplorer.domain.export.ExportFormat
 import dev.shivam.nfcexplorer.domain.model.TagReport
 import dev.shivam.nfcexplorer.ui.locks.LockAnalysisScreen
 import dev.shivam.nfcexplorer.ui.log.SessionLogScreen
@@ -137,7 +140,39 @@ fun NfcExplorerNavHost(
             composable(Destination.LOG.route) {
                 val viewModel: SessionLogViewModel = hiltViewModel()
                 val entries by viewModel.entries.collectAsStateWithLifecycle()
-                SessionLogScreen(entries = entries)
+                val exportResult by viewModel.exportResult.collectAsStateWithLifecycle()
+
+                // One launcher per format: CreateDocument fixes its MIME type at construction.
+                val jsonLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
+                ) { uri ->
+                    uri?.let {
+                        viewModel.export(it, ExportFormat.JSON, lastReport, System.currentTimeMillis())
+                    }
+                }
+                val textLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(ExportFormat.TEXT.mimeType),
+                ) { uri ->
+                    uri?.let {
+                        viewModel.export(it, ExportFormat.TEXT, lastReport, System.currentTimeMillis())
+                    }
+                }
+
+                SessionLogScreen(
+                    entries = entries,
+                    exportResult = exportResult,
+                    onExport = { format ->
+                        val name = viewModel.suggestedFileName(
+                            report = lastReport,
+                            format = format,
+                            nowMillis = System.currentTimeMillis(),
+                        )
+                        when (format) {
+                            ExportFormat.JSON -> jsonLauncher.launch(name)
+                            ExportFormat.TEXT -> textLauncher.launch(name)
+                        }
+                    },
+                )
             }
         }
     }
