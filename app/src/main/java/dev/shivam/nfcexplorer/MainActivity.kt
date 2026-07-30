@@ -21,6 +21,7 @@ import dev.shivam.nfcexplorer.ui.navigation.NfcExplorerNavHost
 import dev.shivam.nfcexplorer.ui.scan.ScanCapability
 import dev.shivam.nfcexplorer.ui.scan.ScanViewModel
 import dev.shivam.nfcexplorer.ui.theme.NfcExplorerTheme
+import dev.shivam.nfcexplorer.ui.write.WriteViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -40,6 +41,8 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: ScanViewModel by viewModels()
 
+    private val writeViewModel: WriteViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
                 NfcExplorerNavHost(
                     state = state,
                     lastReport = report,
+                    writeViewModel = writeViewModel,
                     onOpenNfcSettings = ::openNfcSettings,
                 )
             }
@@ -80,7 +84,15 @@ class MainActivity : ComponentActivity() {
                     },
                 )
 
-                readerMode.tagHandles(this@MainActivity).collect(viewModel::onTagDiscovered)
+                readerMode.tagHandles(this@MainActivity).collect { handle ->
+                    // A tap means "write" only when a write is armed; otherwise it means "read".
+                    // Routing here keeps the two view models from both claiming the same tap.
+                    if (writeViewModel.state.value.isArmed) {
+                        writeViewModel.onTagPresented(handle)
+                    } else {
+                        viewModel.onTagDiscovered(handle)
+                    }
+                }
             }
         }
     }

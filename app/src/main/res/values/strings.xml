@@ -116,6 +116,33 @@
     <string name="dynamic_lock_unsupported">Not supported by this chip. Dynamic lock bits arrived with %1$s.</string>
     <string name="locks_summary">%1$d locked · %2$d writable</string>
 
+    <!-- Write -->
+    <string name="nav_write">Write</string>
+    <string name="write_source">What to write</string>
+    <string name="write_mode_text">Text</string>
+    <string name="write_mode_hex">Hex</string>
+    <string name="write_mode_wipe">Wipe</string>
+    <string name="write_wipe_explanation">Every page in the target range will be set to 00 00 00 00. Whatever is typed above is ignored.</string>
+    <string name="write_error_too_long">Too long for the selected range (%1$d bytes available). Widen the range or shorten the payload.</string>
+    <string name="write_error_bad_hex">Not valid hex. Use pairs of 0–9 and A–F, optionally separated by spaces or colons.</string>
+    <string name="write_target">Target pages</string>
+    <string name="write_target_summary">Pages %1$02X–%2$02X · %3$d bytes</string>
+    <string name="write_start_page">First page</string>
+    <string name="write_end_page">Last page</string>
+    <string name="write_range_warning">Pages 00–03 are the UID, the lock bytes and the OTP page. Writes there are refused, or irreversible under expert mode.</string>
+    <string name="write_preview">Exactly what will be written</string>
+    <string name="write_expert_mode">Expert mode</string>
+    <string name="write_expert_mode_warning">Permits writing the lock bytes and the OTP page. Both are one-way: bits can be set but never cleared, and a locked page can never be unlocked. Resets to off every launch.</string>
+    <string name="write_arm">Arm write</string>
+    <string name="write_cancel">Cancel</string>
+    <string name="write_armed_hold_tag">Armed. Hold the tag against the back of the device.</string>
+    <string name="write_in_progress">Writing…</string>
+    <string name="write_result">Result</string>
+    <string name="write_result_summary">%1$d of %2$d pages written</string>
+    <string name="write_result_complete">complete</string>
+    <string name="write_result_partial">partial</string>
+    <string name="write_result_none">nothing written</string>
+
     <!-- Log -->
     <string name="log_title">Session log</string>
     <string name="log_empty">Nothing logged yet.</string>

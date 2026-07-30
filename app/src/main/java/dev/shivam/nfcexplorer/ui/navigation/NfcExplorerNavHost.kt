@@ -31,6 +31,8 @@ import dev.shivam.nfcexplorer.ui.memory.MemoryExplorerScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanUiState
 import dev.shivam.nfcexplorer.ui.taginfo.TagInfoScreen
+import dev.shivam.nfcexplorer.ui.write.WriteScreen
+import dev.shivam.nfcexplorer.ui.write.WriteViewModel
 
 private enum class Destination(
     val route: String,
@@ -40,6 +42,7 @@ private enum class Destination(
     TAG("tag", R.string.nav_tag, R.drawable.ic_nav_tag),
     MEMORY("memory", R.string.nav_memory, R.drawable.ic_nav_memory),
     LOCKS("locks", R.string.nav_locks, R.drawable.ic_nav_lock),
+    WRITE("write", R.string.nav_write, R.drawable.ic_nav_write),
     LOG("log", R.string.nav_log, R.drawable.ic_nav_log),
 }
 
@@ -55,6 +58,7 @@ private enum class Destination(
 fun NfcExplorerNavHost(
     state: ScanUiState,
     lastReport: TagReport?,
+    writeViewModel: WriteViewModel,
     onOpenNfcSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,6 +119,20 @@ fun NfcExplorerNavHost(
                 WithReport(lastReport, state, onOpenNfcSettings) { report ->
                     LockAnalysisScreen(report)
                 }
+            }
+            composable(Destination.WRITE.route) {
+                val writeState by writeViewModel.state.collectAsStateWithLifecycle()
+                val preview by writeViewModel.encodedPreview.collectAsStateWithLifecycle()
+                WriteScreen(
+                    state = writeState,
+                    encoded = preview,
+                    onModeChange = writeViewModel::onModeChange,
+                    onInputChange = writeViewModel::onInputChange,
+                    onRangeChange = writeViewModel::onRangeChange,
+                    onExpertModeChange = writeViewModel::onExpertModeChange,
+                    onArm = writeViewModel::onArm,
+                    onDisarm = writeViewModel::onDisarm,
+                )
             }
             composable(Destination.LOG.route) {
                 val viewModel: SessionLogViewModel = hiltViewModel()
