@@ -8,7 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import dev.shivam.nfcexplorer.data.action.TagActionRunner
+import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.TagActionDispatch
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
@@ -33,7 +33,7 @@ class TagActionActivity : ComponentActivity() {
 
     @Inject lateinit var repository: TagActionRepository
 
-    @Inject lateinit var runner: TagActionRunner
+    @Inject lateinit var performer: ActionPerformer
 
     @Inject lateinit var logger: SessionLogger
 
@@ -68,7 +68,7 @@ class TagActionActivity : ComponentActivity() {
                     message = "running assigned action",
                     payload = mapOf("uid" to uid.toString(), "label" to assignment.label),
                 )
-                runner.run(assignment.action)
+                performer.perform(assignment.action)
                     .onFailure { failure ->
                         logger.error(
                             category = CATEGORY,

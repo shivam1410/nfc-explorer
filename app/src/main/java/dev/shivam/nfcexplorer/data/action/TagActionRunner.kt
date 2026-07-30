@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.view.KeyEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.IntentSpec
 import dev.shivam.nfcexplorer.domain.action.IntentSpecMapper
 import dev.shivam.nfcexplorer.domain.action.TagAction
@@ -26,9 +27,9 @@ import javax.inject.Singleton
 @Singleton
 class TagActionRunner @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : ActionPerformer {
 
-    fun run(action: TagAction): Result<Unit> = runCatching {
+    override fun perform(action: TagAction): Result<Unit> = runCatching {
         when (val spec = IntentSpecMapper.map(action)) {
             is IntentSpec.LaunchPackage -> launch(spec.packageName)
             is IntentSpec.ActivityIntent -> startActivity(spec)
