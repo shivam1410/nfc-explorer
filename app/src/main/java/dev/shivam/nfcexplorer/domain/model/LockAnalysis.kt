@@ -31,6 +31,13 @@ enum class WriteVerdict {
 
     /** Writing here changes lock state irreversibly. */
     LOCK_CONTROL,
+
+    /**
+     * Page 0x02 could not be read, so nothing is known about this page's lock bit.
+     * Distinct from [WRITABLE] on purpose — guessing writable would invite a write that
+     * silently fails, or worse, one that succeeds against expectations.
+     */
+    UNKNOWN_LOCK_STATE,
 }
 
 /**
