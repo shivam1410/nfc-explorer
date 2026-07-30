@@ -15,6 +15,7 @@ import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 import javax.inject.Inject
@@ -88,13 +89,21 @@ class TagActionsViewModel @Inject constructor(
     private val catalog: AppCatalog,
 ) : ViewModel() {
 
+    /**
+     * Always mutated through [update], never `value = value.copy(...)`.
+     *
+     * Several things write here from their own coroutines — the assignment stream, the app catalog, a
+     * store write — and a plain read-modify-write loses whichever change arrived while it was
+     * suspended. That is not theoretical: it silently emptied the assignment list on screen. [update]
+     * is a compare-and-set loop, so a concurrent change cannot be overwritten by a stale copy.
+     */
     private val backing = MutableStateFlow(TagActionsUiState())
     val state: StateFlow<TagActionsUiState> = backing.asStateFlow()
 
     init {
         viewModelScope.launch {
             repository.observeAll().collect { assignments ->
-                backing.value = backing.value.copy(assignments = assignments)
+                backing.update { it.copy(assignments = assignments) }
             }
         }
         // Eagerly, not when the editor opens: the assignment cards name the app too, and they are on
@@ -106,20 +115,20 @@ class TagActionsViewModel @Inject constructor(
     fun onCreateFor(uid: ByteBlock?) {
         if (uid == null) {
             // Nothing scanned yet, so there is no tag to bind an action to.
-            backing.value = backing.value.copy(draft = null, problem = DraftProblem.NO_TAG)
+            backing.update { it.copy(draft = null, problem = DraftProblem.NO_TAG) }
             return
         }
         val draft = ActionDraft(uid = uid)
-        backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
+        backing.update { it.copy(draft = draft, problem = problemOf(draft), message = null) }
     }
 
     fun onEdit(assignment: TagAssignment) {
         val draft = assignment.toDraft()
-        backing.value = backing.value.copy(draft = draft, problem = problemOf(draft), message = null)
+        backing.update { it.copy(draft = draft, problem = problemOf(draft), message = null) }
     }
 
     fun onAppQueryChange(query: String) {
-        backing.value = backing.value.copy(appQuery = query)
+        backing.update { it.copy(appQuery = query) }
     }
 
     /**
@@ -134,7 +143,7 @@ class TagActionsViewModel @Inject constructor(
             packageName = app.packageName,
             label = draft.label.ifBlank { app.label },
         )
-        backing.value = backing.value.copy(draft = picked, problem = problemOf(picked))
+        backing.update { it.copy(draft = picked, problem = problemOf(picked)) }
     }
 
     /**
@@ -146,16 +155,21 @@ class TagActionsViewModel @Inject constructor(
     private fun loadApps() {
         if (backing.value.apps.isNotEmpty()) return
         viewModelScope.launch {
-            backing.value = backing.value.copy(apps = catalog.launchable())
+            // Read first, publish second. `backing.value.copy(apps = catalog.launchable())` reads the
+            // state *before* suspending, so the write lands hundreds of milliseconds later carrying a
+            // snapshot from before the assignments arrived — and every assignment disappears from the
+            // screen while sitting safely on disk.
+            val apps = catalog.launchable()
+            backing.update { it.copy(apps = apps) }
         }
     }
 
     fun onCancel() {
-        backing.value = backing.value.copy(draft = null, problem = null, message = null)
+        backing.update { it.copy(draft = null, problem = null, message = null) }
     }
 
     fun onDraftChange(draft: ActionDraft) {
-        backing.value = backing.value.copy(draft = draft, problem = problemOf(draft))
+        backing.update { it.copy(draft = draft, problem = problemOf(draft)) }
     }
 
     /**
@@ -198,7 +212,7 @@ class TagActionsViewModel @Inject constructor(
         viewModelScope.launch {
             val assignment = TagAssignment(uid = uid, label = draft.label.trim(), action = action)
             report({ repository.save(assignment) }) {
-                backing.value = backing.value.copy(draft = null, problem = null, message = null)
+                backing.update { it.copy(draft = null, problem = null, message = null) }
             }
         }
     }
@@ -207,7 +221,7 @@ class TagActionsViewModel @Inject constructor(
         viewModelScope.launch {
             report({ repository.delete(uid) }) {
                 // Any message on screen described the assignment that is now gone.
-                backing.value = backing.value.copy(message = null)
+                backing.update { it.copy(message = null) }
             }
         }
     }
@@ -229,9 +243,7 @@ class TagActionsViewModel @Inject constructor(
             write()
             onSuccess()
         } catch (failure: IOException) {
-            backing.value = backing.value.copy(
-                message = "${failure::class.simpleName}: ${failure.message}",
-            )
+            backing.update { it.copy(message = "${failure::class.simpleName}: ${failure.message}") }
         }
     }
 
@@ -240,7 +252,7 @@ class TagActionsViewModel @Inject constructor(
             onSuccess = { "Action performed." },
             onFailure = { "${it::class.simpleName}: ${it.message}" },
         )
-        backing.value = backing.value.copy(message = message)
+        backing.update { it.copy(message = message) }
     }
 
     /**

@@ -10,6 +10,9 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +36,17 @@ class TagActionsViewModelTest {
         private val stored = MutableStateFlow<List<TagAssignment>>(emptyList())
         var deleted = mutableListOf<String>()
 
-        override fun observeAll(): Flow<List<TagAssignment>> = stored.asStateFlow()
+        /**
+         * Emits only after a delay, because `DataStore` reads a file before it can produce anything.
+         *
+         * The earlier version returned a `StateFlow` that emitted synchronously on collect. That was
+         * more prompt than the real thing, and being more prompt hid a race: anything else in the
+         * ViewModel that captured state before suspending could not lose to it.
+         */
+        override fun observeAll(): Flow<List<TagAssignment>> = flow {
+            delay(READ_DELAY_MILLIS)
+            emitAll(stored.asStateFlow())
+        }
         override suspend fun find(uid: ByteBlock) =
             stored.value.firstOrNull { it.uidKey == TagAssignment.uidKeyOf(uid) }
 
@@ -64,12 +77,19 @@ class TagActionsViewModelTest {
         }
     }
 
+    /** Enumerating installed apps is slow on a real device, so the fake is slow too. */
     private class FakeCatalog(private val apps: List<InstalledApp>) : AppCatalog {
         var queryCount = 0
         override suspend fun launchable(): List<InstalledApp> {
             queryCount++
+            delay(CATALOG_DELAY_MILLIS)
             return apps
         }
+    }
+
+    private companion object {
+        const val READ_DELAY_MILLIS = 10L
+        const val CATALOG_DELAY_MILLIS = 200L
     }
 
     private val dispatcher = StandardTestDispatcher()
@@ -375,6 +395,20 @@ class TagActionsViewModelTest {
         model.onPickApp(InstalledApp("com.toggl.giskard", "Toggl Track"))
 
         assertEquals("Toggl Track", model.state.value.labelFor("com.toggl.giskard"))
+    }
+
+    @Test
+    fun `loading the app list does not wipe the assignments`() = runTest(dispatcher) {
+        // Both arrive asynchronously and both write to the same state. The app list takes far longer
+        // to read, so if it captures state before suspending it writes a snapshot from before the
+        // assignments existed - and every assignment vanishes from the screen while staying on disk.
+        repository.save(TagAssignment(uid, "Desk", TagAction.LaunchApp("a.b")))
+
+        val model = viewModel()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("Desk"), model.state.value.assignments.map { it.label })
+        assertEquals(2, model.state.value.apps.size, "the app list should still have loaded")
     }
 
     @Test
