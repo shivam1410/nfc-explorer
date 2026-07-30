@@ -42,9 +42,9 @@ been claimed. Reseat the cable and unlock the phone before Phase 2 Task 2.5.
 | 1.5 Memory rendering | done | **16/16 failed** on `NotImplementedError` | 16/16 | `42455f6` |
 | 1.6 Write guard | done | **18/18 failed** on `NotImplementedError` | 18/18 | `8dd3345` |
 | 1.7 Purity guard + ADR | done | injected `import android.util.Log` → suite failed naming `ByteBlock.kt:3` | 4/4, green on restore | `5d218e2` |
-| 1.8 Review gate | in progress | — | `kotlin-reviewer` running | — |
+| 1.8 Review gate | done | reviewer verdict BLOCK (0 crit, 0 high, 3 med, 3 low) | 132/132 after fixes | `81eec6c` |
 
-**Suite: 87 tests, 0 failures** (`./gradlew :app:testDebugUnitTest`).
+**Suite after review fixes: 132 tests, 0 failures.**
 
 RED was made genuine rather than nominal: stub bodies threw `NotImplementedError` so the
 failures were real runtime failures, not compile errors that merely prove a symbol is absent.
@@ -74,12 +74,33 @@ failures were real runtime failures, not compile errors that merely prove a symb
 8. **Purity guard extended to `androidx.*`** and made self-testing, since a guard that can
    pass vacuously is worse than none.
 
+### Review outcome (Task 1.8)
+
+`kotlin-reviewer` cross-checked every `LOCK0`/`LOCK1` mask, page mapping and block-lock range
+against `docs/mf0icu1-reference.md` and **found no bit-math defect** — the highest-risk area
+came back clean, and independently confirmed the decoder/fake cross-check as strong evidence.
+Verdict was BLOCK on 3 MEDIUM findings. All six findings fixed:
+
+1. **Behaviour change (filed LOW, treated as most important).** Page `0x02` was writable under
+   expert mode even when the lock page could not be read, contradicting `WriteGuard`'s own
+   documented rule; the invariant sweep excluded page 2 and so never caught it. Reproduced RED,
+   then fixed: an unreadable lock page now yields `UNKNOWN_LOCK_STATE` for page 2 as well.
+   Sweep widened to `page >= 2`.
+2. **Tautological `ManufacturerTest`.** `fromUidByte0(code).code == code` holds for both `Known`
+   and `Unknown`, so it could never catch a bad table key. Replaced with tests iterating the
+   table's own keys via a new `Manufacturer.knownCodes`.
+3. **`!!` in test code.** Replaced with named `requireNotNull` helpers that report which page or
+   field was missing. Production and test code are now both `!!`-free (closes deferred D1).
+4. **Untested logic-bearing models.** Added `MemoryDumpTest` (16), `ChipProfileTest` (4),
+   `TagTechnologiesTest` (5). `MemoryDump` now *enforces* page ordering and page width via
+   `init` requires rather than assuming them, so `readableBytes()` cannot silently scramble.
+5. Removed dead `ByteBlock.slice`/`hasMask`.
+6. Named `LOCK0_LAST_USER_PAGE`; softened a doc forward reference.
+
 ### Honest gaps
 
 - `ManufacturerTest` is characterisation-only, **not** RED-first: the lookup shipped with the
   models in Task 1.1. Recorded rather than presented as TDD.
-- Tests use `!!` in several places, which `~/.claude/rules/kotlin/coding-style.md` forbids.
-  Production code is `!!`-free. Deferred to the Phase 1 review pass to avoid churn mid-slice.
 - No ktlint/Detekt configured yet, though the Kotlin rules call for it. Candidate for the
   review pass or Phase 6.
 - `Manufacturer`'s vendor table is a deliberate subset of the ISO/IEC 7816-6 registry;
@@ -97,11 +118,34 @@ failures were real runtime failures, not compile errors that merely prove a symb
 - Task 1.5: `MemoryRenderer` delegates to `util/Hex.kt` rather than re-implementing hex and
   binary formatting.
 
+## Phase 2 — Android NFC transport and read pipeline (in progress)
+
+| Task | Status | RED proof | GREEN | Commit |
+|---|---|---|---|---|
+| 2.1 Session logger | done | **11/11 failed** on `NotImplementedError` | 11/11 | `c916557` |
+| 2.2 Read pipeline (I2) | done | **16/16 failed** on `NotImplementedError` | 16/16 | `58c6434` |
+| 2.3 Android transport adapters | not started | — | — | — |
+| 2.4 Reader mode controller | not started | — | — | — |
+| 2.5 Device read proof | not started | — | — | — |
+
+**Suite: 148 tests, 0 failures. `assembleDebug` green.**
+
+**Invariant I2 closed.** The wrap-around clamp is tested with chip profiles claiming 14 and 15
+pages over the 16-page fake — striding by 4 across exactly 16 pages never wraps, so an
+MF0ICU1-only test would have proven nothing. Partial dumps distinguish `TAG_LOST` (stride was
+attempted) from `NOT_ATTEMPTED` (never asked for).
+
+Added `TagReport`/`TagPresentation` (not in `spec.md`): the read pipeline needs one value
+carrying identity + dump + locks, and it must exist in partial form, so there is deliberately
+no "failed" variant — a partial answer is still an answer.
+
 ## Remaining build scope
 
-Phase 2 (transport + read pipeline), Phase 3 (UI), Phase 4 (guarded write), Phase 5 (export),
-Phase 6 (verification and closeout). Task 0.3 still owed once a device is attached.
+Phase 2 Tasks 2.3–2.5, Phase 3 (UI), Phase 4 (guarded write), Phase 5 (export), Phase 6
+(verification and closeout).
 
 ## Next
 
-Apply `kotlin-reviewer` findings, then Phase 2 Task 2.1 (session logger).
+Phase 2 Task 2.3 — Android transport adapters (`AndroidUltralightTransport`,
+`TagTechnologyInspector`, `TagRepositoryImpl`, Hilt wiring), then 2.4 reader mode and 2.5 the
+first real dump of the hotel card.

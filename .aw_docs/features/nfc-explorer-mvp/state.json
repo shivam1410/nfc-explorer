@@ -2,7 +2,7 @@
   "feature_slug": "nfc-explorer-mvp",
   "stage": "build",
   "mode": "code",
-  "status": "phase_1_complete_pending_review_findings",
+  "status": "phase_1_complete_reviewed; phase_2_in_progress",
   "updated_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
@@ -14,33 +14,128 @@
     "chip_reference": "docs/mf0icu1-reference.md",
     "state": ".aw_docs/features/nfc-explorer-mvp/state.json"
   },
-  "inputs_used": ["prd.md", "spec.md", "design.md", "tasks.md"],
-  "completed_phases": [0, 1],
+  "inputs_used": [
+    "prd.md",
+    "spec.md",
+    "design.md",
+    "tasks.md"
+  ],
+  "completed_phases": [
+    0,
+    1
+  ],
   "current_phase": 2,
   "phase_notes": {
-    "0": "complete except Task 0.3 (device install proof), blocked on adb device absence",
-    "1": "all slices green; review gate 1.8 in flight",
-    "2": "next: Task 2.1 session logger"
+    "0": "complete incl. Task 0.3 device install proof on Pixel 10",
+    "1": "complete; all 6 reviewer findings fixed",
+    "2": "2.1 and 2.2 done; next 2.3 Android transport adapters"
   },
   "completed_slices": [
-    { "task": "0.1", "title": "Bootstrap gradle 8.14.3 wrapper", "validation": "./gradlew --version", "commit": "3f4454d" },
-    { "task": "0.2", "title": "Project skeleton and version catalog", "validation": "./gradlew :app:assembleDebug", "commit": "72a24f6" },
-    { "task": "1.1", "title": "Domain models, transport interfaces, chip reference doc", "validation": "./gradlew :app:compileDebugKotlin", "commit": "1101464" },
-    { "task": "1.2", "title": "Fake MF0ICU1 transport and fixtures", "validation": "16/16 self-tests", "commit": "abe2b66" },
-    { "task": "1.3", "title": "UID/BCC and manufacturer decoding", "red": "10/10 NotImplementedError", "validation": "10/10 + 5/5 green", "commit": "4fd0859" },
-    { "task": "1.4", "title": "Static lock decoding and page access", "red": "21/21 NotImplementedError", "validation": "22/22 green incl. cross-check vs fake", "commit": "376602e" },
-    { "task": "1.5", "title": "Hex/binary/ASCII rendering", "red": "16/16 NotImplementedError", "validation": "16/16 green", "commit": "42455f6" },
-    { "task": "1.6", "title": "Guarded write policy", "red": "18/18 NotImplementedError", "validation": "18/18 green", "commit": "8dd3345" },
-    { "task": "1.7", "title": "Domain purity guard and ADR 0001", "red": "injected android import -> failure at ByteBlock.kt:3", "validation": "4/4 green, green on restore", "commit": "5d218e2" }
+    {
+      "task": "0.1",
+      "title": "Bootstrap gradle 8.14.3 wrapper",
+      "validation": "./gradlew --version",
+      "commit": "3f4454d"
+    },
+    {
+      "task": "0.2",
+      "title": "Project skeleton and version catalog",
+      "validation": "./gradlew :app:assembleDebug",
+      "commit": "72a24f6"
+    },
+    {
+      "task": "1.1",
+      "title": "Domain models, transport interfaces, chip reference doc",
+      "validation": "./gradlew :app:compileDebugKotlin",
+      "commit": "1101464"
+    },
+    {
+      "task": "1.2",
+      "title": "Fake MF0ICU1 transport and fixtures",
+      "validation": "16/16 self-tests",
+      "commit": "abe2b66"
+    },
+    {
+      "task": "1.3",
+      "title": "UID/BCC and manufacturer decoding",
+      "red": "10/10 NotImplementedError",
+      "validation": "10/10 + 5/5 green",
+      "commit": "4fd0859"
+    },
+    {
+      "task": "1.4",
+      "title": "Static lock decoding and page access",
+      "red": "21/21 NotImplementedError",
+      "validation": "22/22 green incl. cross-check vs fake",
+      "commit": "376602e"
+    },
+    {
+      "task": "1.5",
+      "title": "Hex/binary/ASCII rendering",
+      "red": "16/16 NotImplementedError",
+      "validation": "16/16 green",
+      "commit": "42455f6"
+    },
+    {
+      "task": "1.6",
+      "title": "Guarded write policy",
+      "red": "18/18 NotImplementedError",
+      "validation": "18/18 green",
+      "commit": "8dd3345"
+    },
+    {
+      "task": "1.7",
+      "title": "Domain purity guard and ADR 0001",
+      "red": "injected android import -> failure at ByteBlock.kt:3",
+      "validation": "4/4 green, green on restore",
+      "commit": "5d218e2"
+    },
+    {
+      "task": "0.3",
+      "title": "Device install proof",
+      "validation": "installed+launched on Pixel 10 (Android 17), PID 22850, no FATAL, screenshot captured",
+      "commit": "verification only"
+    },
+    {
+      "task": "1.8",
+      "title": "Apply review findings",
+      "red": "page 2 allowed with unknown locks (expert=true)",
+      "validation": "132/132 green",
+      "commit": "81eec6c"
+    },
+    {
+      "task": "2.1",
+      "title": "Append-only session logger",
+      "red": "11/11 NotImplementedError",
+      "validation": "11/11 green incl. 8x50 concurrent writers",
+      "commit": "c916557"
+    },
+    {
+      "task": "2.2",
+      "title": "Wrap-aware read pipeline (invariant I2)",
+      "red": "16/16 NotImplementedError",
+      "validation": "16/16 green; clamp tested at pageCount 14 and 15",
+      "commit": "58c6434"
+    }
   ],
   "remaining_slices": [
-    "0.3 device install proof (blocked on device)",
-    "1.8 apply review findings",
-    "2.1 session logger", "2.2 wrap-aware read pipeline", "2.3 Android transport adapters", "2.4 reader mode controller", "2.5 device read proof",
-    "3.1 theme + components", "3.2 nav shell + scan screen", "3.3 tag info", "3.4 memory explorer", "3.5 lock analysis", "3.6 session log",
-    "4.1 write use case", "4.2 write sheet + expert mode", "4.3 device write proof", "4.4 review gate",
-    "5.1 exporters", "5.2 SAF export",
-    "6.1 full verification", "6.2 README and closeout"
+    "2.3 Android transport adapters",
+    "2.4 reader mode controller",
+    "2.5 device read proof",
+    "3.1 theme + components",
+    "3.2 nav shell + scan screen",
+    "3.3 tag info",
+    "3.4 memory explorer",
+    "3.5 lock analysis",
+    "3.6 session log",
+    "4.1 write use case",
+    "4.2 write sheet + expert mode",
+    "4.3 device write proof",
+    "4.4 review gate",
+    "5.1 exporters",
+    "5.2 SAF export",
+    "6.1 full verification",
+    "6.2 README and closeout"
   ],
   "parallel_execution": {
     "used": false,
@@ -53,16 +148,29 @@
     "./gradlew :app:compileDebugKotlin",
     "./gradlew :app:testDebugUnitTest"
   ],
-  "test_totals": { "suite": "testDebugUnitTest", "tests": 87, "failures": 0 },
-  "reviewer_agents_used": ["kotlin-reviewer (Phase 1 domain, in flight)"],
+  "test_totals": {
+    "suite": "testDebugUnitTest",
+    "tests": 148,
+    "failures": 0
+  },
+  "reviewer_agents_used": [
+    "kotlin-reviewer (Phase 1 domain) - BLOCK: 0 critical, 0 high, 3 medium, 3 low; all fixed; no bit-math defect found"
+  ],
   "deferred_findings": [
-    { "id": "D1", "item": "`!!` used in test code, forbidden by ~/.claude/rules/kotlin/coding-style.md", "rationale": "production code is !!-free; batching the fix into the Phase 1 review pass avoids churn mid-slice", "owner_task": "1.8" },
-    { "id": "D2", "item": "no ktlint/Detekt configured", "rationale": "Kotlin rules call for it; adding a linter mid-phase would expand slice scope", "owner_task": "1.8 or 6.1" },
-    { "id": "D3", "item": "ManufacturerTest is characterisation-only, not RED-first", "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented as TDD", "owner_task": "none - accepted" }
+    {
+      "id": "D2",
+      "item": "no ktlint/Detekt configured",
+      "rationale": "Kotlin rules call for it; adding a linter mid-phase would expand slice scope",
+      "owner_task": "1.8 or 6.1"
+    },
+    {
+      "id": "D3",
+      "item": "ManufacturerTest is characterisation-only, not RED-first",
+      "rationale": "lookup shipped with models in Task 1.1; recorded rather than misrepresented as TDD",
+      "owner_task": "none - accepted"
+    }
   ],
-  "blockers": [
-    { "id": "B1", "item": "Pixel 10 (64111VDCR000BJ) not present on adb", "impact": "Task 0.3 and Task 2.5 device proofs cannot run; no device evidence claimed", "next_action": "reseat USB, unlock phone, accept debugging prompt, then `./gradlew :app:installDebug`" }
-  ],
+  "blockers": [],
   "spec_deviations": [
     "ByteBlock replaces raw ByteArray in domain models (immutability + value equality)",
     "domain transport exception types added so TAG_LOST is distinguishable from NAK_REFUSED",
@@ -72,11 +180,28 @@
     "ManufacturerDecoder.kt folded into Manufacturer companion",
     "MemoryRenderer returns null rather than a status label (i18n + no-fake-zeros)",
     "domain purity guard extended to androidx.* and made self-testing",
-    "material-icons-extended dropped (deprecated, version-skewed)"
+    "material-icons-extended dropped (deprecated, version-skewed)",
+    "TagReport/TagPresentation added to carry identity+dump+locks as one value, with no failed variant (partial answers are still answers)",
+    "lock page (0x02) reports UNKNOWN_LOCK_STATE when lock bytes are unreadable, so lock bits cannot be set blind",
+    "MemoryDump enforces page ordering and page width via init requires",
+    "Manufacturer.knownCodes exposed so the vendor table itself is testable"
   ],
-  "save_point_commits": ["3f4454d", "72a24f6", "1101464", "abe2b66", "4fd0859", "376602e", "42455f6", "8dd3345", "5d218e2"],
+  "save_point_commits": [
+    "3f4454d",
+    "72a24f6",
+    "1101464",
+    "abe2b66",
+    "4fd0859",
+    "376602e",
+    "42455f6",
+    "8dd3345",
+    "5d218e2",
+    "86030ea",
+    "c916557",
+    "81eec6c",
+    "58c6434"
+  ],
   "recommended_next_commands": [
-    "apply kotlin-reviewer findings (Task 1.8)",
-    "/aw:build  (continue at Phase 2 Task 2.1)"
+    "/aw:build  (continue at Phase 2 Task 2.3 - Android transport adapters)"
   ]
 }
