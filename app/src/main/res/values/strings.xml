@@ -68,6 +68,7 @@
     <!-- Capabilities -->
     <string name="capability_supported">supported</string>
     <string name="capability_absent">not supported by this chip</string>
+    <string name="capability_legend_absent">Outlined chips are not supported by this chip.</string>
     <string name="capability_fast_read">FAST_READ</string>
     <string name="capability_get_version">GET_VERSION</string>
     <string name="capability_pwd_auth">PWD_AUTH</string>

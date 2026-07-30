@@ -97,7 +97,7 @@ fun HexPageRow(
 }
 
 /** Column widths, shared with [HexPageHeader] so the header lines up with the rows exactly. */
-val PAGE_COLUMN_WIDTH = 34.dp
+val PAGE_COLUMN_WIDTH = 46.dp
 val HEX_COLUMN_WIDTH = 128.dp
 
 /**
@@ -105,9 +105,13 @@ val HEX_COLUMN_WIDTH = 128.dp
  *
  * Without these the leading two-digit column reads as data rather than as an address, which is a
  * genuine ambiguity in a table where every cell is hex.
+ *
+ * Only PAGE and HEX are captioned. The access chip between HEX and the secondary column has a
+ * variable width, so no fixed header offset could line up with what follows it — and the view
+ * selector directly above the table already names the secondary column.
  */
 @Composable
-fun HexPageHeader(secondaryLabel: String, modifier: Modifier = Modifier) {
+fun HexPageHeader(modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = stringResource(R.string.memory_column_page),
@@ -117,12 +121,6 @@ fun HexPageHeader(secondaryLabel: String, modifier: Modifier = Modifier) {
         )
         Text(
             text = stringResource(R.string.memory_column_hex),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(HEX_COLUMN_WIDTH),
-        )
-        Text(
-            text = secondaryLabel.uppercase(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

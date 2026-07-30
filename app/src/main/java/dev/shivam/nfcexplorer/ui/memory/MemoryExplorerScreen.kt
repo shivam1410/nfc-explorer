@@ -85,10 +85,7 @@ fun MemoryExplorerScreen(report: TagReport, modifier: Modifier = Modifier) {
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
         ) {
             item {
-                HexPageHeader(
-                    secondaryLabel = stringResource(view.labelRes),
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+                HexPageHeader(modifier = Modifier.padding(bottom = 4.dp))
             }
             items(report.memory.pages, key = PageSnapshot::index) { page ->
                 val access = report.locks.accessFor(page.index)

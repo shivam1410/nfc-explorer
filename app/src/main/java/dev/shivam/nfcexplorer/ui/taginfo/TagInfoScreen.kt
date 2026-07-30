@@ -169,12 +169,16 @@ private fun CapabilitiesSection(report: TagReport) {
                 )
             }
         }
-        Text(
-            text = stringResource(R.string.capability_absent),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        // Only shown when something IS absent. Previously unconditional, which would have claimed
+        // "not supported by this chip" even on a chip that supported everything.
+        if (ChipCapability.entries.any { !report.chip.supports(it) }) {
+            Text(
+                text = stringResource(R.string.capability_legend_absent),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 

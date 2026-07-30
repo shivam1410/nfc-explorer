@@ -123,7 +123,9 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             StatusChip(
-                                text = bit.name,
+                                text = "${bit.name} ${stringResource(
+                                    if (bit.isSet) R.string.bit_set else R.string.bit_clear,
+                                )}",
                                 tone = if (bit.isSet) ChipTone.CAUTION else ChipTone.NEUTRAL,
                             )
                             Text(
@@ -180,9 +182,14 @@ private fun LockBitGrid(bits: List<LockBit>) {
     ) {
         bits.forEach { bit ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // A cleared bit is an ABSENCE, so it renders as a quiet outline. Filling it would
+                // read as "set", which is the opposite of what it means. And the state is spelled
+                // out in the label, because colour must never be the only signal.
                 StatusChip(
-                    text = bit.name,
-                    tone = if (bit.isSet) ChipTone.NEGATIVE else ChipTone.POSITIVE,
+                    text = "${bit.name} ${stringResource(
+                        if (bit.isSet) R.string.bit_set else R.string.bit_clear,
+                    )}",
+                    tone = if (bit.isSet) ChipTone.NEGATIVE else ChipTone.NEUTRAL,
                 )
                 if (bit.isFrozen) {
                     Text(
