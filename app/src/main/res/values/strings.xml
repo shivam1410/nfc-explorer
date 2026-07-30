@@ -144,6 +144,37 @@
     <string name="write_result_partial">partial</string>
     <string name="write_result_none">nothing written</string>
 
+    <!-- Tag actions -->
+    <string name="nav_actions">Actions</string>
+    <string name="actions_explanation">Tapping an assigned tag runs its action even when this app is closed. A tag with no action does nothing at all — no app opens, nothing appears. Close this app when using tags for automation, otherwise it holds the NFC radio and swallows the tap.</string>
+    <string name="actions_assign_last_scan">Assign the last scanned tag</string>
+    <string name="actions_scan_first">Scan a tag first — an action is bound to a tag\'s UID.</string>
+    <string name="actions_none_yet">No tags assigned yet.</string>
+    <string name="actions_new_title">New assignment</string>
+    <string name="actions_edit_title">Edit assignment</string>
+    <string name="actions_label">Label</string>
+    <string name="actions_type_launch">Launch app</string>
+    <string name="actions_type_uri">Open link</string>
+    <string name="actions_type_intent">Send intent</string>
+    <string name="actions_type_media">Media</string>
+    <string name="actions_package">Package name, e.g. com.google.android.apps.youtube.music</string>
+    <string name="actions_uri">Link, including scheme, e.g. https://…</string>
+    <string name="actions_uri_optional">Data URI (optional)</string>
+    <string name="actions_intent_action">Intent action, e.g. com.example.DO_THING</string>
+    <string name="actions_save">Save</string>
+    <string name="actions_cancel">Cancel</string>
+    <string name="actions_test">Test now</string>
+    <string name="actions_edit">Edit</string>
+    <string name="actions_delete">Delete</string>
+    <string name="actions_summary_launch">Launch %1$s</string>
+    <string name="actions_summary_uri">Open %1$s</string>
+    <string name="actions_summary_intent">Send %1$s</string>
+    <string name="actions_summary_media">Media: %1$s</string>
+    <string name="actions_problem_no_tag">Scan a tag first.</string>
+    <string name="actions_problem_blank_label">Give it a label so you can tell your tags apart.</string>
+    <string name="actions_problem_missing_target">This action needs a target.</string>
+    <string name="actions_problem_invalid_uri">Include a scheme, e.g. https:// or myapp://</string>
+
     <!-- Log -->
     <string name="log_title">Session log</string>
     <string name="log_empty">Nothing logged yet.</string>

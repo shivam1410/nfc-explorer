@@ -122,6 +122,17 @@ class TagActionsViewModel @Inject constructor(
     }
 
     /**
+     * Runs whatever the open draft currently describes, without saving it.
+     *
+     * The useful moment to test: a wrong package name shows up immediately rather than after a tap
+     * that silently does nothing. An invalid draft performs nothing rather than guessing at intent.
+     */
+    fun onTestDraft() {
+        val action = backing.value.draft?.let(::draftAction) ?: return
+        onTest(action)
+    }
+
+    /**
      * The action the draft describes, or null when it is not valid yet.
      *
      * Construction is wrapped because the domain types validate in `init`, and here a violation means
