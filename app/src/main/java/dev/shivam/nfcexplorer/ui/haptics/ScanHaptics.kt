@@ -32,14 +32,17 @@ data class ScanHapticSignal(
 /**
  * Vibrates in response to [signal].
  *
- * Uses Compose's [LocalHapticFeedback] rather than [android.os.Vibrator], which is a real
- * simplification and not just a stylistic one:
+ * Uses Compose's [LocalHapticFeedback] rather than [android.os.Vibrator]:
  *
  *  - **no `VIBRATE` permission** is needed, so the app's manifest stays as narrow as it is now;
  *  - **no API-level branching.** `VibratorManager` arrived in API 31 and
  *    `getSystemService(VIBRATOR_SERVICE)` is deprecated from 31, so a direct implementation on
  *    `minSdk 26` would need a version check with a deprecated branch. This has neither.
  *  - it **respects the user's system haptic settings**, which a raw vibrator call bypasses.
+ *
+ * Verified working on a Pixel 10 running Android 17. A `Vibrator`-based rewrite was started on the
+ * theory that `performHapticFeedback` is too subtle for a non-touch event and was reverted — the
+ * theory was wrong, and the three distinct effects below are perfectly perceptible in practice.
  *
  * Distinct effects per outcome, so a scan can be told apart from a failure without looking at the
  * screen — which is the point when the phone is held against a card.
