@@ -3,6 +3,7 @@ package dev.shivam.nfcexplorer.data.action
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.map
  */
 class TagActionStore(
     private val documents: AssignmentDocumentStore,
+    private val logger: SessionLogger,
 ) : TagActionRepository {
 
     override fun observeAll(): Flow<List<TagAssignment>> =
@@ -50,9 +52,29 @@ class TagActionStore(
     /**
      * The stored assignments, or an empty list if the document is absent or unreadable.
      *
-     * Deliberately indistinguishable outcomes: a corrupt store must behave exactly like an empty one,
+     * Deliberately indistinguishable *outcomes*: a corrupt store must behave exactly like an empty one,
      * because the alternative on the dispatch path is a crash during a tap that nobody is watching.
+     *
+     * Not indistinguishable in the log, though. Degrading quietly means a user whose tags all stopped
+     * working has nothing to look at, and because [save] merges onto what it can read, an unreadable
+     * document also means the next save replaces whatever was there. Recovering the store is worth more
+     * than refusing writes forever, but the replacement must not be invisible.
      */
-    private suspend fun current(): List<TagAssignment> =
-        TagActionSerializer.decode(documents.read())
+    private suspend fun current(): List<TagAssignment> {
+        val document = documents.read()
+        val decoded = TagActionSerializer.decode(document)
+
+        if (decoded.isEmpty() && !document.isNullOrBlank()) {
+            logger.warn(
+                category = CATEGORY,
+                message = "stored assignments could not be read; treating the store as empty",
+                payload = mapOf("documentLength" to document.length.toString()),
+            )
+        }
+        return decoded
+    }
+
+    private companion object {
+        const val CATEGORY = "actions"
+    }
 }
