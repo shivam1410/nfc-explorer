@@ -155,7 +155,10 @@ class WritePagesUseCaseTest {
     fun `each outcome names its own page`() {
         val source = transport()
 
-        val result = useCase(source, startPage = 9, pages = PageEncoder.zeros(3), locks = unlocked, expertMode = false)
+        val result = useCase(
+            source, startPage = 9, pages = PageEncoder.zeros(3),
+            locks = unlocked, expertMode = false,
+        )
 
         assertEquals(listOf(9, 10, 11), result.outcomes.map { outcome ->
             when (outcome) {
@@ -171,7 +174,10 @@ class WritePagesUseCaseTest {
     fun `a fully successful batch has nothing that stopped it`() {
         val source = transport()
 
-        val result = useCase(source, startPage = 4, pages = PageEncoder.zeros(2), locks = unlocked, expertMode = false)
+        val result = useCase(
+            source, startPage = 4, pages = PageEncoder.zeros(2),
+            locks = unlocked, expertMode = false,
+        )
 
         assertNull(result.stoppedBy)
         assertFalse(result.isPartial)
@@ -194,7 +200,10 @@ class WritePagesUseCaseTest {
 
     @Test
     fun `the batch is summarised in the session log`() {
-        useCase(transport(), startPage = 4, pages = PageEncoder.zeros(3), locks = unlocked, expertMode = false)
+        useCase(
+            transport(), startPage = 4, pages = PageEncoder.zeros(3),
+            locks = unlocked, expertMode = false,
+        )
 
         assertTrue(
             logger.entries.value.any { it.payload.containsKey("pagesWritten") },

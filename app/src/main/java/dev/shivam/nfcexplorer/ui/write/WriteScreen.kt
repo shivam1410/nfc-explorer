@@ -76,7 +76,11 @@ fun WriteScreen(
                     label = { Text(stringResource(mode(state).labelRes())) },
                     isError = state.problem != null,
                     singleLine = false,
-                    textStyle = if (state.mode == WriteMode.HEX) HexTextStyle else MaterialTheme.typography.bodyLarge,
+                    textStyle = if (state.mode == WriteMode.HEX) {
+                        HexTextStyle
+                    } else {
+                        MaterialTheme.typography.bodyLarge
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),

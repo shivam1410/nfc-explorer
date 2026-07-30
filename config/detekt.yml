@@ -1,0 +1,48 @@
+# Detekt overrides. Everything not listed keeps the default from `buildUponDefaultConfig`.
+
+complexity:
+  LongParameterList:
+    # Stateless composables take one parameter per callback by design.
+    excludes: ['**/ui/**']
+  TooManyFunctions:
+    excludes: ['**/ui/**', '**/test/**']
+    # TagTechnologyInspector has one small reader per android.nfc.tech type, and there are nine of
+    # them. Splitting its 91-line `when` into per-technology functions was the right call and
+    # immediately tripped this rule at 13/11 -- the classic case of one rule's fix breaking another.
+    # The structure is correct, so the threshold moves rather than the code.
+    thresholdInClasses: 16
+  CyclomaticComplexMethod:
+    excludes: ['**/ui/**']
+  NestedBlockDepth:
+    # WriteGuardTest sweeps page x lock state x expert mode. Three nested loops is what an
+    # exhaustive sweep looks like, and flattening it would hide what it covers.
+    excludes: ['**/test/**']
+  LongMethod:
+    excludes: ['**/ui/**', '**/domain/usecase/**']
+
+style:
+  MagicNumber:
+    # A tool about byte-level protocol detail is full of deliberate hex literals, and the ones that
+    # matter are already named constants documented against the datasheet.
+    active: false
+  MaxLineLength:
+    maxLineLength: 110
+  ReturnCount:
+    # Guard-clause style is used deliberately in the write path, where each early return is a
+    # distinct refusal reason.
+    max: 6
+
+naming:
+  FunctionNaming:
+    # @Composable functions are PascalCase. This is the rule that made ktlint unusable here.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    excludes: ['**/ui/**']
+
+exceptions:
+  TooGenericExceptionCaught:
+    # Catching Throwable is deliberate in two places, both documented: after a write has already
+    # physically happened, losing the record of it would be worse than any generic-catch smell.
+    excludes: ['**/domain/usecase/**', '**/data/**']
+  SwallowedException:
+    excludes: ['**/data/**']

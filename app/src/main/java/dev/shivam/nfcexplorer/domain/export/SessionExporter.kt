@@ -196,7 +196,10 @@ object TextSessionExporter : SessionExporter {
             appendLine("(empty)")
         } else {
             entries.forEach { entry ->
-                appendLine("[${entry.sequence}] ${entry.timestampMillis} ${entry.level} ${entry.category}: ${entry.message}")
+                appendLine(
+                    "[${entry.sequence}] ${entry.timestampMillis} " +
+                        "${entry.level} ${entry.category}: ${entry.message}",
+                )
                 // trimEnd because a payload value can legitimately be empty (an empty locked-page
                 // list, say). The exporter guarantees clean lines whatever it is handed.
                 entry.payload.forEach { (key, value) ->
