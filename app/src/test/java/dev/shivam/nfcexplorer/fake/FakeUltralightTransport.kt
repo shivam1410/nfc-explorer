@@ -31,11 +31,15 @@ import dev.shivam.nfcexplorer.domain.transport.UltralightTransport.Companion.BYT
  *   simulating the tag being pulled away mid-dump.
  * @param nakPages pages that refuse to be read. A real chip NAKs the whole four-page window,
  *   so any read whose window covers one of these fails.
+ * @param failOnConnect when true, [connect] raises [TagFieldLostException]. Models a tag that is gone
+ *   before the connection opens — and, for the trigger's guard, a `Tag` parcel with no live session
+ *   behind it, which is the case a hostile caller can construct.
  */
 class FakeUltralightTransport(
     initialMemory: ByteArray = ByteArray(TOTAL_BYTES),
     private val failFromPage: Int? = null,
     private val nakPages: Set<Int> = emptySet(),
+    private val failOnConnect: Boolean = false,
 ) : UltralightTransport {
 
     init {
@@ -69,6 +73,7 @@ class FakeUltralightTransport(
 
     override fun connect() {
         check(!isClosed) { "cannot reconnect a closed transport" }
+        if (failOnConnect) throw TagFieldLostException()
         isConnected = true
     }
 

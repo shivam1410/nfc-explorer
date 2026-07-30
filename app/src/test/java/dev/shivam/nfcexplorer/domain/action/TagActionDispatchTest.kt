@@ -18,6 +18,11 @@ import kotlin.test.assertTrue
  */
 class TagActionDispatchTest {
 
+    private val live = TagPresence.Answer.Live
+
+    /** A tag that never answered — a forged parcel, or one that left the field. */
+    private val absent = TagPresence.Answer.Absent(cause = null)
+
     private val assignment = TagAssignment(
         uid = ByteBlock.ofInts(0x04, 0x1C, 0x4E),
         label = "Desk",
@@ -30,7 +35,7 @@ class TagActionDispatchTest {
     fun `acts for a genuine NFC dispatch with a tag and a matching assignment`() {
         TagActionDispatch.NFC_ACTIONS.forEach { action ->
             assertTrue(
-                TagActionDispatch.shouldAct(action, hasTagExtra = true, assignment = assignment),
+                TagActionDispatch.shouldAct(action, presence = live, assignment = assignment),
                 "should act for $action",
             )
         }
@@ -49,7 +54,7 @@ class TagActionDispatchTest {
             "",
         ).forEach { action ->
             assertFalse(
-                TagActionDispatch.shouldAct(action, hasTagExtra = true, assignment = assignment),
+                TagActionDispatch.shouldAct(action, presence = live, assignment = assignment),
                 "must refuse action '$action'",
             )
         }
@@ -57,15 +62,15 @@ class TagActionDispatchTest {
 
     @Test
     fun `refuses a null intent action`() {
-        assertFalse(TagActionDispatch.shouldAct(null, hasTagExtra = true, assignment = assignment))
+        assertFalse(TagActionDispatch.shouldAct(null, presence = live, assignment = assignment))
     }
 
     @Test
-    fun `refuses an NFC action that carries no tag`() {
-        // An action string is trivially spoofable; the tag extra only arrives from the platform.
+    fun `refuses an NFC action whose tag never answered`() {
+        // An action string is trivially spoofable and so is a Tag parcel; answering a connection is not.
         TagActionDispatch.NFC_ACTIONS.forEach { action ->
             assertFalse(
-                TagActionDispatch.shouldAct(action, hasTagExtra = false, assignment = assignment),
+                TagActionDispatch.shouldAct(action, presence = absent, assignment = assignment),
                 "must refuse $action without a tag",
             )
         }
@@ -77,7 +82,7 @@ class TagActionDispatchTest {
     fun `refuses a genuine dispatch when the tag has no assignment`() {
         TagActionDispatch.NFC_ACTIONS.forEach { action ->
             assertFalse(
-                TagActionDispatch.shouldAct(action, hasTagExtra = true, assignment = null),
+                TagActionDispatch.shouldAct(action, presence = live, assignment = null),
                 "must do nothing for an unassigned tag on $action",
             )
         }
@@ -85,8 +90,8 @@ class TagActionDispatchTest {
 
     @Test
     fun `refuses everything when nothing is assigned and the caller is hostile`() {
-        assertFalse(TagActionDispatch.shouldAct("com.example.MALICIOUS", true, null))
-        assertFalse(TagActionDispatch.shouldAct(null, false, null))
+        assertFalse(TagActionDispatch.shouldAct("com.example.MALICIOUS", live, null))
+        assertFalse(TagActionDispatch.shouldAct(null, absent, null))
     }
 
     // --- All three conditions are load-bearing ---
@@ -97,17 +102,17 @@ class TagActionDispatchTest {
         // where all three hold.
         var actedCount = 0
         listOf(true, false).forEach { nfcAction ->
-            listOf(true, false).forEach { hasTag ->
+            listOf(live, absent).forEach { answer ->
                 listOf(assignment, null).forEach { found ->
                     val acted = TagActionDispatch.shouldAct(
                         intentAction = if (nfcAction) "android.nfc.action.TECH_DISCOVERED" else "x",
-                        hasTagExtra = hasTag,
+                        presence = answer,
                         assignment = found,
                     )
                     if (acted) actedCount++
                     assertTrue(
-                        !acted || (nfcAction && hasTag && found != null),
-                        "acted with nfc=$nfcAction tag=$hasTag assigned=${found != null}",
+                        !acted || (nfcAction && answer == live && found != null),
+                        "acted with nfc=$nfcAction tag=$answer assigned=${found != null}",
                     )
                 }
             }

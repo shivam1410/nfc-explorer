@@ -13,6 +13,11 @@ package dev.shivam.nfcexplorer.domain.action
  * kind of activity-level plumbing that no unit test covered.
  *
  * All three conditions are necessary and none is sufficient, swept in `TagActionDispatchTest`.
+ *
+ * Presence arrives as a [TagPresence.Answer] rather than a `Boolean` deliberately. The third review
+ * found this parameter being satisfied with a literal `true` at the only call site, which read as a
+ * check but restated a null test the caller had already done. A `true` no longer compiles here, and an
+ * `Answer.Live` written by hand is a visible claim rather than a plausible-looking flag.
  */
 object TagActionDispatch {
 
@@ -26,13 +31,15 @@ object TagActionDispatch {
     /**
      * @param intentAction the launching intent's action. Trivially spoofable on its own, which is why
      *   it is never sufficient by itself.
-     * @param hasTagExtra whether the intent carries `NfcAdapter.EXTRA_TAG`. Only the platform supplies
+     * @param tagIsLive whether the intent carries `NfcAdapter.EXTRA_TAG`. Only the platform supplies
      *   this, so it is the part a hostile caller cannot fake by writing a string.
      * @param assignment the stored assignment for the tag's UID, or null when the tag is unassigned.
      */
     fun shouldAct(
         intentAction: String?,
-        hasTagExtra: Boolean,
+        presence: TagPresence.Answer,
         assignment: TagAssignment?,
-    ): Boolean = intentAction in NFC_ACTIONS && hasTagExtra && assignment != null
+    ): Boolean = intentAction in NFC_ACTIONS &&
+        presence is TagPresence.Answer.Live &&
+        assignment != null
 }
