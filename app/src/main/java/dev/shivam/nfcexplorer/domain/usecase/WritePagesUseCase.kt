@@ -5,6 +5,7 @@ import dev.shivam.nfcexplorer.domain.model.WriteBatchResult
 import dev.shivam.nfcexplorer.domain.model.WriteOutcome
 import dev.shivam.nfcexplorer.domain.transport.UltralightTransport
 import dev.shivam.nfcexplorer.logging.SessionLogger
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Writes a consecutive run of pages, one page at a time, through the same guard as a single write.
@@ -50,16 +51,34 @@ class WritePagesUseCase(
         )
 
         val outcomes = mutableListOf<WriteOutcome>()
-        for ((offset, payload) in pages.withIndex()) {
-            val outcome = writePage(
-                transport = transport,
-                page = startPage + offset,
-                data = payload,
-                locks = locks,
-                expertMode = expertMode,
+        try {
+            for ((offset, payload) in pages.withIndex()) {
+                val outcome = writePage(
+                    transport = transport,
+                    page = startPage + offset,
+                    data = payload,
+                    locks = locks,
+                    expertMode = expertMode,
+                )
+                outcomes += outcome
+                if (outcome !is WriteOutcome.Written) break
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (unexpected: Throwable) {
+            // Pages written before this point are permanently altered on the tag. Letting the
+            // exception unwind would discard `outcomes` and report the whole batch as a generic
+            // failure, hiding real hardware changes from a user who may then retry believing
+            // nothing happened. The partial result is reported instead.
+            logger.error(
+                category = CATEGORY,
+                message = "batch write aborted unexpectedly; earlier pages were already written",
+                payload = mapOf(
+                    "pagesWritten" to outcomes.count { it is WriteOutcome.Written }.toString(),
+                    "exception" to (unexpected::class.simpleName ?: "Throwable"),
+                    "message" to (unexpected.message ?: ""),
+                ),
             )
-            outcomes += outcome
-            if (outcome !is WriteOutcome.Written) break
         }
 
         val result = WriteBatchResult(

@@ -25,6 +25,7 @@ data class WriteUiState(
     val endPage: Int = LAST_USER_PAGE,
     val expertMode: Boolean = false,
     val isArmed: Boolean = false,
+    val isScreenVisible: Boolean = false,
     val isWriting: Boolean = false,
     val problem: InputProblem? = null,
     val result: WriteBatchResult? = null,
@@ -45,6 +46,7 @@ data class WriteUiState(
         get() = problem == null &&
             pageCount > 0 &&
             !isWriting &&
+            isScreenVisible &&
             (mode == WriteMode.WIPE || input.isNotBlank())
 
     companion object {
@@ -82,12 +84,47 @@ class WriteViewModel @Inject constructor(
         refresh { it }
     }
 
+    /**
+     * Called when the Write screen enters composition.
+     *
+     * Arming is only possible while the screen is on display, because arming *is* the user's
+     * confirmation of the preview shown there.
+     */
+    fun onScreenEntered() {
+        backing.value = backing.value.copy(isScreenVisible = true)
+    }
+
+    /**
+     * Called when the Write screen leaves composition, and **disarms**.
+     *
+     * Without this, an Activity-scoped arm outlives its own screen: the tag router dispatches every
+     * tap globally, so a user who armed a write, switched to another tab and tapped an unrelated tag
+     * would have that payload written to it with no confirmation visible anywhere. Leaving the screen
+     * withdraws the confirmation.
+     */
+    fun onScreenLeft() {
+        backing.value = backing.value.copy(isScreenVisible = false, isArmed = false)
+    }
+
     fun onModeChange(mode: WriteMode) = update { it.copy(mode = mode) }
 
     fun onInputChange(input: String) = update { it.copy(input = input) }
 
-    fun onRangeChange(startPage: Int, endPage: Int) =
-        update { it.copy(startPage = startPage, endPage = endPage) }
+    /**
+     * Clamps to the chip's addressable pages and keeps the range ordered.
+     *
+     * Previously these invariants lived only in the Compose stepper. The guard's per-page null check
+     * happened to catch out-of-range values as a backstop, but that was incidental rather than a
+     * contract, and an inverted range could yield a zero or wrapped page count.
+     */
+    fun onRangeChange(startPage: Int, endPage: Int) = update { current ->
+        val first = startPage.coerceIn(MIN_PAGE, MAX_PAGE)
+        val last = endPage.coerceIn(MIN_PAGE, MAX_PAGE)
+        current.copy(
+            startPage = minOf(first, last),
+            endPage = maxOf(first, last),
+        )
+    }
 
     fun onExpertModeChange(enabled: Boolean) = update { it.copy(expertMode = enabled) }
 
@@ -103,7 +140,9 @@ class WriteViewModel @Inject constructor(
 
     fun onTagPresented(handle: TagHandle) {
         val current = backing.value
-        if (!current.isArmed || current.isWriting) return
+        // isScreenVisible is checked as well as isArmed: defence in depth, so that even if some
+        // future path leaves a stale arm behind, a tap cannot write while the preview is off screen.
+        if (!current.isArmed || !current.isScreenVisible || current.isWriting) return
 
         val pages = encode(current) ?: return
 
@@ -161,6 +200,11 @@ class WriteViewModel @Inject constructor(
      * Distinguishes unparseable hex from hex that simply does not fit, so the message names the
      * actual mistake instead of blaming length for a stray character.
      */
+    private companion object {
+        const val MIN_PAGE = 0
+        const val MAX_PAGE = WriteUiState.LAST_USER_PAGE
+    }
+
     private fun hexProblem(state: WriteUiState): InputProblem {
         val parsed = PageEncoder.fromHex(state.input, pageCount = Int.MAX_VALUE / 4)
         return if (parsed == null) InputProblem.MALFORMED_HEX else InputProblem.TOO_LONG

@@ -10,6 +10,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
@@ -126,6 +127,14 @@ fun NfcExplorerNavHost(
             composable(Destination.WRITE.route) {
                 val writeState by writeViewModel.state.collectAsStateWithLifecycle()
                 val preview by writeViewModel.encodedPreview.collectAsStateWithLifecycle()
+
+                // The view model is Activity-scoped while this screen is not, so it has to be told
+                // when its screen comes and goes. Leaving disarms: an arm is a confirmation of the
+                // preview shown here, and the tag router dispatches taps from every tab.
+                DisposableEffect(Unit) {
+                    writeViewModel.onScreenEntered()
+                    onDispose { writeViewModel.onScreenLeft() }
+                }
                 WriteScreen(
                     state = writeState,
                     encoded = preview,

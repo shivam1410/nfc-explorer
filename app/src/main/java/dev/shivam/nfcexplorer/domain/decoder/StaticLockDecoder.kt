@@ -48,6 +48,31 @@ object StaticLockDecoder {
     private val ALL_PAGES = 0..LAST_PAGE
 
     /**
+     * Extracts the two static lock bytes from a `READ` frame taken at [LOCK_PAGE].
+     *
+     * `readPages(2)` returns pages 2, 3, 4, 5 — sixteen bytes — so the lock bytes are bytes 2 and 3
+     * of the frame, being bytes 2 and 3 of page `0x02` itself. Getting this offset wrong would feed
+     * the decoder the wrong bytes and mislabel which pages are writable, so it lives here as a named
+     * function with tests rather than as two magic indices inside a repository.
+     *
+     * Returns null for a short or absent frame, which the decoder turns into
+     * [WriteVerdict.UNKNOWN_LOCK_STATE] and the guard turns into a refusal — the safe direction.
+     */
+    fun lockBytesFromLockPageFrame(frame: ByteArray?): ByteBlock? {
+        if (frame == null || frame.size <= LOCK1_FRAME_OFFSET) return null
+        return ByteBlock.ofInts(
+            frame[LOCK0_FRAME_OFFSET].toInt() and 0xFF,
+            frame[LOCK1_FRAME_OFFSET].toInt() and 0xFF,
+        )
+    }
+
+    /** Page whose frame carries the lock bytes. */
+    const val LOCK_PAGE_ADDRESS = 2
+
+    private const val LOCK0_FRAME_OFFSET = 2
+    private const val LOCK1_FRAME_OFFSET = 3
+
+    /**
      * @param lockBytes the two bytes at page `0x02` offsets 2 and 3, or null when that page
      *   could not be read. Null produces [WriteVerdict.UNKNOWN_LOCK_STATE] for every page
      *   whose state depends on a lock bit — never a guess of writable.

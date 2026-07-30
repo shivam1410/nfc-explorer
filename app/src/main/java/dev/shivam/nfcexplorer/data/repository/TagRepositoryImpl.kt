@@ -149,10 +149,9 @@ class TagRepositoryImpl @Inject constructor(
      */
     private fun readLockBytes(transport: AndroidUltralightTransport): ByteBlock? =
         try {
-            val frame = transport.readPages(LOCK_PAGE)
-            ByteBlock.ofInts(
-                frame[LOCK0_OFFSET].toInt() and 0xFF,
-                frame[LOCK1_OFFSET].toInt() and 0xFF,
+            // Frame layout handled by the decoder, which has tests for it.
+            StaticLockDecoder.lockBytesFromLockPageFrame(
+                transport.readPages(StaticLockDecoder.LOCK_PAGE_ADDRESS),
             )
         } catch (failure: IOException) {
             logger.warn(
@@ -165,10 +164,6 @@ class TagRepositoryImpl @Inject constructor(
 
     private companion object {
         const val CATEGORY = "session"
-
-        const val LOCK_PAGE = 2
-        const val LOCK0_OFFSET = 2
-        const val LOCK1_OFFSET = 3
 
         /** Zero geometry, so the read pipeline attempts no pages. */
         val UNREADABLE_CHIP = dev.shivam.nfcexplorer.domain.model.ChipProfile.UNIDENTIFIED
