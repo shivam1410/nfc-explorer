@@ -105,6 +105,7 @@ class WriteViewModelTest {
     @Test
     fun `wipe mode can be armed with an empty input because zeroing is its whole purpose`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onModeChange(WriteMode.WIPE)
 
         assertTrue(model.state.value.canArm)
@@ -113,6 +114,7 @@ class WriteViewModelTest {
     @Test
     fun `typing then clearing the field disarms and blocks arming again`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         assertTrue(model.state.value.canArm)
 
@@ -127,6 +129,7 @@ class WriteViewModelTest {
     @Test
     fun `text within capacity is valid`() {
         val model = viewModel()
+        model.onScreenEntered()
 
         model.onInputChange("hello")
 
@@ -170,6 +173,7 @@ class WriteViewModelTest {
     @Test
     fun `wipe mode ignores the input entirely`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("this is far too long to fit anywhere at all, truly enormous text")
 
         model.onModeChange(WriteMode.WIPE)
@@ -184,6 +188,7 @@ class WriteViewModelTest {
     @Test
     fun `arming requires valid input`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onRangeChange(4, 4)
         model.onInputChange("ABCDE")
 
@@ -195,6 +200,7 @@ class WriteViewModelTest {
     @Test
     fun `arming then disarming leaves nothing pending`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
 
         model.onArm()
@@ -207,6 +213,7 @@ class WriteViewModelTest {
     @Test
     fun `changing the payload after arming disarms it`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onArm()
 
@@ -219,10 +226,52 @@ class WriteViewModelTest {
     @Test
     fun `changing the range after arming disarms it`() {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onArm()
 
         model.onRangeChange(6, 8)
+
+        assertFalse(model.state.value.isArmed)
+    }
+
+    // --- Screen visibility: the CRITICAL finding ---
+
+    @Test
+    fun `leaving the write screen disarms`() {
+        val model = viewModel()
+        model.onScreenEntered()
+        model.onInputChange("hi")
+        model.onArm()
+        assertTrue(model.state.value.isArmed)
+
+        model.onScreenLeft()
+
+        // Arming is a confirmation of what is on screen. Once that screen is gone the confirmation
+        // no longer means anything, and a tap on some unrelated tag must not execute it.
+        assertFalse(model.state.value.isArmed)
+    }
+
+    @Test
+    fun `a tag presented while the write screen is not visible is ignored`() = runTest(dispatcher) {
+        val model = viewModel()
+        model.onScreenEntered()
+        model.onInputChange("hi")
+        model.onArm()
+        model.onScreenLeft()
+
+        model.onTagPresented(StubHandle)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, repository.writeCount, "a write must not fire from an off-screen arm")
+    }
+
+    @Test
+    fun `arming is not possible before the screen is entered`() {
+        val model = viewModel()
+        model.onInputChange("hi")
+
+        model.onArm()
 
         assertFalse(model.state.value.isArmed)
     }
@@ -241,8 +290,41 @@ class WriteViewModelTest {
     }
 
     @Test
+    fun `the previewed bytes are exactly the bytes written`() = runTest(dispatcher) {
+        // The preview IS the thing the user confirms by arming. Asserting each side against a
+        // hand-written expectation would pass even if the two diverged, so they are compared
+        // against each other.
+        val model = viewModel()
+        model.onScreenEntered()
+        model.onRangeChange(4, 6)
+        model.onInputChange("hello wo")
+        model.onArm()
+        val previewed = requireNotNull(model.encodedPreview.value).map { it.toHex() }
+
+        model.onTagPresented(StubHandle)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(previewed, requireNotNull(repository.lastPages).map { it.toHex() })
+    }
+
+    @Test
+    fun `the range is clamped to the chip geometry and kept in order`() {
+        val model = viewModel()
+
+        model.onRangeChange(startPage = -5, endPage = 99)
+        assertEquals(0, model.state.value.startPage)
+        assertEquals(15, model.state.value.endPage)
+
+        // An inverted range must not produce a negative or wrapped page count.
+        model.onRangeChange(startPage = 10, endPage = 4)
+        assertTrue(model.state.value.startPage <= model.state.value.endPage)
+        assertTrue(model.state.value.pageCount > 0)
+    }
+
+    @Test
     fun `an armed write executes on the next tag and encodes the payload`() = runTest(dispatcher) {
         val model = viewModel()
+        model.onScreenEntered()
         model.onRangeChange(4, 5)
         model.onInputChange("Hi")
         model.onArm()
@@ -258,6 +340,7 @@ class WriteViewModelTest {
     @Test
     fun `a wipe writes zeros across the whole range`() = runTest(dispatcher) {
         val model = viewModel()
+        model.onScreenEntered()
         model.onModeChange(WriteMode.WIPE)
         model.onArm()
 
@@ -271,6 +354,7 @@ class WriteViewModelTest {
     @Test
     fun `expert mode is passed through to the repository`() = runTest(dispatcher) {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onExpertModeChange(true)
         model.onArm()
@@ -284,6 +368,7 @@ class WriteViewModelTest {
     @Test
     fun `a completed write disarms so a second tap cannot repeat it silently`() = runTest(dispatcher) {
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onArm()
 
@@ -302,6 +387,7 @@ class WriteViewModelTest {
             WriteBatchResult(startPage = 4, pagesRequested = 1, outcomes = emptyList()),
         )
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onArm()
 
@@ -316,6 +402,7 @@ class WriteViewModelTest {
     fun `a failed write session is reported without a stack trace`() = runTest(dispatcher) {
         repository.result = Result.failure(IllegalStateException("tag vanished"))
         val model = viewModel()
+        model.onScreenEntered()
         model.onInputChange("hi")
         model.onArm()
 

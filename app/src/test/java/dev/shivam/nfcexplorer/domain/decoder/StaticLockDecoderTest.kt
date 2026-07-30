@@ -288,6 +288,61 @@ class StaticLockDecoderTest {
             }
     }
 
+    // --- Lock-page frame extraction (safety-critical offsets) ---
+
+    @Test
+    fun `lock bytes come from bytes 2 and 3 of the lock page frame`() {
+        // readPages(2) returns pages 2,3,4,5. Page 2 is BCC1, internal, LOCK0, LOCK1 -- so the lock
+        // bytes are frame[2] and frame[3]. Anything else would mislabel which pages are writable.
+        val frame = Mf0icu1Fixtures.bytes(
+            0xAF, 0x48, 0xF8, 0xFF, // page 2: BCC1, internal, LOCK0, LOCK1
+            0x46, 0x0D, 0xAE, 0x11, // page 3
+            0xE2, 0x42, 0x1B, 0x5E, // page 4
+            0x36, 0x56, 0x3A, 0x96, // page 5
+        )
+
+        assertEquals(
+            ByteBlock.ofInts(0xF8, 0xFF),
+            StaticLockDecoder.lockBytesFromLockPageFrame(frame),
+        )
+    }
+
+    @Test
+    fun `the lock page address is page 2`() {
+        assertEquals(2, StaticLockDecoder.LOCK_PAGE_ADDRESS)
+    }
+
+    @Test
+    fun `a short or absent frame yields no lock bytes rather than reading past the end`() {
+        assertNull(StaticLockDecoder.lockBytesFromLockPageFrame(null))
+        assertNull(StaticLockDecoder.lockBytesFromLockPageFrame(ByteArray(0)))
+        // Three bytes: index 3 does not exist, so this must not throw.
+        assertNull(StaticLockDecoder.lockBytesFromLockPageFrame(Mf0icu1Fixtures.bytes(0, 0, 0)))
+    }
+
+    @Test
+    fun `an unreadable frame decodes to unknown lock state, never to writable`() {
+        val analysis = StaticLockDecoder.decode(
+            StaticLockDecoder.lockBytesFromLockPageFrame(null),
+        )
+
+        assertTrue(analysis.writablePages.isEmpty())
+    }
+
+    @Test
+    fun `extracted lock bytes decode to the same analysis as the bytes given directly`() {
+        // Ties the extraction and the decoder together, so a wrong offset shows up as a wrong
+        // verdict rather than only as a wrong pair of bytes.
+        val frame = Mf0icu1Fixtures.bytes(0xAF, 0x48, 0x80, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+        val viaFrame = StaticLockDecoder.decode(
+            StaticLockDecoder.lockBytesFromLockPageFrame(frame),
+        )
+
+        assertEquals(decode(0x80, 0x00).pageAccess, viaFrame.pageAccess)
+        assertEquals(listOf(7), viaFrame.lockedPages)
+    }
+
     // --- Input validation ---
 
     @Test

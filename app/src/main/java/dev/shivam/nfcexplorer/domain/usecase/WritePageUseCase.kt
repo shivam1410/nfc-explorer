@@ -8,6 +8,7 @@ import dev.shivam.nfcexplorer.domain.transport.UltralightTransport
 import dev.shivam.nfcexplorer.domain.writer.WriteGuard
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Writes one page, but only if the guard allows it, and proves the result by reading back.
@@ -120,13 +121,19 @@ class WritePageUseCase(
         try {
             val frame = transport.readPages(page)
             ByteBlock.copyOf(frame.copyOfRange(0, UltralightTransport.BYTES_PER_PAGE))
-        } catch (failure: IOException) {
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: Throwable) {
+            // Catches Throwable, not just IOException. The write has ALREADY physically happened by
+            // this point, so letting an unexpected exception escape here would discard the record of
+            // a permanent hardware change -- a malformed short frame producing
+            // IndexOutOfBoundsException, for instance. Verification failing is not the write failing.
             logger.warn(
                 category = CATEGORY,
                 message = "could not read back the written page",
                 payload = mapOf(
                     "page" to page.toString(),
-                    "exception" to (failure::class.simpleName ?: "IOException"),
+                    "exception" to (failure::class.simpleName ?: "Throwable"),
                 ),
             )
             null

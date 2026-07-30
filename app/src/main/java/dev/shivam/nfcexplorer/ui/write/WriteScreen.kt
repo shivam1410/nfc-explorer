@@ -191,7 +191,9 @@ private fun Stepper(label: String, value: Int, onChange: (Int) -> Unit) {
 
 @Composable
 private fun ExpertModeCard(state: WriteUiState, onExpertModeChange: (Boolean) -> Unit) {
-    val touchesGatedPages = state.startPage <= OTP_PAGE
+    // The gated pages are 0x02 and 0x03. Previously this asked only whether startPage <= 3, which
+    // warned on a UID-only range (0-1) that touches neither of them.
+    val touchesGatedPages = state.startPage <= OTP_PAGE && state.endPage >= LOCK_PAGE
     if (!touchesGatedPages && !state.expertMode) return
 
     Card(
@@ -298,6 +300,7 @@ private fun WriteOutcome.describe(): String = when (this) {
     is WriteOutcome.Failed -> "%02X  failed: %s %s".format(page, exceptionName, message ?: "")
 }
 
+private const val LOCK_PAGE = 2
 private const val OTP_PAGE = 3
 
 private fun mode(state: WriteUiState): WriteMode = state.mode
