@@ -10,7 +10,7 @@ each slice was small and the review gate sits at the end of the phase).
 |---|---|---|---|---|
 | 0.1 Bootstrap wrapper | done | no `gradle` on PATH; cached 8.14.3 dist located | `./gradlew --version` → Gradle 8.14.3, JVM 17.0.18 | `3f4454d` |
 | 0.2 Skeleton + catalog | done | empty non-git directory | `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL | `72a24f6` |
-| 0.3 Device install proof | **deferred** | — | blocked: no adb device | — |
+| 0.3 Device install proof | done | device re-appeared on adb | installed + launched on Pixel 10 (Android 17), PID 22850, no FATAL in logcat, screenshot captured | verification only |
 
 **Deviations.**
 
