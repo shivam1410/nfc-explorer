@@ -1,0 +1,92 @@
+{
+  "feature_slug": "nfc-explorer-mvp",
+  "stage": "plan",
+  "mode": "full",
+  "status": "plan_complete_awaiting_build",
+  "created_utc": "2026-07-30",
+  "artifacts": {
+    "prd": ".aw_docs/features/nfc-explorer-mvp/prd.md",
+    "design": ".aw_docs/features/nfc-explorer-mvp/design.md",
+    "spec": ".aw_docs/features/nfc-explorer-mvp/spec.md",
+    "tasks": ".aw_docs/features/nfc-explorer-mvp/tasks.md",
+    "state": ".aw_docs/features/nfc-explorer-mvp/state.json"
+  },
+  "key_inputs": {
+    "target_chip": "MIFARE Ultralight MF0ICU1 (NXP), 64 bytes, 16 pages x 4 bytes",
+    "motivating_question": "Determine what is stored on a hotel key card and why NXP TagInfo / NFC Tools refuse to dump or format it",
+    "user_decisions": {
+      "gradle_structure": "single :app module with strict package boundaries",
+      "device_verification": "physical device available over adb",
+      "write_safety": "guarded writes; lock-byte and OTP writes gated behind expert mode"
+    },
+    "toolchain": {
+      "jdk": "Temurin 17.0.18",
+      "gradle": "8.14.3 (cached, wrapper bootstrapped from ~/.gradle/wrapper/dists)",
+      "gradle_on_path": false,
+      "sdk_platforms": ["android-35", "android-36", "android-36.1"],
+      "build_tools": ["34.0.0", "35.0.0", "36.0.0", "36.1.0", "37.0.0"],
+      "compile_sdk": 36,
+      "target_sdk": 36,
+      "min_sdk": 26,
+      "application_id": "dev.shivam.nfcexplorer"
+    },
+    "device": {
+      "serial": "64111VDCR000BJ",
+      "model": "Pixel_10",
+      "adb_status_at_plan_time": "detected once, then dropped off - reconfirm before Phase 0 Task 0.3"
+    }
+  },
+  "internal_skills_used": [
+    "using-aw-skills",
+    "aw-plan",
+    "android-clean-architecture"
+  ],
+  "assumptions_and_constraints": [
+    "MF0ICU1 has no GET_VERSION, FAST_READ, PWD_AUTH, or dynamic lock bits - dynamic lock decode is deferred to Phase 2 with NTAG21x and reported as unsupported-by-chip in Phase 1",
+    "MifareUltralight.readPages returns 16 bytes and wraps past the last page - the reader must discard the wrapped tail or page indices will be silently wrong",
+    "NFC hardware does not exist in the Android emulator, so all tag I/O sits behind UltralightTransport and is proven on the JVM via a fake that emulates MF0ICU1 semantics",
+    "domain package must contain zero android.* imports, enforced by DomainPurityTest rather than convention",
+    "Writes to page 0x02 (lock bytes) and 0x03 (OTP) are irreversible in hardware and are expert-mode gated; pages 0-1 are never writable",
+    "Compose screens and Hilt modules are exempted from the per-file unit test rule with a stated reason; ViewModels are not exempt",
+    "AGP/Kotlin/Compose version pins are validated by a real assembleDebug in Phase 0 rather than trusted from memory"
+  ],
+  "save_point_commit_policy": "One focused commit per task where a commit is named; git init happens in Task 0.2 since the directory is not yet a repository. Behaviour-changing slices commit only after their GREEN validation command passes.",
+  "parallel_build_policy": {
+    "max_parallel_subagents": 3,
+    "waves": [
+      {
+        "group": "decoders",
+        "tasks": ["1.3", "1.4", "1.5", "1.6"],
+        "ready_when": "Task 1.1 (domain models) and 1.2 (fake transport) merged",
+        "write_scope": "disjoint files under domain/decoder, domain/writer and their tests"
+      },
+      {
+        "group": "ui-screens",
+        "tasks": ["3.3", "3.4", "3.5", "3.6"],
+        "ready_when": "Tasks 3.1 (theme + components) and 3.2 (nav shell) merged",
+        "write_scope": "disjoint packages ui/taginfo, ui/memory, ui/locks, ui/log"
+      }
+    ],
+    "never_parallel": ["Phase 0", "1.1", "1.2", "2.2", "2.5", "4.3"]
+  },
+  "phases": [
+    { "id": 0, "title": "Toolchain proven", "outcome": "empty Compose app builds, installs and launches on the Pixel 10; version pins validated by real resolution" },
+    { "id": 1, "title": "Domain model and pure decoders", "outcome": "every MF0ICU1 decode rule implemented and proven on the JVM with zero hardware" },
+    { "id": 2, "title": "Android NFC transport and read pipeline", "outcome": "a real tap produces a correct, wrap-aware 16-page dump with per-page status" },
+    { "id": 3, "title": "UI", "outcome": "all four destinations render real session data in dark and light M3" },
+    { "id": 4, "title": "Guarded write", "outcome": "a page can be written behind arm-and-confirm; every refusal and exception explained" },
+    { "id": 5, "title": "Export", "outcome": "a session leaves the device as valid JSON and readable TXT via SAF" },
+    { "id": 6, "title": "Verification and closeout", "outcome": "AC1-AC8 evidenced, JVM and device evidence separated, README written" }
+  ],
+  "acceptance_criteria_ids": ["AC1", "AC2", "AC3", "AC4", "AC5", "AC6", "AC7", "AC8"],
+  "invariant_ids": ["I1", "I2", "I3", "I4", "I5"],
+  "adr_planned": "docs/adr/0001-fakeable-tag-transport.md",
+  "out_of_scope_by_design": [
+    "card emulation / HCE",
+    "cloning or replaying access credentials",
+    "cracking authentication on protected tags"
+  ],
+  "recommended_next_commands": [
+    "/aw:build  (start at Phase 0, Task 0.1)"
+  ]
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Platform-level shell only. All real colour, typography and shape decisions live in
+      Compose (ui/theme, Phase 3). windowBackground has a values-night variant so a cold
+      start in dark mode does not flash white before Compose draws.
+    -->
+    <style name="Theme.NfcExplorer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>
