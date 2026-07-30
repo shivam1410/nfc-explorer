@@ -119,23 +119,52 @@ with no Android needed to prove it.
 - [ ] Sixth nav destination, or an entry from the Tag screen if six crowds the bar — decide by looking
       at it on the device, given six is beyond Material's recommended range
 - [ ] List assignments with label, UID and action summary; editor per action type; delete; test button
-- [ ] Copy states the silent-on-unmapped behaviour, so a no-op does not read as a bug
-- [ ] All strings in `strings.xml`
+- [x] Copy states the silent-on-unmapped behaviour, so a no-op does not read as a bug
+- [x] All strings in `strings.xml`
 - Acceptance: `assembleDebug` and Detekt green
 - Commit: `feat: tag actions screen`
+- Kept the sixth bottom-nav tab after looking at it on the device rather than guessing
+  (`evidence/actions-nav.png`). Detekt's one finding was an unused `onTest`, which became
+  `onTestDraft()` — testing before saving is the more useful moment.
 
-### Task 4.3 — Review gate
-- [ ] `kotlin-reviewer` over `domain/action`, `data/action`, `TagActionActivity` and the UI, with the
-      exported-activity surface called out as the primary concern
-- [ ] Fix blocking findings before Phase 5
-- **Both previous reviews found the defect in the layer deciding *when* logic runs, not in the logic.
-  Point the reviewer at dispatch and lifecycle first.**
+### Task 4.3 — Review gate — DONE, verdict BLOCK, resolved
+- [x] `kotlin-reviewer` over `domain/action`, `data/action`, `TagActionActivity` and the UI
+- [x] Blocking findings fixed
+
+**The note above was right for the third time running.** The reviewer's CRITICAL was in the dispatch
+layer, and it was the parameter this plan invented to guard it: `shouldAct`'s `hasTagExtra` was passed a
+literal `true` by the only caller, which had already null-checked the tag. Eight combinations swept, one
+of the three conditions unable to vary. Full write-up in `evidence/trigger-trust-boundary.md`.
+
+Fixed:
+- `TagPresence.check` connects to the tag; a forged `Tag` parcel cannot answer. `shouldAct` now takes a
+  `TagPresence.Answer`, so a literal `true` does not compile.
+- Stale `message` surviving cancel/save/delete.
+- A failing `DataStore` write escaping `viewModelScope` and killing the app on a button press.
+- An unreadable assignment document degrading to empty with no log line.
+- `MediaKey` rendered via `enum.name` in two places.
+
+Accepted, not fixed:
+- `observeAll()` collected in `init` rather than `stateIn(WhileSubscribed)`. The flow is documented never
+  to throw and `DataStoreAssignmentDocuments` already has a `catch`, so this buys nothing here.
+- `Column` + `forEach` rather than `LazyColumn` + `key` for the assignment list. One card per tag; a
+  phone will not hold enough tags for this to matter.
+- No unit tests for `TagActionRunner`, `DataStoreAssignmentDocuments`, `InstalledAppCatalog` or
+  `AndroidNfcATransport`. All four are below-the-seam adapters that only delegate — ADR 0001's policy,
+  device-verified instead.
+
+### Task 4.4 — App picker (added after Phase 4, from user feedback)
+- [x] The package-name text field became a searchable list of launchable apps
+- [x] Label pre-filled from the chosen app only when still empty
+- [x] Verified on device against the real installed list
 
 ---
 
 ## Phase 5 — Device verification
 
 ### Task 5.1 — On-device checks
+- [x] Card B (`04 1C 4E 52 CE 7C 80`) already assigned by the user to open Google, surviving app
+      restarts — partial AC1/AC2 evidence, and the store contents were read back off the device
 - [ ] Assign "launch app" to card B (`04 1C 4E 52 CE 7C 80`), close the app, tap → app launches, no
       NFC Explorer UI (AC2)
 - [ ] Tap card A, which has no assignment → nothing happens, no UI (AC3)
@@ -144,6 +173,9 @@ with no Android needed to prove it.
 - [ ] Assign a YouTube Music playlist URI, tap → opens in the app
 - [ ] Note whether a MacroDroid chooser appears if MacroDroid is also configured
 - [ ] Screenshots into `evidence/`; update `verification.md`
+- [ ] **New, because of the presence check:** confirm a normal tap still works. A connection attempt now
+      runs before the action, so a card whipped away the instant it is discovered will do nothing. This
+      is the one regression risk the fix introduces and only hardware can settle it.
 - Blocker: if the app does not launch on tap, check dispatch order before changing code — another app
   may be claiming the tag first.
 

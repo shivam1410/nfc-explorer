@@ -1,14 +1,15 @@
 {
   "feature_slug": "tag-actions",
-  "stage": "plan",
+  "stage": "build",
   "mode": "full",
-  "status": "plan_complete_awaiting_build",
+  "status": "phases_1_4_complete_awaiting_device_verification",
   "created_utc": "2026-07-30",
   "artifacts": {
     "prd": ".aw_docs/features/tag-actions/prd.md",
     "spec": ".aw_docs/features/tag-actions/spec.md",
     "tasks": ".aw_docs/features/tag-actions/tasks.md",
-    "state": ".aw_docs/features/tag-actions/state.json"
+    "state": ".aw_docs/features/tag-actions/state.json",
+    "evidence_trust_boundary": ".aw_docs/features/tag-actions/evidence/trigger-trust-boundary.md"
   },
   "builds_on": "nfc-explorer-mvp (phases 0-6 complete, 284 tests, Detekt gating)",
   "user_decisions": {
@@ -24,23 +25,63 @@
     "reader mode wins while NFC Explorer is foregrounded, so actions fire when the app is closed - the normal case"
   ],
   "phases": [
-    { "id": 1, "title": "Action model and Intent mapping", "outcome": "action types described in pure Kotlin, mapping proven without Android" },
-    { "id": 2, "title": "Persistence", "outcome": "assignments survive restart; a corrupt store degrades to empty" },
-    { "id": 3, "title": "The trigger", "outcome": "assigned tag acts with the app closed; anything else does nothing. Security-critical" },
-    { "id": 4, "title": "Management UI", "outcome": "create from last scan, edit, delete, test now" },
-    { "id": 5, "title": "Device verification", "outcome": "AC1-AC8 evidenced on hardware, docs updated" }
+    {
+      "id": 1,
+      "title": "Action model and Intent mapping",
+      "outcome": "action types described in pure Kotlin, mapping proven without Android"
+    },
+    {
+      "id": 2,
+      "title": "Persistence",
+      "outcome": "assignments survive restart; a corrupt store degrades to empty"
+    },
+    {
+      "id": 3,
+      "title": "The trigger",
+      "outcome": "assigned tag acts with the app closed; anything else does nothing. Security-critical"
+    },
+    {
+      "id": 4,
+      "title": "Management UI",
+      "outcome": "create from last scan, edit, delete, test now"
+    },
+    {
+      "id": 5,
+      "title": "Device verification",
+      "outcome": "AC1-AC8 evidenced on hardware, docs updated"
+    }
   ],
-  "acceptance_criteria_ids": ["AC1","AC2","AC3","AC4","AC5","AC6","AC7","AC8"],
+  "acceptance_criteria_ids": [
+    "AC1",
+    "AC2",
+    "AC3",
+    "AC4",
+    "AC5",
+    "AC6",
+    "AC7",
+    "AC8"
+  ],
   "notable_decisions": [
     "kotlinx.serialization added for persistence, unlike the hand-encoded export path: the exporter only writes, persistence must also READ, and hand-writing a JSON parser is where silent corruption lives. @Serializable DTOs live in data/ so domain/ stays annotation-free",
     "Intent construction sits behind a pure IntentSpec seam so the risky mapping is unit-tested while the thin Android adapter is device-verified, consistent with ADR 0001",
-    "AC6 (exported activity abuse) is tested via a pure shouldAct predicate rather than an instrumented test, since no androidTest source set exists"
+    "AC6 (exported activity abuse) is tested via a pure shouldAct predicate rather than an instrumented test, since no androidTest source set exists",
+    "AC6 was tested by a pure predicate as planned, and the predicate was still wrong: the activity fed it a literal true for the one condition that was supposed to be unforgeable. Reachability was then measured rather than argued (adb am start from uid 2000 with a spoofed NFC action). The fix is TagPresence.check, which connects to the tag - a forged Tag parcel has no live session behind it and cannot answer. shouldAct now takes a TagPresence.Answer so a literal true will not compile, because the activity itself is still untested",
+    "The package-name text field became an app picker after the user asked why it was not one. There was no good reason: it mirrored the domain type's shape rather than what a person knows. It also makes an unlaunchable target unreachable, since LaunchApp can only work through a launch intent"
   ],
   "known_tradeoffs": [
     "less capable than MacroDroid by design: no conditions, scheduling or HTTP",
     "will collide with MacroDroid if both are configured - Android may show a chooser per tap; README must warn",
-    "a silent no-op on an unmapped tag can read as a broken app until the behaviour is known"
+    "a silent no-op on an unmapped tag can read as a broken app until the behaviour is known",
+    "A cloned UID passes the presence check, since a clone is a genuinely live tag. Inherent to identifying tags by UID, same as MacroDroid and Tasker. Bounded: an attacker can only replay an action the user configured",
+    "The presence check costs one connection attempt per tap, so a card pulled away instantly will not fire. Failure mode is 'nothing happened', logged with the cause; unverified on hardware"
   ],
-  "parallel_execution": { "used": false, "cap": 1, "note": "slices share types and are too small to fan out" },
-  "recommended_next_commands": ["/aw:build  (start at Phase 1, Task 1.1)"]
+  "parallel_execution": {
+    "used": false,
+    "cap": 1,
+    "note": "slices share types and are too small to fan out"
+  },
+  "recommended_next_commands": [
+    "/aw:verify  (Phase 5, Task 5.1 - needs the phone and two cards)"
+  ],
+  "test_count": 367
 }
