@@ -183,3 +183,57 @@ evidence of an original Ultralight.
 
 Task 2.5 once the phone is unlocked and a tag is tapped. Then Phase 3 (UI), the rest of Phase 4,
 and Phase 5.
+
+
+## Phase 6 — Verification and closeout (in progress)
+
+### Visual verification pass (Task 6.1a)
+
+Ran on the Pixel 10 over adb: navigated the bottom nav with `input tap`, toggled dark/light with
+`cmd uimode night`, captured each screen, and pulled a real exported file off the device with
+`adb pull`.
+
+**Found 11 defects. The suite was green for every one of them.**
+
+| Surface | Defect | Suite at the time |
+|---|---|---|
+| Memory | access chip pushed off the right edge, hiding the write verdict | 266 green |
+| Memory | column header never rendered — strings defined in Task 3.1, never used | 266 green |
+| Memory | wasted row padding: only 14 of 16 pages visible | 266 green |
+| Memory | header read `PAGEHEX`; secondary caption could not align with a variable-width chip | 266 green |
+| Locks | cleared lock bits rendered as *filled* chips, reading as set | 266 green |
+| Locks | colour was the sole carrier of set-vs-clear; `bit_set`/`bit_clear` strings unused | 266 green |
+| Tag | capability footnote rendered unconditionally, claiming "not supported" regardless | 266 green |
+| Tag | BCC verdict chip preceded its own label, reading backwards | 269 green |
+| Export | `Known(code=4, name=…)` — data class `toString` leaking into the human-readable format | 266 green |
+| Export | trailing whitespace on every memory line and on empty payload values | 266 green |
+| **Write** | **preview uninitialised + `canArm` not requiring a payload → armable silent wipe with nothing shown** | **269 green** |
+
+They cluster into three kinds, none of which a unit test can see:
+
+1. **Strings defined then never wired up** (3). Intent captured in `strings.xml`, never rendered.
+2. **Raw `toString` reaching a user-facing surface** (2). Compiles, reads terribly.
+3. **State never initialised** (1) — and this was the dangerous one.
+
+The Write defect is the most serious in the project. `encodedPreview` was only populated by an edit,
+and `canArm` did not require a payload, while `PageEncoder.fromText("", 12)` encodes to twelve
+all-zero pages. Together: open Write, arm, tap — pages `04`–`0F` wiped with the review panel never
+displayed. The entire arm-and-confirm design was bypassable by not typing anything.
+
+**Conclusion for the record:** the Compose-and-Hilt test exemption in `spec.md` is defensible, but it
+is not free. It cost eleven defects, one of them on the irreversible path. Any future UI slice should
+end with a look at the actual screen, not a green suite.
+
+### Evidence
+
+- `evidence/f-*.png` — Tag, Memory, Locks, Write in dark and light
+- `evidence/g-write.png` — Write screen after the arming fix (preview shown, Arm disabled while empty)
+- `evidence/export-sample.txt` — a real export pulled off the device with `adb pull`
+- `evidence/hotel-card-dump.md`, `evidence/write-proof.md` — device read and write proofs
+
+### Still outstanding
+
+- `kotlin-reviewer` over the write path (Task 4.4)
+- `verification.md` recording AC1–AC8
+- ktlint or Detekt (deferred finding D2)
+- HUMAN: pull a card away mid-read and confirm a partial dump plus the reject buzz
