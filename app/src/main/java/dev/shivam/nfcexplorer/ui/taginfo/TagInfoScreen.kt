@@ -126,6 +126,24 @@ private fun ChipSection(report: TagReport) {
             chip.chipName.ifEmpty { stringResource(R.string.value_not_confirmed) },
         )
         KeyValueRow(stringResource(R.string.label_family), chip.family.ifEmpty { "—" })
+
+        if (!chip.hasReadableMemory) {
+            // A tag outside the Ultralight family. Its geometry rows would all read zero and the
+            // unconfirmed-geometry note below explains a GET_VERSION quirk of a chip family this tag
+            // is not in — which is how "0 pages of 0" plus Ultralight trivia came to look like a
+            // failure to someone whose tag was working perfectly well for actions.
+            StatusChip(
+                text = stringResource(R.string.chip_unreadable),
+                tone = ChipTone.CAUTION,
+            )
+            Text(
+                text = stringResource(R.string.chip_unreadable_explanation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+
         KeyValueRow(
             stringResource(R.string.label_total_bytes),
             stringResource(R.string.value_bytes, chip.totalBytes),

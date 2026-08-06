@@ -68,6 +68,8 @@
 
     <string name="geometry_confirmed">confirmed</string>
     <string name="geometry_unconfirmed">floor, unconfirmed</string>
+    <string name="chip_unreadable">Memory not readable</string>
+    <string name="chip_unreadable_explanation">This tag is not in the MIFARE Ultralight family, so this app has no page-level access to it — the UID, the manufacturer and the technology list are everything it can see. Memory, lock bits and writing are all unavailable. Tag actions still work: they are keyed on the UID and never read memory.</string>
     <string name="geometry_unconfirmed_explanation">Android reports the same technology, ATQA and SAK for MIFARE Ultralight, Ultralight EV1 and every NTAG21x. Telling them apart needs GET_VERSION, which the original Ultralight does not implement, so this is the smallest memory any of them has. The tag may hold more.</string>
 
     <!-- Capabilities -->
