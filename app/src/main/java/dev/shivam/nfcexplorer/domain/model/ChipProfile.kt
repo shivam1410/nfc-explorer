@@ -42,6 +42,18 @@ data class ChipProfile(
 ) {
     fun supports(capability: ChipCapability): Boolean = capability in capabilities
 
+    /**
+     * Whether this app can read the tag's memory at all.
+     *
+     * Distinct from [geometryConfirmed], and conflating the two misled a real user. Unconfirmed
+     * geometry means the memory *is* readable and the page count is a safe floor. Unreadable means the
+     * tag is not in the Ultralight family, so there is no page-oriented access to it here — the UID and
+     * the technology list are all there is.
+     *
+     * Tag actions are unaffected either way: they are keyed on the UID and never touch memory.
+     */
+    val hasReadableMemory: Boolean get() = pageCount > 0
+
     companion object {
         /**
          * The original MIFARE Ultralight. `capabilities` is empty on purpose: no

@@ -83,3 +83,32 @@ class ChipProfileTest {
         assertFalse(profile.geometryConfirmed)
     }
 }
+
+class ChipProfileReadabilityTest {
+
+    @Test
+    fun `an identified chip has readable memory`() {
+        assertTrue(ChipProfile.MF0ICU1.hasReadableMemory)
+    }
+
+    @Test
+    fun `an unidentified chip has no readable memory`() {
+        // What a tag outside the Ultralight family produces: the UID and technologies are known, the
+        // memory is not reachable at all. Distinct from "geometry unconfirmed", which means the memory
+        // IS readable and the page count is a floor.
+        assertFalse(ChipProfile.UNIDENTIFIED.hasReadableMemory)
+    }
+
+    @Test
+    fun `unreadable is not the same as unconfirmed`() {
+        // The distinction the UI was missing. ULTRALIGHT_FAMILY_MINIMUM is what a real hotel card gets:
+        // the page count is a floor rather than a measurement, yet every page still reads. UNIDENTIFIED
+        // means no page reads at all. Conflating them made the app explain a GET_VERSION quirk to
+        // someone holding a card from a completely different chip family.
+        val floor = ChipProfile.ULTRALIGHT_FAMILY_MINIMUM
+
+        assertFalse(floor.geometryConfirmed, "a floor is not a measurement")
+        assertTrue(floor.hasReadableMemory, "but its pages still read")
+        assertFalse(ChipProfile.UNIDENTIFIED.hasReadableMemory)
+    }
+}
