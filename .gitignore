@@ -13,3 +13,6 @@ local.properties
 *.aab
 *.keystore
 !debug.keystore
+
+# Symlink to the local agentic workspace. Machine-specific and not part of the project.
+.aw
