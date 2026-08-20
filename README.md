@@ -165,5 +165,5 @@ suite could not see**, recorded in
 One thing worth saying plainly, given what this app does: it writes to NFC tags, and some of those
 writes are physically irreversible. OTP bits and lock bits can be set but never cleared, so a mistake
 here is not undone by reinstalling. The write path guards against that and explains itself before
-acting — see [Write safety](#️-write-safety) — but the licence's "as is, without warranty" applies to
+acting, as the Write safety section above describes, but the licence's "as is, without warranty" applies to
 your tags as much as to the code.
