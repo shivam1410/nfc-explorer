@@ -5,8 +5,10 @@ import dev.shivam.nfcexplorer.data.action.DataStoreAssignmentDocuments
 import dev.shivam.nfcexplorer.data.action.InstalledAppCatalog
 import dev.shivam.nfcexplorer.data.action.TagActionRunner
 import dev.shivam.nfcexplorer.data.action.TagActionStore
+import dev.shivam.nfcexplorer.data.system.ActiveNotificationProbe
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.AppCatalog
+import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import dagger.Binds
@@ -30,6 +32,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindAppCatalog(impl: InstalledAppCatalog): AppCatalog
+
+    @Binds
+    abstract fun bindNotificationProbe(impl: ActiveNotificationProbe): NotificationProbe
 }
 
 @Module

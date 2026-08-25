@@ -66,6 +66,37 @@
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
 
+        <!--
+          Reads the notification shade so a toggle can tell whether the app it targets is currently
+          running. Requires a grant the user makes by hand in system settings; until then
+          ActiveNotificationProbe reports Unavailable rather than guessing "not running".
+        -->
+        <service
+            android:name=".data.system.TrackingNotificationListener"
+            android:exported="true"
+            android:label="@string/notification_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
+          Dispatches drag gestures. Also user-granted, also inert until granted.
+        -->
+        <service
+            android:name=".data.system.GestureDispatchService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/gesture_accessibility_service" />
+        </service>
+
     </application>
 
 </manifest>

@@ -16,8 +16,18 @@ enum class MediaKey { PLAY_PAUSE, NEXT, PREVIOUS }
  */
 sealed interface TagAction {
 
+    /**
+     * An action that can be performed on its own, with no runtime state to consult first.
+     *
+     * The split exists so [IntentSpecMapper.map] can stay pure and total. A composite action such as
+     * [WhileNotificationShowing] cannot be mapped without asking the device a question, so it is
+     * resolved to a [Leaf] before mapping — and the type system, rather than a comment, is what
+     * guarantees the mapper is never handed one.
+     */
+    sealed interface Leaf : TagAction
+
     /** Launches an installed app by package name. */
-    data class LaunchApp(val packageName: String) : TagAction {
+    data class LaunchApp(val packageName: String) : Leaf {
         init {
             require(packageName.isNotBlank()) { "packageName must not be blank" }
         }
@@ -26,7 +36,7 @@ sealed interface TagAction {
     /**
      * Opens a URI: an `https://` link, or an app deep link such as a YouTube Music playlist.
      */
-    data class OpenUri(val uri: String) : TagAction {
+    data class OpenUri(val uri: String) : Leaf {
         init {
             require(uri.isNotBlank()) { "uri must not be blank" }
             // A URI without a scheme resolves to nothing, and would fail silently at tap time.
@@ -47,7 +57,7 @@ sealed interface TagAction {
         val action: String,
         val uri: String? = null,
         val extras: Map<String, String> = emptyMap(),
-    ) : TagAction {
+    ) : Leaf {
         init {
             require(action.isNotBlank()) { "intent action must not be blank" }
             require(uri == null || SCHEME.containsMatchIn(uri)) {
@@ -57,10 +67,112 @@ sealed interface TagAction {
         }
     }
 
-    data class MediaCommand(val key: MediaKey) : TagAction
+    data class MediaCommand(val key: MediaKey) : Leaf
+
+    /**
+     * Drags a finger across the screen, for a control that an intent cannot reach.
+     *
+     * The last resort, and it is deliberately unpleasant to configure. An app that exposes an intent
+     * should be driven with [SendIntent]; this exists for controls that are a *gesture* and nothing
+     * else — Sleep Cycle's slide-to-stop being the case it was written for, where the app publishes
+     * an intent to start a sleep session but none to end one.
+     *
+     * Coordinates are **ratios of the screen**, not pixels. A recorded pixel pair is only correct on
+     * the device it was recorded on; a ratio survives a different phone and a rotation.
+     *
+     * [requireForegroundPackage], when set, aborts the drag unless that package is frontmost. Without
+     * it a mistimed tap pokes at whatever happens to be on screen — which is not hypothetical: while
+     * this feature was being investigated, an unrelated app stole focus and silently absorbed several
+     * drags aimed at Sleep Cycle.
+     *
+     * [holdMillis] and [steps] are not decoration. A smoothly interpolated swipe of the right length
+     * was tested against Sleep Cycle's slider twice and did nothing at all; a stepped drag that
+     * dwells at the start point before moving is what actually grabs the control.
+     */
+    data class DragGesture(
+        val startXRatio: Float,
+        val startYRatio: Float,
+        val endXRatio: Float,
+        val endYRatio: Float,
+        val holdMillis: Long = DEFAULT_HOLD_MILLIS,
+        val travelMillis: Long = DEFAULT_TRAVEL_MILLIS,
+        val steps: Int = DEFAULT_STEPS,
+        val requireForegroundPackage: String? = null,
+    ) : Leaf {
+        init {
+            require(startXRatio in RATIO && startYRatio in RATIO) { "start must be within the screen" }
+            require(endXRatio in RATIO && endYRatio in RATIO) { "end must be within the screen" }
+            require(holdMillis >= 0) { "holdMillis must not be negative" }
+            require(travelMillis > 0) { "travelMillis must be positive" }
+            require(steps >= 2) { "steps must be at least 2" }
+            require(requireForegroundPackage?.isNotBlank() != false) {
+                "requireForegroundPackage, when present, must not be blank"
+            }
+        }
+    }
+
+    /**
+     * Performs several actions in order, pausing [gapMillis] between them.
+     *
+     * Exists because a gesture usually cannot be the whole story: something has to put the right
+     * screen in front of it first. Ending a Sleep Cycle session is "bring the sleep screen up, wait
+     * for it to settle, then drag" — three facts that belong to one action, not three tags.
+     *
+     * Nesting is rejected rather than merely discouraged. A flat list keeps the total run time
+     * obvious, which matters for something fired by a tap that the user is not watching.
+     */
+    data class Steps(
+        val steps: List<Leaf>,
+        val gapMillis: Long = DEFAULT_GAP_MILLIS,
+    ) : Leaf {
+        init {
+            require(steps.isNotEmpty()) { "steps must not be empty" }
+            require(steps.none { it is Steps }) { "steps must not nest" }
+            require(gapMillis >= 0) { "gapMillis must not be negative" }
+        }
+    }
+
+    /**
+     * Picks between two actions depending on whether an app is currently showing a notification.
+     *
+     * This is how one tag becomes a toggle. A long-running app state — a sleep session, a recording, a
+     * timer — almost always has an ongoing foreground-service notification behind it, and that
+     * notification is far better evidence than a flag this app stores itself: it disappears exactly
+     * when the state really ends, including when the app ends it without being asked.
+     *
+     * A remembered flag was the obvious alternative and is quietly wrong. Sleep Cycle ends its session
+     * on its own every morning when the alarm fires; a stored flag would still read "running", so the
+     * next tap would try to stop a session that had already stopped, and stay inverted from then on.
+     *
+     * Matching is by **notification channel**, not by the text on it. Channel ids are chosen by the
+     * app's developers and never translated, so `CHANNEL_SLEEP_NOTIFICATION` identifies a running
+     * sleep session on any phone; "Analysis in progress" identifies one only in English, and would
+     * silently stop matching for a user whose phone is set to anything else.
+     *
+     * Both branches are [Leaf] on purpose: it bounds resolution to a single step, so a composite can
+     * never nest inside a composite and no cycle is representable.
+     */
+    data class WhileNotificationShowing(
+        val packageName: String,
+        val channelId: String,
+        val showing: Leaf,
+        val absent: Leaf,
+    ) : TagAction {
+        init {
+            require(packageName.isNotBlank()) { "packageName must not be blank" }
+            require(channelId.isNotBlank()) { "channelId must not be blank" }
+        }
+    }
 
     private companion object {
         /** `scheme:` per RFC 3986 — a letter followed by letters, digits, `+`, `-` or `.`. */
         val SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:")
+
+        val RATIO = 0f..1f
+
+        const val DEFAULT_HOLD_MILLIS = 150L
+        const val DEFAULT_TRAVEL_MILLIS = 1_000L
+        const val DEFAULT_STEPS = 10
+        const val DEFAULT_GAP_MILLIS = 900L
     }
 }

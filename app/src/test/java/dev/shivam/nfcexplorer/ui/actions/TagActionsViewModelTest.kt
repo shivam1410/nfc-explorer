@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -71,7 +72,7 @@ class TagActionsViewModelTest {
     private class RecordingPerformer(private val result: Result<Unit> = Result.success(Unit)) :
         ActionPerformer {
         val performed = mutableListOf<TagAction>()
-        override fun perform(action: TagAction): Result<Unit> {
+        override suspend fun perform(action: TagAction): Result<Unit> {
             performed += action
             return result
         }
@@ -279,27 +280,30 @@ class TagActionsViewModelTest {
     // --- Test now ---
 
     @Test
-    fun `test now performs the action without needing a tag`() {
+    fun `test now performs the action without needing a tag`() = runTest {
         val model = viewModel()
 
         model.onTest(TagAction.MediaCommand(MediaKey.NEXT))
+        // Performing suspends now, so the launched work has to drain before it can be observed.
+        advanceUntilIdle()
 
         assertEquals(listOf<TagAction>(TagAction.MediaCommand(MediaKey.NEXT)), performer.performed.toList())
     }
 
     @Test
-    fun `a failing test reports a message rather than throwing`() {
+    fun `a failing test reports a message rather than throwing`() = runTest {
         val failing = RecordingPerformer(Result.failure(IllegalStateException("no such app")))
         val model = TagActionsViewModel(repository, failing, catalog)
 
         model.onTest(TagAction.LaunchApp("com.absent"))
+        advanceUntilIdle()
 
         val message = model.state.value.message
         assertTrue(message?.contains("no such app") == true, "got: $message")
     }
 
     @Test
-    fun `the open draft can be tested before it is saved`() {
+    fun `the open draft can be tested before it is saved`() = runTest {
         // Trying an action before committing it is the more useful moment: a wrong package name is
         // obvious immediately rather than after a tap that silently does nothing.
         val model = viewModel()
@@ -307,6 +311,7 @@ class TagActionsViewModelTest {
         model.onDraftChange(draft(model, label = "Music", type = ActionType.OPEN_URI, uri = "https://x.test"))
 
         model.onTestDraft()
+        advanceUntilIdle()
 
         assertEquals(listOf<TagAction>(TagAction.OpenUri("https://x.test")), performer.performed.toList())
     }

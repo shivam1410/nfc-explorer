@@ -8,7 +8,12 @@ package dev.shivam.nfcexplorer.domain.action
  *
  * Returns [Result] rather than throwing: every caller runs somewhere a crash would be unhelpful, from
  * a no-UI activity fired by a tap to a button press whose failure should become a message.
+ *
+ * `suspend` because an action is no longer always instantaneous. A gesture takes about a second of
+ * wall clock and a multi-step action waits between its steps; doing that on the caller's thread would
+ * block the main thread of an activity started by a tap. Suspending keeps the timing honest — the
+ * result still describes what actually happened — without anyone having to remember to hop threads.
  */
 interface ActionPerformer {
-    fun perform(action: TagAction): Result<Unit>
+    suspend fun perform(action: TagAction): Result<Unit>
 }

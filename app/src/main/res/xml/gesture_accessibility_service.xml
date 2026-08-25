@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares the narrowest service that can still drag a finger.
+
+  canPerformGestures is the whole reason this exists: injecting a touch into another app is not
+  possible any other way, and Sleep Cycle's slide-to-stop is a gesture with no intent behind it.
+
+  canRetrieveWindowContent is on only to read the frontmost package name, which is the safety check
+  that stops a drag landing on whatever app happens to have stolen focus. No window text is read and
+  no accessibility events are acted on; onAccessibilityEvent is deliberately empty.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="100" />
