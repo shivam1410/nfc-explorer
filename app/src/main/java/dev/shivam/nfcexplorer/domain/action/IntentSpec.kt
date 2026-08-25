@@ -1,12 +1,16 @@
 package dev.shivam.nfcexplorer.domain.action
 
 /**
- * A platform-agnostic description of the intent an action should produce.
+ * A platform-agnostic description of what an action should produce.
  *
  * This is the seam that makes the risky part testable. Mapping a [TagAction] to *what should be
- * fired* is where the logic lives; turning an [IntentSpec] into a real `android.content.Intent` is
- * mechanical delegation. So the mapping is unit-tested and the adapter is device-verified — the same
- * reasoning as `docs/adr/0001-fakeable-tag-transport.md`.
+ * fired* is where the logic lives; turning an [IntentSpec] into a real `android.content.Intent` — or
+ * into a dispatched gesture — is mechanical delegation. So the mapping is unit-tested and the adapter
+ * is device-verified: the same reasoning as `docs/adr/0001-fakeable-tag-transport.md`.
+ *
+ * Not every spec is literally an `Intent` any more. [Drag] is a gesture and [Sequence] is a plan, but
+ * they are described here for the same reason the others are — so the decision of what to do is
+ * separable from the machinery that does it.
  */
 sealed interface IntentSpec {
 
@@ -22,13 +26,38 @@ sealed interface IntentSpec {
 
     /** Dispatch a media key event. [keyCode] is an `android.view.KeyEvent` constant. */
     data class MediaKeyEvent(val keyCode: Int) : IntentSpec
+
+    /**
+     * Drag a finger, in screen ratios. The adapter multiplies by the real display size.
+     *
+     * Ratios survive the trip from the device a gesture was measured on to the device it runs on;
+     * pixels do not.
+     */
+    data class Drag(
+        val startXRatio: Float,
+        val startYRatio: Float,
+        val endXRatio: Float,
+        val endYRatio: Float,
+        val holdMillis: Long,
+        val travelMillis: Long,
+        val steps: Int,
+        val requireForegroundPackage: String?,
+    ) : IntentSpec
+
+    /** Perform each spec in order, pausing [gapMillis] between them. Never nested. */
+    data class Sequence(val specs: List<IntentSpec>, val gapMillis: Long) : IntentSpec
 }
 
 /**
- * Maps actions to intent specs.
+ * Maps leaf actions to intent specs.
  *
- * Pure and total: every [TagAction] yields exactly one [IntentSpec], with no failure path — the
+ * Pure and total: every [TagAction.Leaf] yields exactly one [IntentSpec], with no failure path — the
  * action types already validated themselves at construction, so there is nothing left to reject here.
+ *
+ * It takes a [TagAction.Leaf] rather than a [TagAction] deliberately. A composite action cannot be
+ * mapped without first asking the device a question, and accepting one here would mean either a
+ * failure path or a lie; [ActionResolver] collapses composites first, and the compiler enforces the
+ * order rather than a comment asking for it.
  */
 object IntentSpecMapper {
 
@@ -40,7 +69,7 @@ object IntentSpecMapper {
     const val KEYCODE_MEDIA_NEXT = 87
     const val KEYCODE_MEDIA_PREVIOUS = 88
 
-    fun map(action: TagAction): IntentSpec = when (action) {
+    fun map(action: TagAction.Leaf): IntentSpec = when (action) {
         is TagAction.LaunchApp -> IntentSpec.LaunchPackage(action.packageName)
 
         is TagAction.OpenUri -> IntentSpec.ActivityIntent(action = ACTION_VIEW, uri = action.uri)
@@ -57,6 +86,23 @@ object IntentSpecMapper {
                 MediaKey.NEXT -> KEYCODE_MEDIA_NEXT
                 MediaKey.PREVIOUS -> KEYCODE_MEDIA_PREVIOUS
             },
+        )
+
+        is TagAction.DragGesture -> IntentSpec.Drag(
+            startXRatio = action.startXRatio,
+            startYRatio = action.startYRatio,
+            endXRatio = action.endXRatio,
+            endYRatio = action.endYRatio,
+            holdMillis = action.holdMillis,
+            travelMillis = action.travelMillis,
+            steps = action.steps,
+            requireForegroundPackage = action.requireForegroundPackage,
+        )
+
+        // Steps cannot contain Steps, so this recursion is exactly one level deep.
+        is TagAction.Steps -> IntentSpec.Sequence(
+            specs = action.steps.map(::map),
+            gapMillis = action.gapMillis,
         )
     }
 }

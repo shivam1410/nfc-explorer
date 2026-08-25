@@ -55,18 +55,49 @@ object TagActionSerializer {
     private fun toDto(assignment: TagAssignment) = AssignmentDto(
         uidHex = assignment.uidKey,
         label = assignment.label,
-        action = when (val action = assignment.action) {
-            is TagAction.LaunchApp -> ActionDto(type = TYPE_LAUNCH_APP, packageName = action.packageName)
-            is TagAction.OpenUri -> ActionDto(type = TYPE_OPEN_URI, uri = action.uri)
-            is TagAction.SendIntent -> ActionDto(
-                type = TYPE_SEND_INTENT,
-                intentAction = action.action,
-                uri = action.uri,
-                extras = action.extras,
-            )
-            is TagAction.MediaCommand -> ActionDto(type = TYPE_MEDIA, mediaKey = action.key.name)
-        },
+        action = actionDto(assignment.action),
     )
+
+    /**
+     * Recursive, but only ever one level deep: [TagAction.Steps] rejects nesting and
+     * [TagAction.WhileNotificationShowing] takes leaves for both branches.
+     */
+    private fun actionDto(action: TagAction): ActionDto = when (action) {
+        is TagAction.LaunchApp -> ActionDto(type = TYPE_LAUNCH_APP, packageName = action.packageName)
+        is TagAction.OpenUri -> ActionDto(type = TYPE_OPEN_URI, uri = action.uri)
+        is TagAction.SendIntent -> ActionDto(
+            type = TYPE_SEND_INTENT,
+            intentAction = action.action,
+            uri = action.uri,
+            extras = action.extras,
+        )
+        is TagAction.MediaCommand -> ActionDto(type = TYPE_MEDIA, mediaKey = action.key.name)
+        is TagAction.DragGesture -> ActionDto(
+            type = TYPE_DRAG,
+            drag = DragDto(
+                startXRatio = action.startXRatio,
+                startYRatio = action.startYRatio,
+                endXRatio = action.endXRatio,
+                endYRatio = action.endYRatio,
+                holdMillis = action.holdMillis,
+                travelMillis = action.travelMillis,
+                steps = action.steps,
+                requireForegroundPackage = action.requireForegroundPackage,
+            ),
+        )
+        is TagAction.Steps -> ActionDto(
+            type = TYPE_STEPS,
+            steps = action.steps.map(::actionDto),
+            gapMillis = action.gapMillis,
+        )
+        is TagAction.WhileNotificationShowing -> ActionDto(
+            type = TYPE_WHILE_NOTIFICATION,
+            packageName = action.packageName,
+            channelId = action.channelId,
+            showing = actionDto(action.showing),
+            absent = actionDto(action.absent),
+        )
+    }
 
     /**
      * Null for anything unusable: an unparseable UID, an unknown action type, a missing field, or a
@@ -81,6 +112,26 @@ object TagActionSerializer {
 
     private fun toActionOrNull(dto: ActionDto): TagAction? = runCatching {
         when (dto.type) {
+            TYPE_WHILE_NOTIFICATION -> {
+                val pkg = dto.packageName ?: return@runCatching null
+                val channel = dto.channelId ?: return@runCatching null
+                val showing = dto.showing?.let(::toLeafOrNull) ?: return@runCatching null
+                val absent = dto.absent?.let(::toLeafOrNull) ?: return@runCatching null
+                TagAction.WhileNotificationShowing(pkg, channel, showing, absent)
+            }
+            else -> toLeafOrNull(dto)
+        }
+    }.getOrNull()
+
+    /**
+     * A leaf action, or null.
+     *
+     * Separate from [toActionOrNull] so the branches of a composite are constrained to leaves by the
+     * return type. A document hand-edited to nest a composite inside a composite decodes to null and
+     * loses one assignment, rather than producing a shape the domain forbids.
+     */
+    private fun toLeafOrNull(dto: ActionDto): TagAction.Leaf? = runCatching {
+        when (dto.type) {
             TYPE_LAUNCH_APP -> dto.packageName?.let(TagAction::LaunchApp)
             TYPE_OPEN_URI -> dto.uri?.let(TagAction::OpenUri)
             TYPE_SEND_INTENT -> dto.intentAction?.let { action ->
@@ -89,6 +140,23 @@ object TagActionSerializer {
             TYPE_MEDIA -> dto.mediaKey
                 ?.let { name -> MediaKey.entries.firstOrNull { it.name == name } }
                 ?.let(TagAction::MediaCommand)
+            TYPE_DRAG -> dto.drag?.let { drag ->
+                TagAction.DragGesture(
+                    startXRatio = drag.startXRatio,
+                    startYRatio = drag.startYRatio,
+                    endXRatio = drag.endXRatio,
+                    endYRatio = drag.endYRatio,
+                    holdMillis = drag.holdMillis,
+                    travelMillis = drag.travelMillis,
+                    steps = drag.steps,
+                    requireForegroundPackage = drag.requireForegroundPackage,
+                )
+            }
+            TYPE_STEPS -> dto.steps
+                ?.map { child -> toLeafOrNull(child) ?: return@runCatching null }
+                ?.let { children ->
+                    TagAction.Steps(steps = children, gapMillis = dto.gapMillis ?: 0L)
+                }
             // Written by a newer build. Skip this entry, keep the rest.
             else -> null
         }
@@ -98,6 +166,9 @@ object TagActionSerializer {
     private const val TYPE_OPEN_URI = "openUri"
     private const val TYPE_SEND_INTENT = "sendIntent"
     private const val TYPE_MEDIA = "media"
+    private const val TYPE_DRAG = "dragGesture"
+    private const val TYPE_STEPS = "steps"
+    private const val TYPE_WHILE_NOTIFICATION = "whileNotificationShowing"
 
     @Serializable
     private data class StoreDto(
@@ -127,5 +198,24 @@ object TagActionSerializer {
         @SerialName("intentAction") val intentAction: String? = null,
         @SerialName("mediaKey") val mediaKey: String? = null,
         @SerialName("extras") val extras: Map<String, String> = emptyMap(),
+        @SerialName("channelId") val channelId: String? = null,
+        @SerialName("showing") val showing: ActionDto? = null,
+        @SerialName("absent") val absent: ActionDto? = null,
+        @SerialName("steps") val steps: List<ActionDto>? = null,
+        @SerialName("gapMillis") val gapMillis: Long? = null,
+        @SerialName("drag") val drag: DragDto? = null,
+    )
+
+    /** Gesture geometry, kept in its own object so [ActionDto] does not sprout eight more columns. */
+    @Serializable
+    private data class DragDto(
+        @SerialName("startXRatio") val startXRatio: Float,
+        @SerialName("startYRatio") val startYRatio: Float,
+        @SerialName("endXRatio") val endXRatio: Float,
+        @SerialName("endYRatio") val endYRatio: Float,
+        @SerialName("holdMillis") val holdMillis: Long,
+        @SerialName("travelMillis") val travelMillis: Long,
+        @SerialName("steps") val steps: Int,
+        @SerialName("requireForegroundPackage") val requireForegroundPackage: String? = null,
     )
 }

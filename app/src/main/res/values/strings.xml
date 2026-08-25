@@ -164,6 +164,11 @@
     <string name="actions_type_uri">Open link</string>
     <string name="actions_type_intent">Send intent</string>
     <string name="actions_type_media">Media</string>
+    <string name="actions_type_sleep_cycle">Sleep Cycle</string>
+    <string name="actions_sleep_cycle_explainer">One tap starts a Sleep Cycle session; tapping again while one is running ends it. Needs notification access (to see whether a session is running) and the accessibility service (to work the slide-to-stop control, which Sleep Cycle exposes no other way).</string>
+    <string name="notification_listener_label">NFC Explorer session detection</string>
+    <string name="accessibility_service_label">NFC Explorer gestures</string>
+    <string name="accessibility_service_description">Lets a tag end a Sleep Cycle sleep session by performing its slide-to-stop gesture. Used only when a tag with that action is tapped.</string>
     <string name="actions_app_search">Search installed apps</string>
     <string name="actions_app_none">No installed app matches that.</string>
     <string name="actions_app_loading">Reading installed apps…</string>
@@ -181,6 +186,9 @@
     <string name="actions_summary_uri">Open %1$s</string>
     <string name="actions_summary_intent">Send %1$s</string>
     <string name="actions_summary_media">Media: %1$s</string>
+    <string name="actions_summary_gesture">Screen gesture</string>
+    <string name="actions_summary_steps">%1$d steps</string>
+    <string name="actions_summary_toggle">%1$s — start or end</string>
     <string name="actions_problem_no_tag">Scan a tag first.</string>
     <string name="actions_problem_blank_label">Give it a label so you can tell your tags apart.</string>
     <string name="actions_problem_missing_target">This action needs a target.</string>

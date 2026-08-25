@@ -7,6 +7,7 @@ import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.AppCatalog
 import dev.shivam.nfcexplorer.domain.action.InstalledApp
 import dev.shivam.nfcexplorer.domain.action.MediaKey
+import dev.shivam.nfcexplorer.domain.action.SleepCycle
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
@@ -21,7 +22,7 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** Which kind of action the editor is composing. */
-enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA }
+enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA, SLEEP_CYCLE }
 
 /** Why the draft cannot be saved. */
 enum class DraftProblem { NO_TAG, BLANK_LABEL, MISSING_TARGET, INVALID_URI }
@@ -247,12 +248,20 @@ class TagActionsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Runs [action] and reports what happened.
+     *
+     * Launched rather than run inline because performing is now suspending: a gesture takes about a
+     * second and a multi-step action waits between steps.
+     */
     fun onTest(action: TagAction) {
-        val message = performer.perform(action).fold(
-            onSuccess = { "Action performed." },
-            onFailure = { "${it::class.simpleName}: ${it.message}" },
-        )
-        backing.update { it.copy(message = message) }
+        viewModelScope.launch {
+            val message = performer.perform(action).fold(
+                onSuccess = { "Action performed." },
+                onFailure = { "${it::class.simpleName}: ${it.message}" },
+            )
+            backing.update { it.copy(message = message) }
+        }
     }
 
     /**
@@ -283,6 +292,8 @@ class TagActionsViewModel @Inject constructor(
                     uri = draft.uri.trim().ifBlank { null },
                 )
                 ActionType.MEDIA -> TagAction.MediaCommand(draft.mediaKey)
+                // A preset: no fields to fill in, so nothing here can be half-typed.
+                ActionType.SLEEP_CYCLE -> SleepCycle.toggle()
             }
         }.getOrNull()
     }
@@ -331,6 +342,18 @@ class TagActionsViewModel @Inject constructor(
             label = label,
             type = ActionType.MEDIA,
             mediaKey = current.key,
+            isExisting = true,
+        )
+        // Gestures and composites are only ever produced by a preset, and the editor offers no fields
+        // for them. Editing one and saving rebuilds the preset from scratch, which is the honest
+        // behaviour: there is nothing here the user could have adjusted.
+        is TagAction.DragGesture,
+        is TagAction.Steps,
+        is TagAction.WhileNotificationShowing,
+        -> ActionDraft(
+            uid = uid,
+            label = label,
+            type = ActionType.SLEEP_CYCLE,
             isExisting = true,
         )
     }

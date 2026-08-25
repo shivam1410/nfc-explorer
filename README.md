@@ -10,7 +10,7 @@ refuse to read it?* — and generalised from there. See
 
 ## Status
 
-Phase 1 MVP complete. **274 unit tests, 0 failures.**
+Phase 1 MVP complete. **406 unit tests, 0 failures.**
 
 | Feature | State |
 |---|---|
@@ -21,6 +21,8 @@ Phase 1 MVP complete. **274 unit tests, 0 failures.**
 | Lock analysis: static lock bits, block-locking, per-page verdicts | done |
 | Guarded write: text, hex, bulk wipe, arm-and-confirm | done |
 | Session log and JSON/TXT export via the system file picker | done |
+| Tag actions: launch, link, intent, media | done |
+| Sleep Cycle start/stop toggle on one tag | code complete, gesture unverified on hardware |
 | MIFARE Classic, DESFire, NTAG21x, IsoDep | not started |
 | NDEF decode, raw transceive console, hex editor | not started |
 
@@ -36,7 +38,7 @@ in behind `ChipProfileResolver` and the transport interface without reshaping th
 
 ```bash
 ./gradlew :app:assembleDebug        # build
-./gradlew :app:testDebugUnitTest    # 274 unit tests, no device needed
+./gradlew :app:testDebugUnitTest    # 406 unit tests, no device needed
 ./gradlew :app:installDebug         # install on a connected device
 ```
 
@@ -137,7 +139,7 @@ These are invariants, not preferences, and most have tests attached:
 ./gradlew :app:testDebugUnitTest
 ```
 
-274 JVM tests, no hardware. Covered: UID/BCC arithmetic, every documented lock and block-lock bit,
+406 JVM tests, no hardware. Covered: UID/BCC arithmetic, every documented lock and block-lock bit,
 page-access classification, `READ` wrap-around, memory rendering, the write guard swept across all
 pages × lock states × expert mode, page encoding, batch writes, the session logger under concurrent
 writers, JSON escaping, export null-vs-zeros, and both ViewModels.
@@ -155,6 +157,8 @@ suite could not see**, recorded in
 - [docs/nfc-primer.md](docs/nfc-primer.md) — pages, OTP, lock bits explained
 - [docs/mf0icu1-reference.md](docs/mf0icu1-reference.md) — authoritative chip tables for the decoders
 - [docs/adr/0001-fakeable-tag-transport.md](docs/adr/0001-fakeable-tag-transport.md) — the transport seam
+- [docs/sleep-cycle-automation.md](docs/sleep-cycle-automation.md) — what is reachable in Sleep Cycle,
+  what is not, and why stopping a session needs a gesture
 - [.aw_docs/features/nfc-explorer-mvp/](.aw_docs/features/nfc-explorer-mvp/) — PRD, spec, tasks,
   execution log, and device evidence
 

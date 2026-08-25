@@ -256,6 +256,13 @@ private fun DraftEditor(
                     )
                 }
             }
+
+            // Nothing to configure. The explainer earns its place by naming the two permissions,
+            // because without them the tag does nothing and the reason is not otherwise visible.
+            ActionType.SLEEP_CYCLE -> Text(
+                text = stringResource(R.string.actions_sleep_cycle_explainer),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         state.problem?.let { problem ->
@@ -411,6 +418,12 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
     is TagAction.SendIntent -> stringResource(R.string.actions_summary_intent, action.action)
     is TagAction.MediaCommand ->
         stringResource(R.string.actions_summary_media, stringResource(action.key.labelRes()))
+    is TagAction.DragGesture -> stringResource(R.string.actions_summary_gesture)
+    is TagAction.Steps -> stringResource(R.string.actions_summary_steps, action.steps.size)
+    // Named by the app it watches rather than by the mechanism: "Sleep Cycle - start or end" says
+    // what the tag does, where "toggle on a notification channel" says how it is implemented.
+    is TagAction.WhileNotificationShowing ->
+        stringResource(R.string.actions_summary_toggle, appNameOf(action.packageName))
 }
 
 private fun ActionType.labelRes(): Int = when (this) {
@@ -418,6 +431,7 @@ private fun ActionType.labelRes(): Int = when (this) {
     ActionType.OPEN_URI -> R.string.actions_type_uri
     ActionType.SEND_INTENT -> R.string.actions_type_intent
     ActionType.MEDIA -> R.string.actions_type_media
+    ActionType.SLEEP_CYCLE -> R.string.actions_type_sleep_cycle
 }
 
 private fun MediaKey.labelRes(): Int = when (this) {

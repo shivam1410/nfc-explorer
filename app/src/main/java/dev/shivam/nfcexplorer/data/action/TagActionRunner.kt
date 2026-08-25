@@ -6,34 +6,68 @@ import android.media.AudioManager
 import android.net.Uri
 import android.view.KeyEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.shivam.nfcexplorer.data.system.ScreenGestureDispatcher
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
+import dev.shivam.nfcexplorer.domain.action.ActionResolver
 import dev.shivam.nfcexplorer.domain.action.IntentSpec
 import dev.shivam.nfcexplorer.domain.action.IntentSpecMapper
+import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Performs an action.
  *
- * Deliberately thin: [IntentSpecMapper] decides *what* to fire and is unit-tested, while this class
- * only turns a spec into a platform call. Same split as the transport adapters — the logic is above
- * the seam, the delegation below it, verified on device.
+ * Deliberately thin: [ActionResolver] decides *which* action a composite collapses to and
+ * [IntentSpecMapper] decides *what* to fire — both pure and unit-tested — while this class only turns
+ * a spec into a platform call. Same split as the transport adapters: the logic is above the seam, the
+ * delegation below it, verified on device.
  *
  * Returns [Result] rather than throwing. This runs from an activity with no UI, triggered by a tap, so
- * a missing app or a bad URI has to be reported to the log rather than surfaced as a crash the user
- * cannot see the cause of.
+ * a missing app, a refused gesture or a withheld permission has to reach the log rather than surface
+ * as a crash the user cannot see the cause of.
  */
 @Singleton
 class TagActionRunner @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val notifications: NotificationProbe,
+    private val gestures: ScreenGestureDispatcher,
 ) : ActionPerformer {
 
-    override fun perform(action: TagAction): Result<Unit> = runCatching {
-        when (val spec = IntentSpecMapper.map(action)) {
+    override suspend fun perform(action: TagAction): Result<Unit> =
+        when (val resolution = ActionResolver.resolve(action, notifications)) {
+            // The state a toggle depends on could not be read. Doing nothing and saying why beats
+            // guessing, because the wrong guess ends a night's recording or starts a second session.
+            is ActionResolver.Resolution.Refused ->
+                Result.failure(IllegalStateException(resolution.reason))
+
+            is ActionResolver.Resolution.Perform ->
+                run(IntentSpecMapper.map(resolution.leaf))
+        }
+
+    private suspend fun run(spec: IntentSpec): Result<Unit> = runCatching {
+        when (spec) {
             is IntentSpec.LaunchPackage -> launch(spec.packageName)
             is IntentSpec.ActivityIntent -> startActivity(spec)
             is IntentSpec.MediaKeyEvent -> dispatchMediaKey(spec.keyCode)
+            is IntentSpec.Drag -> gestures.perform(spec).getOrThrow()
+            is IntentSpec.Sequence -> runSequence(spec)
+        }
+    }
+
+    /**
+     * Runs each step in order, stopping at the first failure.
+     *
+     * Stopping matters. The sequence that ends a sleep session is "raise the screen, then drag"; if
+     * raising the screen fails there is nothing under the finger, and carrying on would drag across
+     * whatever app is actually there.
+     */
+    private suspend fun runSequence(spec: IntentSpec.Sequence) {
+        spec.specs.forEachIndexed { index, step ->
+            if (index > 0) delay(spec.gapMillis)
+            run(step).getOrThrow()
         }
     }
 
