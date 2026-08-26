@@ -131,6 +131,19 @@ fun SettingsScreen(
             subtitle = stringResource(R.string.settings_sync_subtitle),
             collapsible = false,
         ) {
+            // Stated before the button, because "which direction does this go" is the question
+            // people hesitate over, and the answer only appeared afterwards in the result line.
+            Text(
+                text = stringResource(R.string.settings_sync_direction),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = state.lastSyncedAtMillis
+                    ?.let { stringResource(R.string.settings_sync_last, LAST_SYNC_FORMAT.format(java.util.Date(it))) }
+                    ?: stringResource(R.string.settings_sync_never),
+                style = MaterialTheme.typography.bodySmall,
+            )
             Button(
                 onClick = onSyncNow,
                 enabled = state.sync !is SyncUiState.Running,
@@ -351,6 +364,10 @@ fun SettingsScreen(
         }
     }
 }
+
+/** Date and time, no seconds: sync is not an operation anyone times to the second. */
+private val LAST_SYNC_FORMAT =
+    java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.getDefault())
 
 /** One permission, its state in words, and the way to change it. */
 @Composable

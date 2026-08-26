@@ -179,6 +179,7 @@ private fun TogglTagPicker(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryEditable),
+            shape = FIELD_SHAPE,
         )
         ExposedDropdownMenu(
             expanded = isOpen && matches.isNotEmpty(),
@@ -219,13 +220,6 @@ internal fun DraftEditor(
         // A form you can collapse is a form that can hide the field you are filling in.
         collapsible = false,
     ) {
-        OutlinedTextField(
-            value = draft.label,
-            onValueChange = { onDraftChange(draft.copy(label = it)) },
-            label = { Text(stringResource(R.string.actions_label)) },
-            isError = draft.touched && state.problem == DraftProblem.BLANK_LABEL,
-            modifier = Modifier.fillMaxWidth(),
-        )
 
         // Measured width rather than weight(1f). A weight divides the row it lands in, so the last
         // row -- holding one tile -- gave that tile the full width, and a square aspect ratio then
@@ -248,6 +242,17 @@ internal fun DraftEditor(
                 }
             }
         }
+
+        // Below the tiles: you pick what the tag does, then name it -- and the name is already
+        // filled in from the choice, so this reads as confirming rather than as another blank.
+        OutlinedTextField(
+            value = draft.label,
+            onValueChange = { onDraftChange(draft.copy(label = it)) },
+            label = { Text(stringResource(R.string.actions_label)) },
+            isError = draft.touched && state.problem == DraftProblem.BLANK_LABEL,
+            modifier = Modifier.fillMaxWidth(),
+            shape = FIELD_SHAPE,
+        )
 
         when (draft.type) {
             ActionType.LAUNCH_APP -> AppPicker(
@@ -279,6 +284,7 @@ internal fun DraftEditor(
                             state.problem == DraftProblem.INVALID_URI
                         ),
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
             }
 
@@ -289,6 +295,7 @@ internal fun DraftEditor(
                     label = { Text(stringResource(R.string.actions_intent_action)) },
                     isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
                 OutlinedTextField(
                     value = draft.uri,
@@ -296,6 +303,7 @@ internal fun DraftEditor(
                     label = { Text(stringResource(R.string.actions_uri_optional)) },
                     isError = draft.touched && state.problem == DraftProblem.INVALID_URI,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
             }
 
@@ -332,6 +340,7 @@ internal fun DraftEditor(
                     isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
                 OutlinedButton(
                     onClick = {
@@ -346,6 +355,7 @@ internal fun DraftEditor(
                     onValueChange = { onDraftChange(draft.copy(messageText = it)) },
                     label = { Text(stringResource(R.string.actions_whatsapp_message)) },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -387,6 +397,7 @@ internal fun DraftEditor(
                     placeholder = { Text(draft.label.ifBlank { "" }) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FIELD_SHAPE,
                 )
                 TogglTagPicker(
                     chosen = draft.togglTag,
@@ -487,6 +498,7 @@ private fun AppPicker(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryEditable),
+            shape = FIELD_SHAPE,
         )
 
         ExposedDropdownMenu(
@@ -703,6 +715,9 @@ private const val ACTIONS_PER_ROW = 3
 private val ACTION_TILE_GAP = 8.dp
 private val ACTION_TILE_CORNER = 14.dp
 private val ACTION_TILE_ICON = 26.dp
+
+/** Softer than Material's default field corner, to sit with the rounded tiles above them. */
+private val FIELD_SHAPE = RoundedCornerShape(16.dp)
 
 /**
  * The icon for a configured action, so a list of tags is scannable by shape as well as by reading.

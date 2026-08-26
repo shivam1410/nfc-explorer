@@ -32,6 +32,7 @@ class CloudSyncService @Inject constructor(
     private val logger: SessionLogger,
     private val cloud: CloudStore,
     private val deviceId: SyncDeviceId,
+    private val syncState: SyncState,
 ) : CloudSync {
 
     override suspend fun sync(nowMillis: Long): Result<SyncReport> = runCatching {
@@ -71,6 +72,10 @@ class CloudSyncService @Inject constructor(
         }
 
         val logsUploaded = uploadSessionLog(nowMillis)
+
+        // Stamped only here, at the end of a run that threw nothing: a half-finished sync must not
+        // be able to claim the data is current.
+        syncState.recordSuccess(nowMillis)
 
         SyncReport(
             pulled = merged.fromCloud.size,

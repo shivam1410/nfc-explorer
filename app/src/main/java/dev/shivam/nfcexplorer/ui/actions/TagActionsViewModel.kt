@@ -114,6 +114,23 @@ val LINK_SCHEMES = listOf("https://", "http://")
 private val SCHEME_PREFIX = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 /**
+ * Default names, one per type.
+ *
+ * Doubles as the test for "did the user write this?": a label equal to one of these was suggested,
+ * so replacing it costs nothing. Plain strings rather than resources because the view model must
+ * stay free of Android, and these are seeds the user edits rather than UI copy.
+ */
+private val SUGGESTED_LABELS = mapOf(
+    ActionType.LAUNCH_APP to "Launch app",
+    ActionType.OPEN_URI to "Open link",
+    ActionType.SEND_INTENT to "Send intent",
+    ActionType.MEDIA to "Media",
+    ActionType.SLEEP_CYCLE to "Sleep Cycle",
+    ActionType.TOGGL to "Toggl",
+    ActionType.WHATSAPP to "WhatsApp",
+)
+
+/**
  * Manages tag-to-action assignments.
  *
  * Validation is delegated to the domain types rather than reimplemented: [draftAction] tries to
@@ -279,12 +296,13 @@ class TagActionsViewModel @Inject constructor(
     fun onTypeChange(type: ActionType) {
         val draft = backing.value.draft ?: return
         if (type == ActionType.TOGGL) loadTogglTags()
+        val named = draft.copy(label = draft.suggestedLabelFor(type))
         val seeded = when {
-            type == ActionType.OPEN_URI && draft.uri.isBlank() -> draft.copy(
+            type == ActionType.OPEN_URI && named.uri.isBlank() -> named.copy(
                 type = type,
                 uri = LINK_SCHEMES.first(),
             )
-            else -> draft.copy(type = type)
+            else -> named.copy(type = type)
         }
         // Deliberately not onDraftChange: choosing what kind of action this is does not count as
         // having filled the form in, so it must not start showing errors about empty fields.
@@ -390,6 +408,19 @@ class TagActionsViewModel @Inject constructor(
     fun onTestDraft() {
         val action = backing.value.draft?.let(::draftAction) ?: return
         onTest(action)
+    }
+
+    /**
+     * A name for [type], unless the user has written one of their own.
+     *
+     * Filled in rather than left blank because a label is required and "Toggl" is a better starting
+     * point than an empty field. Only a label this function itself suggested is replaced -- anything
+     * typed, or carried in from an existing assignment, is left exactly as it is. Switching types
+     * while exploring therefore renames, and switching after naming does not.
+     */
+    private fun ActionDraft.suggestedLabelFor(type: ActionType): String {
+        val typed = label.isNotBlank() && label !in SUGGESTED_LABELS.values
+        return if (typed) label else SUGGESTED_LABELS.getValue(type)
     }
 
     /**

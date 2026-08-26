@@ -14,6 +14,7 @@ import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.update.AppVersion
+import dev.shivam.nfcexplorer.data.sync.SyncState
 import dev.shivam.nfcexplorer.data.update.UpdateInstaller
 import dev.shivam.nfcexplorer.domain.update.AppRelease
 import dev.shivam.nfcexplorer.domain.update.InstallStatus
@@ -87,6 +88,8 @@ data class SettingsUiState(
     val togglTokenTail: String? = null,
     val sync: SyncUiState = SyncUiState.Idle,
     val togglCheck: TogglCheck = TogglCheck.Idle,
+    /** Epoch millis of the last successful sync, or null if this device has never finished one. */
+    val lastSyncedAtMillis: Long? = null,
     val install: InstallStatus = InstallStatus.Idle,
     /** Tags deleted but still recorded, and therefore restorable without the card. */
     val deleted: List<TagAssignment> = emptyList(),
@@ -110,6 +113,7 @@ class SettingsViewModel @Inject constructor(
     private val installer: UpdateInstaller,
     private val toggl: TogglSession,
     private val assignments: TagActionRepository,
+    private val syncState: SyncState,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -205,6 +209,13 @@ class SettingsViewModel @Inject constructor(
     /** Re-read on every resume: both grants are made outside the app and revocable at any time. */
     fun refreshGrants() {
         backing.update { it.copy(grants = grants.current()) }
+        // Re-read on resume too: another device syncing does not change this, but returning from a
+        // consent screen mid-sync does.
+        refreshLastSynced()
+    }
+
+    private fun refreshLastSynced() {
+        backing.update { it.copy(lastSyncedAtMillis = syncState.lastSyncedAtMillis()) }
     }
 
     /**
@@ -243,6 +254,7 @@ class SettingsViewModel @Inject constructor(
             onFailure = { SyncUiState.Failed("${it::class.simpleName}: ${it.message}") },
         )
         backing.update { it.copy(sync = status) }
+        refreshLastSynced()
     }
 
     fun onOpenNotificationAccess() = openSettings(SystemSettings.openNotificationAccess())
