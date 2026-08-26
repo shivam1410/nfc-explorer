@@ -36,6 +36,10 @@ import dev.shivam.nfcexplorer.ui.memory.MemoryExplorerScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanUiState
 import dev.shivam.nfcexplorer.ui.actions.TagActionsScreen
+import dev.shivam.nfcexplorer.ui.discovery.DiscoveryScreen
+import dev.shivam.nfcexplorer.ui.discovery.DiscoverySection
+import dev.shivam.nfcexplorer.ui.settings.SettingsScreen
+import dev.shivam.nfcexplorer.ui.settings.SettingsViewModel
 import dev.shivam.nfcexplorer.ui.actions.TagActionsViewModel
 import dev.shivam.nfcexplorer.ui.taginfo.TagInfoScreen
 import dev.shivam.nfcexplorer.ui.write.WriteScreen
@@ -46,16 +50,19 @@ private enum class Destination(
     @StringRes val labelRes: Int,
     @DrawableRes val iconRes: Int,
 ) {
-    TAG("tag", R.string.nav_tag, R.drawable.ic_nav_tag),
-    MEMORY("memory", R.string.nav_memory, R.drawable.ic_nav_memory),
-    LOCKS("locks", R.string.nav_locks, R.drawable.ic_nav_lock),
-    WRITE("write", R.string.nav_write, R.drawable.ic_nav_write),
+    // Order is the bar order, and Actions leads deliberately: running a tag's action is what this
+    // app is opened for day to day, while the inspection screens matter only with a card in hand.
     ACTIONS("actions", R.string.nav_actions, R.drawable.ic_nav_actions),
     LOG("log", R.string.nav_log, R.drawable.ic_nav_log),
+    SETTINGS("settings", R.string.nav_settings, R.drawable.ic_nav_settings),
+    DISCOVERY("discovery", R.string.nav_discovery, R.drawable.ic_nav_tag),
 }
 
 /**
  * Bottom-nav shell over the four destinations.
+ *
+ * Actions, Log and Settings are single screens; Discovery groups the four tag-inspection surfaces
+ * behind a secondary tab row, so the bar stays at four entries rather than six.
  *
  * The three tag screens render [lastReport] rather than reading from [state], so moving between
  * them never forces a re-tap and a failed re-scan does not blank a dump mid-read. Until the first
@@ -108,46 +115,64 @@ fun NfcExplorerNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Destination.TAG.route,
+            startDestination = Destination.ACTIONS.route,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            composable(Destination.TAG.route) {
-                WithReport(lastReport, state, onOpenNfcSettings) { report ->
-                    TagInfoScreen(report)
-                }
-            }
-            composable(Destination.MEMORY.route) {
-                WithReport(lastReport, state, onOpenNfcSettings) { report ->
-                    MemoryExplorerScreen(report)
-                }
-            }
-            composable(Destination.LOCKS.route) {
-                WithReport(lastReport, state, onOpenNfcSettings) { report ->
-                    LockAnalysisScreen(report)
-                }
-            }
-            composable(Destination.WRITE.route) {
-                val writeState by writeViewModel.state.collectAsStateWithLifecycle()
-                val preview by writeViewModel.encodedPreview.collectAsStateWithLifecycle()
+            composable(Destination.DISCOVERY.route) {
+                DiscoveryScreen { section ->
+                    when (section) {
+                        DiscoverySection.TAG -> WithReport(lastReport, state, onOpenNfcSettings) {
+                            TagInfoScreen(it)
+                        }
+                        DiscoverySection.MEMORY -> WithReport(lastReport, state, onOpenNfcSettings) {
+                            MemoryExplorerScreen(it)
+                        }
+                        DiscoverySection.LOCKS -> WithReport(lastReport, state, onOpenNfcSettings) {
+                            LockAnalysisScreen(it)
+                        }
+                        DiscoverySection.WRITE -> {
+                            val writeState by writeViewModel.state.collectAsStateWithLifecycle()
+                            val preview by writeViewModel.encodedPreview.collectAsStateWithLifecycle()
 
-                // The view model is Activity-scoped while this screen is not, so it has to be told
-                // when its screen comes and goes. Leaving disarms: an arm is a confirmation of the
-                // preview shown here, and the tag router dispatches taps from every tab.
-                DisposableEffect(Unit) {
-                    writeViewModel.onScreenEntered()
-                    onDispose { writeViewModel.onScreenLeft() }
+                            // The view model is Activity-scoped while this tab is not, so it has to
+                            // be told when its screen comes and goes. Leaving disarms: an arm is a
+                            // confirmation of the preview shown here, and the tag router dispatches
+                            // taps from every tab. Now driven by tab selection rather than route
+                            // changes, which is the same guarantee -- the composable leaves
+                            // composition either way.
+                            DisposableEffect(Unit) {
+                                writeViewModel.onScreenEntered()
+                                onDispose { writeViewModel.onScreenLeft() }
+                            }
+                            WriteScreen(
+                                state = writeState,
+                                encoded = preview,
+                                onModeChange = writeViewModel::onModeChange,
+                                onInputChange = writeViewModel::onInputChange,
+                                onRangeChange = writeViewModel::onRangeChange,
+                                onExpertModeChange = writeViewModel::onExpertModeChange,
+                                onArm = writeViewModel::onArm,
+                                onDisarm = writeViewModel::onDisarm,
+                            )
+                        }
+                    }
                 }
-                WriteScreen(
-                    state = writeState,
-                    encoded = preview,
-                    onModeChange = writeViewModel::onModeChange,
-                    onInputChange = writeViewModel::onInputChange,
-                    onRangeChange = writeViewModel::onRangeChange,
-                    onExpertModeChange = writeViewModel::onExpertModeChange,
-                    onArm = writeViewModel::onArm,
-                    onDisarm = writeViewModel::onDisarm,
+            }
+            composable(Destination.SETTINGS.route) {
+                val settingsViewModel: SettingsViewModel = hiltViewModel()
+                val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+                LifecycleResumeEffect(settingsViewModel) {
+                    settingsViewModel.refreshGrants()
+                    onPauseOrDispose { }
+                }
+                SettingsScreen(
+                    state = settingsState,
+                    onOpenNotificationAccess = settingsViewModel::onOpenNotificationAccess,
+                    onOpenAccessibilitySettings = settingsViewModel::onOpenAccessibilitySettings,
+                    onCheckForUpdates = settingsViewModel::onCheckForUpdates,
+                    onOpenRelease = settingsViewModel::onOpenRelease,
                 )
             }
             composable(Destination.ACTIONS.route) {

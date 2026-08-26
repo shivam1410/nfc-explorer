@@ -85,6 +85,11 @@ sealed interface TagAction {
      * this feature was being investigated, an unrelated app stole focus and silently absorbed several
      * drags aimed at Sleep Cycle.
      *
+     * [awaitForegroundMillis] is how long to keep looking for that package before giving up. A fixed
+     * pause would have to be pessimistic to cover a slow launch, and would still lose to an app that
+     * grabs the screen a moment later; waiting for the condition costs nothing when the screen is
+     * already right and survives the case that actually happens.
+     *
      * [holdMillis] and [steps] are not decoration. A smoothly interpolated swipe of the right length
      * was tested against Sleep Cycle's slider twice and did nothing at all; a stepped drag that
      * dwells at the start point before moving is what actually grabs the control.
@@ -98,6 +103,7 @@ sealed interface TagAction {
         val travelMillis: Long = DEFAULT_TRAVEL_MILLIS,
         val steps: Int = DEFAULT_STEPS,
         val requireForegroundPackage: String? = null,
+        val awaitForegroundMillis: Long = DEFAULT_AWAIT_FOREGROUND_MILLIS,
     ) : Leaf {
         init {
             require(startXRatio in RATIO && startYRatio in RATIO) { "start must be within the screen" }
@@ -108,6 +114,7 @@ sealed interface TagAction {
             require(requireForegroundPackage?.isNotBlank() != false) {
                 "requireForegroundPackage, when present, must not be blank"
             }
+            require(awaitForegroundMillis >= 0) { "awaitForegroundMillis must not be negative" }
         }
     }
 
@@ -174,5 +181,6 @@ sealed interface TagAction {
         const val DEFAULT_TRAVEL_MILLIS = 1_000L
         const val DEFAULT_STEPS = 10
         const val DEFAULT_GAP_MILLIS = 900L
+        const val DEFAULT_AWAIT_FOREGROUND_MILLIS = 4_000L
     }
 }

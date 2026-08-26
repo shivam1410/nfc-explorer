@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.view.accessibility.AccessibilityEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.shivam.nfcexplorer.domain.action.IntentSpec
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -143,15 +144,48 @@ class ScreenGestureDispatcher @Inject constructor(
             )
 
         spec.requireForegroundPackage?.let { required ->
-            val actual = service.foregroundPackage()
+            val actual = awaitForeground(service, required, spec.awaitForegroundMillis)
             if (actual != required) {
                 return Result.failure(
-                    IllegalStateException("expected $required in the foreground but found ${actual ?: "nothing"}"),
+                    IllegalStateException(
+                        "expected $required in the foreground but found ${actual ?: "nothing"}",
+                    ),
                 )
             }
         }
 
         val metrics = context.resources.displayMetrics
         return service.drag(spec, metrics.widthPixels, metrics.heightPixels)
+    }
+
+    /**
+     * Polls until [required] is frontmost, or the budget runs out.
+     *
+     * Two things make this necessary and they pull in opposite directions. The screen this drag
+     * targets is usually being launched by the step immediately before it, so it may not be up yet;
+     * and another app can take the foreground at any moment -- during development a tracker app did
+     * exactly that, three times, absorbing drags aimed elsewhere. Polling handles the first without
+     * making the second worse: it never drags at the wrong app, it just waits a little for the right
+     * one.
+     *
+     * Returns whatever is frontmost when it gives up, so the caller can name it in the failure.
+     */
+    private suspend fun awaitForeground(
+        service: GestureDispatchService,
+        required: String,
+        budgetMillis: Long,
+    ): String? {
+        var waited = 0L
+        var actual = service.foregroundPackage()
+        while (actual != required && waited < budgetMillis) {
+            delay(FOREGROUND_POLL_MILLIS)
+            waited += FOREGROUND_POLL_MILLIS
+            actual = service.foregroundPackage()
+        }
+        return actual
+    }
+
+    private companion object {
+        const val FOREGROUND_POLL_MILLIS = 150L
     }
 }
