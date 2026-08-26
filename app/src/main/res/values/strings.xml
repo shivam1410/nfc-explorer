@@ -169,12 +169,15 @@
     <string name="settings_sync_failed">Sync failed: %1$s</string>
     <string name="settings_sync_quiet">Already in sync.</string>
     <string name="settings_sync_done">Pulled %1$d, pushed %2$d, uploaded %3$d log.</string>
-    <string name="settings_toggl_set">Saved on this device — ends in %1$s</string>
+    <string name="settings_toggl_set">✓ Token saved on this device — ends in %1$s</string>
     <string name="settings_toggl_show">Show token</string>
     <string name="settings_toggl_hide">Hide token</string>
-    <string name="settings_toggl_unset">No API token saved.</string>
+    <string name="settings_toggl_unset">No token saved yet.</string>
     <string name="settings_toggl_token">API token</string>
+    <string name="settings_toggl_replace">Replace token</string>
     <string name="settings_toggl_save">Save</string>
+    <string name="settings_toggl_edit">Edit</string>
+    <string name="settings_toggl_cancel">Cancel</string>
     <string name="settings_toggl_clear">Clear</string>
     <string name="settings_toggl_explainer">Encrypted with a key held in this device&#8217;s secure hardware. It is never written to a tag, never exported, and cannot be restored onto another phone — you will enter it once per device.</string>
     <string name="settings_version">Version %1$s</string>
