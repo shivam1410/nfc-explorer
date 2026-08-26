@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -250,10 +251,18 @@ fun NfcExplorerNavHost(
                 )
             }
             composable(EDITOR_ROUTE) {
-                // Keyed on the token so a repeat tap of the same card still counts, and so a tag
-                // already sitting in lastReport does not silently skip the "hold a tag" step.
+                // Only scans that happen *after* this page opens count.
+                //
+                // LaunchedEffect runs on first composition whether or not its key changed, so keying
+                // on the token alone consumed whatever tag was last scanned the moment the page
+                // appeared -- cancelling and reopening landed straight back on the same tag instead
+                // of waiting for a tap. Remembering the token at entry is what makes "new scan"
+                // mean new.
+                val tokenAtEntry = rememberSaveable { scanToken }
                 LaunchedEffect(scanToken) {
-                    lastReport?.identity?.uid?.let(actionsViewModel::onTagScanned)
+                    if (scanToken != tokenAtEntry) {
+                        lastReport?.identity?.uid?.let(actionsViewModel::onTagScanned)
+                    }
                 }
 
                 TagEditorScreen(
@@ -273,6 +282,7 @@ fun NfcExplorerNavHost(
                     onTypeChange = actionsViewModel::onTypeChange,
                     onSchemeChange = actionsViewModel::onSchemeChange,
                     onEditScanned = actionsViewModel::onEditScannedTag,
+                    onScanAnother = actionsViewModel::onStartAddFlow,
                 )
             }
             composable(Destination.LOG.route) {

@@ -42,6 +42,7 @@ fun TagEditorScreen(
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
     onEditScanned: (TagAssignment) -> Unit,
+    onScanAnother: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -58,6 +59,7 @@ fun TagEditorScreen(
             state.addTag is AddTagState.AlreadyAssigned -> AlreadyAssigned(
                 assignment = state.addTag.assignment,
                 onEdit = onEditScanned,
+                onScanAnother = onScanAnother,
                 onCancel = onCancel,
             )
 
@@ -115,6 +117,7 @@ private fun WaitingForTag() {
 private fun AlreadyAssigned(
     assignment: TagAssignment,
     onEdit: (TagAssignment) -> Unit,
+    onScanAnother: () -> Unit,
     onCancel: () -> Unit,
 ) {
     SectionCard(
@@ -131,8 +134,13 @@ private fun AlreadyAssigned(
         ) {
             Text(stringResource(R.string.actions_add_edit_existing))
         }
-        TextButton(onClick = onCancel) {
+        // Two ways out, because they are different intentions: try a different card, or abandon
+        // the whole flow. Collapsing them into one button made "cancel" ambiguous.
+        TextButton(onClick = onScanAnother) {
             Text(stringResource(R.string.actions_add_scan_another))
+        }
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.actions_add_cancel))
         }
     }
 }

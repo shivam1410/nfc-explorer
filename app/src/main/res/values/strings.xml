@@ -205,7 +205,8 @@
     <string name="actions_add_taken_title">This tag is already assigned</string>
     <string name="actions_add_taken">It is set up as &#8220;%1$s&#8221;.</string>
     <string name="actions_add_edit_existing">Edit this tag</string>
-    <string name="actions_add_scan_another">Cancel</string>
+    <string name="actions_add_scan_another">Scan a different tag</string>
+    <string name="actions_add_cancel">Cancel</string>
     <string name="actions_editor_gone">Nothing to edit. Go back and pick a tag.</string>
     <string name="actions_toggl_workspace">Toggl workspace ID</string>
     <string name="actions_toggl_explainer">One tap starts a timer; tapping again stops whatever is running. The entry is named after this tag&#8217;s label. Add your API token in Settings — it is stored encrypted on this device and never written to the tag.</string>
