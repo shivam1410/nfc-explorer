@@ -237,11 +237,6 @@ fun NfcExplorerNavHost(
             composable(Destination.ACTIONS.route) {
                 TagActionsScreen(
                     state = actionsState,
-                    lastScannedUid = lastReport?.identity?.uid,
-                    onCreateFor = { uid ->
-                        actionsViewModel.onCreateFor(uid)
-                        if (uid != null) openEditor()
-                    },
                     onEdit = { assignment ->
                         actionsViewModel.onEdit(assignment)
                         openEditor()
