@@ -5,20 +5,22 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.MifareUltralight
 import android.nfc.tech.NfcA
+import android.nfc.tech.NfcB
+import android.nfc.tech.NfcF
+import android.nfc.tech.NfcV
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import dev.shivam.nfcexplorer.data.nfc.AndroidNfcATransport
-import dev.shivam.nfcexplorer.data.nfc.AndroidUltralightTransport
+import dev.shivam.nfcexplorer.data.nfc.AndroidTagConnection
 import dev.shivam.nfcexplorer.di.ApplicationScope
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.TagActionDispatch
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagPresence
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
-import dev.shivam.nfcexplorer.domain.transport.TagTransport
+import dev.shivam.nfcexplorer.domain.transport.TagConnection
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +98,7 @@ class TagActionActivity : ComponentActivity() {
         // Proven before the store is even consulted, so a caller that cannot produce a live tag learns
         // nothing about what is assigned. On Dispatchers.IO because this is a blocking exchange with
         // the tag, the same as every other read in this app.
-        val presence = withContext(Dispatchers.IO) { TagPresence.check(transportFor(tag)) }
+        val presence = withContext(Dispatchers.IO) { TagPresence.check(connectionFor(tag)) }
         val assignment = repository.find(uid)
         val permitted = TagActionDispatch.shouldAct(
             intentAction = intent?.action,
@@ -171,15 +173,24 @@ class TagActionActivity : ComponentActivity() {
     }
 
     /**
-     * A transport to prove the tag answers, or null when it speaks nothing this app can open.
+     * A connection to prove the tag answers, or null when it speaks nothing this app can open.
      *
-     * Ultralight first because that is the family this app decodes; plain `NfcA` second because the
-     * trigger's tech filter admits it, and without the fallback an assignment on such a tag would fail
-     * the presence check and silently stop working.
+     * Every family the tech filter claims is here, and the two have to stay in step: a tag the filter
+     * admits but this does not is launched by the system, fails the presence check, and does nothing
+     * on every tap. That is how NfcB, NfcF and NfcV behaved the moment the filter widened to admit
+     * them -- assignable in the app, and silently inert against the phone.
+     *
+     * Ultralight first, so the family this app actually decodes is opened through its own class.
+     * Order is otherwise immaterial: presence needs any technology that answers, not the right one.
      */
-    private fun transportFor(tag: Tag): TagTransport? =
-        MifareUltralight.get(tag)?.let(::AndroidUltralightTransport)
-            ?: NfcA.get(tag)?.let(::AndroidNfcATransport)
+    private fun connectionFor(tag: Tag): TagConnection? =
+        listOfNotNull(
+            MifareUltralight.get(tag),
+            NfcA.get(tag),
+            NfcB.get(tag),
+            NfcF.get(tag),
+            NfcV.get(tag),
+        ).firstOrNull()?.let(::AndroidTagConnection)
 
     /**
      * The typed `EXTRA_TAG` accessor arrived in API 33; below that the deprecated form is the only

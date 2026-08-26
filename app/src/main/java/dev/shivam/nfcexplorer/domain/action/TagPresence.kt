@@ -1,6 +1,6 @@
 package dev.shivam.nfcexplorer.domain.action
 
-import dev.shivam.nfcexplorer.domain.transport.TagTransport
+import dev.shivam.nfcexplorer.domain.transport.TagConnection
 import java.io.IOException
 
 /**
@@ -59,7 +59,7 @@ object TagPresence {
     }
 
     /**
-     * Opens and immediately releases [transport], reporting whether the tag answered.
+     * Opens and immediately releases [connection], reporting whether the tag answered.
      *
      * A null transport means the tag's technology is not one this app can talk to, so nothing can be
      * proven about it.
@@ -67,10 +67,10 @@ object TagPresence {
      * Releases the connection on both paths: this runs on every tap, and a tag left connected blocks
      * the next reader.
      */
-    fun check(transport: TagTransport?): Answer {
-        if (transport == null) return Answer.Absent(cause = null)
+    fun check(connection: TagConnection?): Answer {
+        if (connection == null) return Answer.Absent(cause = null)
         return try {
-            transport.use { it.connect() }
+            connection.use { it.connect() }
             Answer.Live
         } catch (failure: IOException) {
             Answer.Absent(cause = failure)
