@@ -177,7 +177,7 @@
     <string name="settings_sync_consent">Waiting for you to allow access…</string>
     <string name="settings_sync_failed">Sync failed: %1$s</string>
     <string name="settings_sync_quiet">Already in sync.</string>
-    <string name="settings_sync_done">Pulled %1$d, pushed %2$d, logs uploaded %3$d.</string>
+    <string name="settings_sync_done">Pulled %1$d, pushed %2$d, logs uploaded %3$d, restored %4$d.</string>
     <string name="settings_toggl_set">✓ Token saved on this device — ends in %1$s</string>
     <string name="settings_toggl_show">Show token</string>
     <string name="settings_toggl_hide">Hide token</string>
