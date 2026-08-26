@@ -353,7 +353,7 @@ internal fun DraftEditor(
                         onDraftChange(draft.copy(phoneNumber = it, contactName = ""))
                     },
                     label = { Text(stringResource(R.string.actions_whatsapp_number)) },
-                    isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
+                    isError = draft.touched && draft.phoneNumber.none(Char::isDigit),
                     // Inside the field rather than a full-width button beneath it: picking a
                     // contact is one way of filling this single input, not a step of its own.
                     trailingIcon = {
@@ -382,6 +382,7 @@ internal fun DraftEditor(
                     value = draft.messageText,
                     onValueChange = { onDraftChange(draft.copy(messageText = it)) },
                     label = { Text(stringResource(R.string.actions_whatsapp_message)) },
+                    isError = draft.touched && draft.messageText.isBlank(),
                     modifier = Modifier.fillMaxWidth(),
                     shape = FieldShape,
                 )

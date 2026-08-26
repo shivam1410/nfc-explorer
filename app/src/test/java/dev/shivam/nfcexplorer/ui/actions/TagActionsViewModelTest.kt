@@ -220,6 +220,38 @@ class TagActionsViewModelTest {
         assertFalse(model.state.value.draft?.touched == true)
     }
 
+
+    // --- WhatsApp requires both halves ---
+
+    @Test
+    fun `a WhatsApp action needs a message as well as a number`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(
+            draft(model, label = "Tell her", type = ActionType.WHATSAPP)
+                .copy(phoneNumber = "917982242069"),
+        )
+
+        // A chat opened with nothing in it is a tap that did not do the thing it was made for.
+        assertEquals(DraftProblem.MISSING_TARGET, model.state.value.problem)
+
+        model.onDraftChange(model.state.value.draft!!.copy(messageText = "on my way"))
+
+        assertNull(model.state.value.problem)
+    }
+
+    @Test
+    fun `a message without a number is still incomplete`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(
+            draft(model, label = "Tell her", type = ActionType.WHATSAPP)
+                .copy(messageText = "on my way"),
+        )
+
+        assertEquals(DraftProblem.MISSING_TARGET, model.state.value.problem)
+    }
+
     private companion object {
         const val READ_DELAY_MILLIS = 10L
         const val CATALOG_DELAY_MILLIS = 200L
