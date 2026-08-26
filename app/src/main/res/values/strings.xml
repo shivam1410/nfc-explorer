@@ -160,6 +160,8 @@
     <string name="settings_about_title">About</string>
     <string name="settings_toggl_title">Toggl</string>
     <string name="settings_sync_title">Google Drive sync</string>
+    <string name="settings_export_title">Export session log</string>
+    <string name="settings_export_subtitle">Everything this app recorded since it started, written wherever you choose.</string>
     <string name="settings_sync_subtitle">Actions and session logs, in a hidden folder inside your own Drive. This app cannot see any of your other files.</string>
     <string name="settings_sync_now">Sync now</string>
     <string name="settings_sync_running">Syncing…</string>
@@ -167,7 +169,9 @@
     <string name="settings_sync_failed">Sync failed: %1$s</string>
     <string name="settings_sync_quiet">Already in sync.</string>
     <string name="settings_sync_done">Pulled %1$d, pushed %2$d, uploaded %3$d log.</string>
-    <string name="settings_toggl_set">API token saved on this device.</string>
+    <string name="settings_toggl_set">Saved on this device — ends in %1$s</string>
+    <string name="settings_toggl_show">Show token</string>
+    <string name="settings_toggl_hide">Hide token</string>
     <string name="settings_toggl_unset">No API token saved.</string>
     <string name="settings_toggl_token">API token</string>
     <string name="settings_toggl_save">Save</string>

@@ -46,8 +46,6 @@ import java.util.Locale
 @Composable
 fun SessionLogScreen(
     entries: List<LogEntry>,
-    exportResult: ExportResult?,
-    onExport: (ExportFormat) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var minimumLevel by remember { mutableStateOf<LogLevel?>(null) }
@@ -81,35 +79,6 @@ fun SessionLogScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(onClick = { onExport(ExportFormat.JSON) }) {
-                Text(stringResource(R.string.export_json))
-            }
-            OutlinedButton(onClick = { onExport(ExportFormat.TEXT) }) {
-                Text(stringResource(R.string.export_txt))
-            }
-        }
-
-        exportResult?.let { result ->
-            Text(
-                text = when (result) {
-                    is ExportResult.Written ->
-                        stringResource(R.string.export_written, result.bytes, result.format.extension)
-                    is ExportResult.Failed -> stringResource(R.string.export_failed, result.reason)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = when (result) {
-                    is ExportResult.Written -> MaterialTheme.colorScheme.primary
-                    is ExportResult.Failed -> MaterialTheme.colorScheme.error
-                },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            )
-        }
 
         Text(
             text = stringResource(R.string.log_entry_count, visible.size),

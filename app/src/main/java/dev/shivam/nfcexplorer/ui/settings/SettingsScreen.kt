@@ -10,7 +10,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
+import dev.shivam.nfcexplorer.domain.export.ExportFormat
+import dev.shivam.nfcexplorer.ui.log.ExportResult
 import dev.shivam.nfcexplorer.domain.update.AppRelease
 import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
@@ -41,9 +48,12 @@ fun SettingsScreen(
     onDownloadAndInstall: (AppRelease) -> Unit,
     onAllowInstalls: () -> Unit,
     onSyncNow: () -> Unit,
+    exportResult: ExportResult?,
+    onExport: (ExportFormat) -> Unit,
     onTogglDraftChange: (String) -> Unit,
     onSaveTogglToken: () -> Unit,
     onClearTogglToken: () -> Unit,
+    onToggleTokenVisibility: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -67,6 +77,37 @@ fun SettingsScreen(
                 labelRes = R.string.actions_grant_accessibility,
                 onOpen = onOpenAccessibilitySettings,
             )
+        }
+
+        SectionCard(
+            title = stringResource(R.string.settings_export_title),
+            subtitle = stringResource(R.string.settings_export_subtitle),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onExport(ExportFormat.JSON) }) {
+                    Text(stringResource(R.string.export_json))
+                }
+                OutlinedButton(onClick = { onExport(ExportFormat.TEXT) }) {
+                    Text(stringResource(R.string.export_txt))
+                }
+            }
+            exportResult?.let { result ->
+                Text(
+                    text = when (result) {
+                        is ExportResult.Written -> stringResource(
+                            R.string.export_written,
+                            result.bytes,
+                            result.format.extension,
+                        )
+                        is ExportResult.Failed -> stringResource(R.string.export_failed, result.reason)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (result) {
+                        is ExportResult.Written -> MaterialTheme.colorScheme.primary
+                        is ExportResult.Failed -> MaterialTheme.colorScheme.error
+                    },
+                )
+            }
         }
 
         SectionCard(
@@ -115,17 +156,36 @@ fun SettingsScreen(
 
         SectionCard(
             title = stringResource(R.string.settings_toggl_title),
-            subtitle = stringResource(
-                if (state.togglTokenSet) R.string.settings_toggl_set
-                else R.string.settings_toggl_unset,
-            ),
+            subtitle = state.togglTokenTail
+                ?.let { stringResource(R.string.settings_toggl_set, it) }
+                ?: stringResource(R.string.settings_toggl_unset),
         ) {
             OutlinedTextField(
                 value = state.togglDraft,
                 onValueChange = onTogglDraftChange,
                 label = { Text(stringResource(R.string.settings_toggl_token)) },
                 // Masked, and never echoed back after saving: the stored value is not readable here.
-                visualTransformation = PasswordVisualTransformation(),
+                // Masked by default, revealable on demand: a pasted token is impossible to check
+                // otherwise, and a mistyped one fails later as an opaque 403.
+                visualTransformation = if (state.togglTokenVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(onClick = onToggleTokenVisibility) {
+                        Icon(
+                            painter = painterResource(
+                                if (state.togglTokenVisible) R.drawable.ic_eye_off
+                                else R.drawable.ic_eye,
+                            ),
+                            contentDescription = stringResource(
+                                if (state.togglTokenVisible) R.string.settings_toggl_hide
+                                else R.string.settings_toggl_show,
+                            ),
+                        )
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

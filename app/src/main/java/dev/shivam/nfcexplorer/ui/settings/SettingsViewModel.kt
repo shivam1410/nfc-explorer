@@ -55,6 +55,15 @@ data class SettingsUiState(
      */
     val togglTokenSet: Boolean = false,
     val togglDraft: String = "",
+    /** Whether the token field is unmasked. Never persisted; resets with the screen. */
+    val togglTokenVisible: Boolean = false,
+    /**
+     * The tail of the stored token, e.g. `1a2b`.
+     *
+     * Enough to recognise which token is saved without putting the secret on screen — "saved" alone
+     * left no way to tell a successful save from a silently cleared field.
+     */
+    val togglTokenTail: String? = null,
     val sync: SyncUiState = SyncUiState.Idle,
     val install: InstallStatus = InstallStatus.Idle,
 )
@@ -83,7 +92,22 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refreshGrants()
-        backing.update { it.copy(togglTokenSet = secrets.has(SecretStore.TOGGL_TOKEN)) }
+        refreshTogglToken()
+    }
+
+    /** Reads only whether a token exists and its last few characters, never the whole value. */
+    private fun refreshTogglToken() {
+        val stored = secrets.read(SecretStore.TOGGL_TOKEN)
+        backing.update {
+            it.copy(
+                togglTokenSet = stored != null,
+                togglTokenTail = stored?.takeLast(TOKEN_TAIL_LENGTH),
+            )
+        }
+    }
+
+    fun onToggleTokenVisibility() {
+        backing.update { it.copy(togglTokenVisible = !it.togglTokenVisible) }
     }
 
     fun onTogglDraftChange(value: String) {
@@ -95,12 +119,14 @@ class SettingsViewModel @Inject constructor(
         val token = backing.value.togglDraft.trim()
         if (token.isBlank()) return
         secrets.write(SecretStore.TOGGL_TOKEN, token)
-        backing.update { it.copy(togglDraft = "", togglTokenSet = true) }
+        backing.update { it.copy(togglDraft = "", togglTokenVisible = false) }
+        refreshTogglToken()
     }
 
     fun onClearTogglToken() {
         secrets.clear(SecretStore.TOGGL_TOKEN)
-        backing.update { it.copy(togglDraft = "", togglTokenSet = false) }
+        backing.update { it.copy(togglDraft = "", togglTokenVisible = false) }
+        refreshTogglToken()
     }
 
     /** Re-read on every resume: both grants are made outside the app and revocable at any time. */
@@ -228,6 +254,10 @@ class SettingsViewModel @Inject constructor(
 
     /** Opens the release page in a browser. Installing is the user's decision, not the app's. */
     fun onOpenRelease(url: String) = openSettings(TagAction.OpenUri(url))
+
+    private companion object {
+        const val TOKEN_TAIL_LENGTH = 4
+    }
 
     private fun openSettings(action: TagAction) {
         viewModelScope.launch { performer.perform(action) }

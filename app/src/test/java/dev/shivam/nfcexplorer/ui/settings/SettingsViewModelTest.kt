@@ -186,6 +186,66 @@ class SettingsViewModelTest {
         assertTrue(model.state.value.togglTokenSet)
     }
 
+    /**
+     * Clearing the field on save is otherwise indistinguishable from the save failing, so the tail
+     * is what tells the user something is actually stored.
+     */
+    @Test
+    fun `a saved token is confirmed by its last few characters`() = runTest {
+        val model = viewModel()
+
+        model.onTogglDraftChange("abcdef123456")
+        model.onSaveTogglToken()
+
+        assertEquals("3456", model.state.value.togglTokenTail)
+    }
+
+    @Test
+    fun `the whole token never reaches ui state`() = runTest {
+        val model = viewModel()
+
+        model.onTogglDraftChange("abcdef123456")
+        model.onSaveTogglToken()
+
+        val state = model.state.value
+        assertFalse(state.togglDraft.contains("abcdef"), "the draft must not retain the secret")
+        assertFalse(state.togglTokenTail?.contains("abcdef") == true)
+    }
+
+    @Test
+    fun `an existing token is recognised when the screen opens`() = runTest {
+        secrets.values[SecretStore.TOGGL_TOKEN] = "zzzz9999"
+
+        val model = viewModel()
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.togglTokenSet)
+        assertEquals("9999", model.state.value.togglTokenTail)
+    }
+
+    @Test
+    fun `clearing forgets the tail as well as the token`() = runTest {
+        secrets.values[SecretStore.TOGGL_TOKEN] = "zzzz9999"
+        val model = viewModel()
+
+        model.onClearTogglToken()
+
+        assertEquals(null, model.state.value.togglTokenTail)
+    }
+
+    /** Revealing is a view concern and must never be remembered. */
+    @Test
+    fun `token visibility toggles and resets on save`() = runTest {
+        val model = viewModel()
+
+        model.onToggleTokenVisibility()
+        assertTrue(model.state.value.togglTokenVisible)
+
+        model.onTogglDraftChange("abc")
+        model.onSaveTogglToken()
+        assertFalse(model.state.value.togglTokenVisible)
+    }
+
     @Test
     fun `clearing removes the stored token`() = runTest {
         secrets.values[SecretStore.TOGGL_TOKEN] = "old"
