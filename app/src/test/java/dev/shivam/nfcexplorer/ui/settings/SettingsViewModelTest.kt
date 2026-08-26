@@ -1,6 +1,7 @@
 package dev.shivam.nfcexplorer.ui.settings
 
 import dev.shivam.nfcexplorer.data.sync.Authorization
+import dev.shivam.nfcexplorer.data.sync.SyncState
 import dev.shivam.nfcexplorer.data.update.UpdateInstaller
 import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.data.sync.AccessTokens
@@ -108,6 +109,13 @@ class SettingsViewModelTest {
 
     private val assignments = FakeAssignments()
 
+    private class FakeSyncState(var at: Long? = null) : SyncState {
+        override fun lastSyncedAtMillis(): Long? = at
+        override fun recordSuccess(atMillis: Long) { at = atMillis }
+    }
+
+    private val syncState = FakeSyncState()
+
     /** Answers as Toggl would, without a network. */
     private class FakeToggl(
         var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
@@ -136,6 +144,7 @@ class SettingsViewModelTest {
         installer = installer,
         toggl = toggl,
         assignments = assignments,
+        syncState = syncState,
     )
 
     // --- Permissions ---
@@ -430,6 +439,25 @@ class SettingsViewModelTest {
     }
 
     // --- Sync ---
+
+    @Test
+    fun `a never-synced device reports no last sync`() = runTest {
+        val model = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(null, model.state.value.lastSyncedAtMillis)
+    }
+
+    @Test
+    fun `the last sync time is picked up after a successful sync`() = runTest {
+        syncState.at = 1_700_000_000_000
+        val model = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(1_700_000_000_000, model.state.value.lastSyncedAtMillis)
+    }
+
+
 
     @Test
     fun `a sync that moves nothing reports quietly`() = runTest {

@@ -172,6 +172,54 @@ class TagActionsViewModelTest {
         assertTrue(action.tags.isEmpty())
     }
 
+
+    // --- Suggested labels ---
+
+    @Test
+    fun `choosing a type names the tag after it`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.TOGGL)
+
+        assertEquals("Toggl", model.state.value.draft?.label)
+    }
+
+    @Test
+    fun `switching type renames while the label is still a suggestion`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.TOGGL)
+        model.onTypeChange(ActionType.WHATSAPP)
+
+        assertEquals("WhatsApp", model.state.value.draft?.label)
+    }
+
+    /** Once it is the user's words, changing type must not overwrite them. */
+    @Test
+    fun `a typed label survives a change of type`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onTypeChange(ActionType.TOGGL)
+        model.onDraftChange(model.state.value.draft!!.copy(label = "Deep work"))
+
+        model.onTypeChange(ActionType.WHATSAPP)
+
+        assertEquals("Deep work", model.state.value.draft?.label)
+    }
+
+    /** Suggesting a name is not the user filling the form in, so no errors yet. */
+    @Test
+    fun `choosing a type does not start showing errors`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.TOGGL)
+
+        assertFalse(model.state.value.draft?.touched == true)
+    }
+
     private companion object {
         const val READ_DELAY_MILLIS = 10L
         const val CATALOG_DELAY_MILLIS = 200L

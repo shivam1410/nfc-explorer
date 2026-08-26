@@ -11,6 +11,8 @@ import dev.shivam.nfcexplorer.data.secret.KeystoreSecretStore
 import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.data.sync.CloudSyncService
 import dev.shivam.nfcexplorer.data.sync.DriveAppDataStore
+import dev.shivam.nfcexplorer.data.sync.PreferencesSyncState
+import dev.shivam.nfcexplorer.data.sync.SyncState
 import dev.shivam.nfcexplorer.data.sync.GoogleAccessTokens
 import dev.shivam.nfcexplorer.data.toggl.PreferencesTogglConfig
 import dev.shivam.nfcexplorer.data.toggl.TogglHttpSession
@@ -73,6 +75,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindCloudSync(impl: CloudSyncService): CloudSync
+
+    @Binds
+    abstract fun bindSyncState(impl: PreferencesSyncState): SyncState
 
     @Binds
     abstract fun bindAccessTokens(impl: GoogleAccessTokens): AccessTokens

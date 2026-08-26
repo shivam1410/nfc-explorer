@@ -169,6 +169,9 @@
     <string name="settings_export_title">Export session log</string>
     <string name="settings_export_subtitle">Everything this app recorded since it started, written wherever you choose.</string>
     <string name="settings_sync_subtitle">Actions and session logs, in a hidden folder inside your own Drive. This app cannot see any of your other files.</string>
+    <string name="settings_sync_direction">Syncing goes both ways in one pass: whichever change is newer wins, per tag, whichever device made it.</string>
+    <string name="settings_sync_last">Last synced %1$s</string>
+    <string name="settings_sync_never">Not synced on this device yet.</string>
     <string name="settings_sync_now">Sync now</string>
     <string name="settings_sync_running">Syncing…</string>
     <string name="settings_sync_consent">Waiting for you to allow access…</string>
