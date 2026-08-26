@@ -3,6 +3,7 @@ package dev.shivam.nfcexplorer.data.sync
 import dev.shivam.nfcexplorer.data.action.TagActionSerializer
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.sync.CloudStore
+import dev.shivam.nfcexplorer.domain.sync.CloudSync
 import dev.shivam.nfcexplorer.domain.sync.SyncMerge
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
 import dev.shivam.nfcexplorer.logging.LogEntry
@@ -32,9 +33,9 @@ class CloudSyncService @Inject constructor(
     private val logger: SessionLogger,
     private val cloud: CloudStore,
     private val deviceId: SyncDeviceId,
-) {
+) : CloudSync {
 
-    suspend fun sync(nowMillis: Long): Result<SyncReport> = runCatching {
+    override suspend fun sync(nowMillis: Long): Result<SyncReport> = runCatching {
         val local = repository.observeAll().first()
 
         val remoteDocument = cloud.read(CloudStore.ACTIONS_DOCUMENT).getOrThrow()

@@ -7,12 +7,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 
 /**
  * Hosts the tag-inspection screens behind a secondary tab row.
@@ -29,7 +28,9 @@ fun DiscoveryScreen(
     var selected by rememberSaveable { mutableStateOf(DiscoverySection.TAG) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ScrollableTabRow(selectedTabIndex = selected.ordinal, edgePadding = 0.dp) {
+        // Fixed rather than scrollable: four short labels fit, and a ScrollableTabRow sizes each
+        // tab to its text, which leaves them bunched at the left with dead space after "Write".
+        TabRow(selectedTabIndex = selected.ordinal) {
             DiscoverySection.entries.forEach { section ->
                 Tab(
                     selected = section == selected,

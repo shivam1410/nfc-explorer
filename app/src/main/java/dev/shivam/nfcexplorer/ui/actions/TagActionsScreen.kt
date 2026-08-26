@@ -18,6 +18,11 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -68,8 +73,6 @@ fun TagActionsScreen(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
-    onOpenNotificationAccess: () -> Unit,
-    onOpenAccessibilitySettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -111,8 +114,6 @@ fun TagActionsScreen(
                 onPickApp = onPickApp,
                 onTypeChange = onTypeChange,
                 onSchemeChange = onSchemeChange,
-                onOpenNotificationAccess = onOpenNotificationAccess,
-                onOpenAccessibilitySettings = onOpenAccessibilitySettings,
             )
         }
 
@@ -174,8 +175,6 @@ private fun DraftEditor(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
-    onOpenNotificationAccess: () -> Unit,
-    onOpenAccessibilitySettings: () -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -197,11 +196,22 @@ private fun DraftEditor(
             modifier = Modifier.padding(top = 8.dp),
         ) {
             ActionType.entries.forEach { type ->
-                FilterChip(
-                    selected = draft.type == type,
-                    onClick = { onTypeChange(type) },
-                    label = { Text(stringResource(type.labelRes())) },
-                )
+                // Filled when chosen, outlined otherwise: the selected action has to be obvious at a
+                // glance, and an icon alone would not say which of two similar ones is active.
+                val label: @Composable () -> Unit = {
+                    Icon(
+                        painter = painterResource(type.iconRes()),
+                        contentDescription = null,
+                        modifier = Modifier.size(ACTION_ICON_SIZE),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(type.labelRes()))
+                }
+                if (draft.type == type) {
+                    FilledTonalButton(onClick = { onTypeChange(type) }) { label() }
+                } else {
+                    OutlinedButton(onClick = { onTypeChange(type) }) { label() }
+                }
             }
         }
 
@@ -277,27 +287,12 @@ private fun DraftEditor(
                 )
             }
 
-            // Nothing to configure, but the two grants are shown and reachable from here. Without
-            // them the tag silently does nothing, and a tap that does nothing for an unstated reason
-            // is the failure mode this app works hardest to avoid.
-            ActionType.SLEEP_CYCLE -> Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.actions_sleep_cycle_explainer),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                GrantRow(
-                    granted = state.grants.notificationAccess,
-                    labelRes = R.string.actions_grant_notifications,
-                    onOpen = onOpenNotificationAccess,
-                )
-                GrantRow(
-                    granted = state.grants.gestureService,
-                    labelRes = R.string.actions_grant_accessibility,
-                    onOpen = onOpenAccessibilitySettings,
-                )
-            }
+            // No form: the preset has nothing to configure. The permissions it needs live in
+            // Settings rather than being restated on every editor that happens to select it.
+            ActionType.SLEEP_CYCLE -> Text(
+                text = stringResource(R.string.actions_sleep_cycle_explainer),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         state.problem?.let { problem ->
@@ -438,6 +433,8 @@ private const val ICON_PIXELS = 96
 
 private val ICON_SIZE = 28.dp
 
+private val ACTION_ICON_SIZE = 18.dp
+
 /**
  * One line describing what a tag will do.
  *
@@ -462,38 +459,14 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
         stringResource(R.string.actions_summary_toggle, appNameOf(action.packageName))
 }
 
-/**
- * One permission, its current state, and the way to change it.
- *
- * States granted/not granted in words rather than by colour alone, the same rule the lock verdicts
- * follow: a green dot is not a fact anyone can act on.
- */
-@Composable
-private fun GrantRow(granted: Boolean, labelRes: Int, onOpen: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = stringResource(labelRes),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(
-                if (granted) R.string.actions_grant_on else R.string.actions_grant_off,
-            ),
-            style = MaterialTheme.typography.labelSmall,
-        )
-        TextButton(onClick = onOpen) {
-            Text(
-                stringResource(
-                    if (granted) R.string.actions_grant_review else R.string.actions_grant_open,
-                ),
-            )
-        }
-    }
+/** Screen-reader users get the label; the icon is decoration, so it carries no description. */
+private fun ActionType.iconRes(): Int = when (this) {
+    ActionType.LAUNCH_APP -> R.drawable.ic_action_app
+    ActionType.OPEN_URI -> R.drawable.ic_action_link
+    ActionType.SEND_INTENT -> R.drawable.ic_action_intent
+    ActionType.MEDIA -> R.drawable.ic_action_media
+    ActionType.SLEEP_CYCLE -> R.drawable.ic_action_sleep
+    ActionType.TOGGL -> R.drawable.ic_action_timer
 }
 
 private fun ActionType.labelRes(): Int = when (this) {
