@@ -277,6 +277,14 @@
     <string name="actions_media_play_pause">Play / pause</string>
     <string name="actions_media_next">Next track</string>
     <string name="actions_media_previous">Previous track</string>
+    <string name="actions_extras_title">Extras</string>
+    <string name="actions_extra_key">Key</string>
+    <string name="actions_extra_value">Value</string>
+    <string name="actions_extra_add">Add extra</string>
+    <string name="actions_extra_remove">Remove extra</string>
+    <string name="actions_problem_blank_extra_key">An extra has a value but no key.</string>
+    <string name="actions_problem_duplicate_extra_key">Two extras share a key — one would overwrite the other.</string>
+    <string name="actions_whatsapp_autosend_no_grant">Auto-send needs the accessibility service, and it is currently off. Android turns it off whenever the app is reinstalled or updated, so this needs granting again. Until then a tap opens the chat but sends nothing.</string>
     <string name="actions_problem_invalid_uri">Include a scheme, e.g. https:// or myapp://</string>
 
     <!-- Log -->

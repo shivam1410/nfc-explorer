@@ -223,6 +223,10 @@ internal fun DraftEditor(
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
     onSelectTogglTag: (String) -> Unit,
+    onAutoSendChange: (Boolean) -> Unit,
+    onAddExtra: () -> Unit,
+    onExtraChange: (Int, ExtraField) -> Unit,
+    onRemoveExtra: (Int) -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -317,6 +321,12 @@ internal fun DraftEditor(
                     modifier = Modifier.fillMaxWidth(),
                     shape = FieldShape,
                 )
+                ExtrasEditor(
+                    extras = draft.extras,
+                    onAdd = onAddExtra,
+                    onChange = onExtraChange,
+                    onRemove = onRemoveExtra,
+                )
             }
 
             ActionType.MEDIA -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -398,7 +408,16 @@ internal fun DraftEditor(
                     )
                     Switch(
                         checked = draft.autoSend,
-                        onCheckedChange = { onDraftChange(draft.copy(autoSend = it)) },
+                        onCheckedChange = onAutoSendChange,
+                    )
+                }
+                // The failure this prevents is invisible otherwise: without the grant the chat opens,
+                // the message sits there unsent, and the only trace is a line in the session log.
+                if (state.autoSendNeedsAccessibility) {
+                    Text(
+                        text = stringResource(R.string.actions_whatsapp_autosend_no_grant),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
                 Text(
@@ -850,6 +869,63 @@ internal fun ActionType.labelRes(): Int = when (this) {
     ActionType.WHATSAPP -> R.string.actions_type_whatsapp
 }
 
+/**
+ * Key/value rows for an intent's string extras.
+ *
+ * Rows rather than a map, so a key can be half-typed and two rows can briefly share one; the view
+ * model decides which of those states is an error. Nothing is offered until the user asks for a row,
+ * because most intents need no extras and empty fields read as required ones.
+ */
+@Composable
+private fun ExtrasEditor(
+    extras: List<ExtraField>,
+    onAdd: () -> Unit,
+    onChange: (Int, ExtraField) -> Unit,
+    onRemove: (Int) -> Unit,
+) {
+    if (extras.isNotEmpty()) {
+        Text(
+            text = stringResource(R.string.actions_extras_title),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+
+    extras.forEachIndexed { index, extra ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            OutlinedTextField(
+                value = extra.key,
+                onValueChange = { onChange(index, extra.copy(key = it)) },
+                label = { Text(stringResource(R.string.actions_extra_key)) },
+                isError = extra.key.isBlank() && extra.value.isNotBlank(),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                shape = FieldShape,
+            )
+            OutlinedTextField(
+                value = extra.value,
+                onValueChange = { onChange(index, extra.copy(value = it)) },
+                label = { Text(stringResource(R.string.actions_extra_value)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                shape = FieldShape,
+            )
+            IconButton(onClick = { onRemove(index) }) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_delete),
+                    contentDescription = stringResource(R.string.actions_extra_remove),
+                )
+            }
+        }
+    }
+
+    TextButton(onClick = onAdd) { Text(stringResource(R.string.actions_extra_add)) }
+}
+
 private fun MediaKey.labelRes(): Int = when (this) {
     MediaKey.PLAY_PAUSE -> R.string.actions_media_play_pause
     MediaKey.NEXT -> R.string.actions_media_next
@@ -861,4 +937,6 @@ private fun DraftProblem.labelRes(): Int = when (this) {
     DraftProblem.BLANK_LABEL -> R.string.actions_problem_blank_label
     DraftProblem.MISSING_TARGET -> R.string.actions_problem_missing_target
     DraftProblem.INVALID_URI -> R.string.actions_problem_invalid_uri
+    DraftProblem.BLANK_EXTRA_KEY -> R.string.actions_problem_blank_extra_key
+    DraftProblem.DUPLICATE_EXTRA_KEY -> R.string.actions_problem_duplicate_extra_key
 }

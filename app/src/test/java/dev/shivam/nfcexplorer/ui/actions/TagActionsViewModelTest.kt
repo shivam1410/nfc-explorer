@@ -7,6 +7,8 @@ import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.action.SystemGrantState
+import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.toggl.TogglAccount
 import dev.shivam.nfcexplorer.domain.toggl.TogglOutcome
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
@@ -347,7 +349,15 @@ class TagActionsViewModelTest {
         ),
     )
 
-    private fun viewModel() = TagActionsViewModel(repository, performer, catalog, toggl)
+    /** The accessibility grant, flippable, because the point is what happens when it is withdrawn. */
+    private class FakeGrants(var gestureService: Boolean = true) : SystemGrants {
+        override fun current() = SystemGrantState(gestureService = gestureService)
+    }
+
+    private val grants = FakeGrants()
+
+    private fun viewModel() =
+        TagActionsViewModel(repository, performer, catalog, toggl, grants)
 
     // --- Draft lifecycle ---
 
@@ -531,7 +541,7 @@ class TagActionsViewModelTest {
     @Test
     fun `a failing test reports a message rather than throwing`() = runTest {
         val failing = RecordingPerformer(Result.failure(IllegalStateException("no such app")))
-        val model = TagActionsViewModel(repository, failing, catalog, toggl)
+        val model = TagActionsViewModel(repository, failing, catalog, toggl, grants)
 
         model.onTest(TagAction.LaunchApp("com.absent"))
         advanceUntilIdle()
@@ -720,7 +730,7 @@ class TagActionsViewModelTest {
     fun `a save that fails is reported rather than taking the app down`() = runTest(dispatcher) {
         // DataStore writes can fail on a full or unreadable disk. Every other failure in this feature
         // reports itself; an unhandled one here would crash the app on a button press.
-        val model = TagActionsViewModel(FailingRepository(), performer, catalog, toggl)
+        val model = TagActionsViewModel(FailingRepository(), performer, catalog, toggl, grants)
         model.onCreateFor(uid)
         model.onDraftChange(draft(model, label = "Desk", packageName = "com.example.notes"))
 

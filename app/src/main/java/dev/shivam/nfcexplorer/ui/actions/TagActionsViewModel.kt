@@ -14,6 +14,8 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.action.matching
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import dev.shivam.nfcexplorer.domain.action.SystemGrants
+import dev.shivam.nfcexplorer.util.percentEncodeUnsafe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +41,32 @@ sealed interface AddTagState {
 }
 
 /** Why the draft cannot be saved. */
-enum class DraftProblem { NO_TAG, BLANK_LABEL, MISSING_TARGET, INVALID_URI }
+enum class DraftProblem {
+    NO_TAG,
+    BLANK_LABEL,
+    MISSING_TARGET,
+    INVALID_URI,
+
+    /**
+     * A value was typed against no key.
+     *
+     * Reported rather than dropped. Silently discarding the value would lose typing the user can see
+     * on screen, which is the same class of bug as the extras that used to vanish on edit.
+     */
+    BLANK_EXTRA_KEY,
+
+    /** Two extras share a key, so one would overwrite the other with nothing to say which won. */
+    DUPLICATE_EXTRA_KEY,
+}
+
+/**
+ * One row of the extras editor.
+ *
+ * A list of pairs rather than a `Map`, for the same reason the rest of the draft holds raw strings: a
+ * half-typed row has a blank key, and two rows can briefly share one while a key is being renamed. A
+ * `Map` can represent neither — it would collapse the duplicate mid-rename and lose a row.
+ */
+data class ExtraField(val key: String = "", val value: String = "")
 
 /**
  * The editor's in-progress fields.
@@ -55,6 +82,13 @@ data class ActionDraft(
     val packageName: String = "",
     val uri: String = "",
     val intentAction: String = "",
+    /**
+     * String extras for [ActionType.SEND_INTENT].
+     *
+     * These round-trip. They previously did not: the editor could not enter them and [toDraft] did
+     * not read them back, so opening a stored action that had extras and saving it erased them.
+     */
+    val extras: List<ExtraField> = emptyList(),
     val mediaKey: MediaKey = MediaKey.PLAY_PAUSE,
     /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
     val phoneNumber: String = "",
@@ -92,8 +126,27 @@ data class TagActionsUiState(
      * field still works, so nothing here blocks saving.
      */
     val togglTagOptions: List<String> = emptyList(),
+    /**
+     * Whether the accessibility service is currently granted. Null until it has been read.
+     *
+     * Read fresh rather than remembered, because the grant is revoked by any reinstall — including
+     * this app's own in-app update, which is what silently broke auto-send once already. Null and
+     * true both mean "say nothing"; only an explicit false warns.
+     */
+    val accessibilityGranted: Boolean? = null,
 ) {
     val isEditing: Boolean get() = draft != null
+
+    /**
+     * Whether to warn that auto-send cannot work right now.
+     *
+     * Only for a draft that actually asked for it: the grant is irrelevant to every other action, and
+     * a warning shown against them would train the user to ignore it.
+     */
+    val autoSendNeedsAccessibility: Boolean
+        get() = draft?.type == ActionType.WHATSAPP &&
+            draft.autoSend &&
+            accessibilityGranted == false
     val canSave: Boolean get() = draft != null && problem == null
 
     /** The apps worth showing for what has been typed so far. Derived, so it cannot fall out of step. */
@@ -146,6 +199,7 @@ class TagActionsViewModel @Inject constructor(
     private val performer: ActionPerformer,
     private val catalog: AppCatalog,
     private val toggl: TogglSession,
+    private val grants: SystemGrants,
 ) : ViewModel() {
 
     /**
@@ -225,6 +279,9 @@ class TagActionsViewModel @Inject constructor(
     fun onEdit(assignment: TagAssignment) {
         if (assignment.action is TagAction.TogglToggle) loadTogglTags()
         val draft = assignment.toDraft()
+        // Before the editor is on screen, so an assignment whose grant was revoked says so on open
+        // rather than after the next tap silently does nothing.
+        refreshGrants()
         backing.update { it.copy(draft = draft, problem = problemOf(draft), message = null) }
     }
 
@@ -274,6 +331,46 @@ class TagActionsViewModel @Inject constructor(
     fun onDraftChange(draft: ActionDraft) {
         val edited = draft.copy(touched = true)
         backing.update { it.copy(draft = edited, problem = problemOf(edited)) }
+    }
+
+    /**
+     * Switches auto-send, and re-reads the grant it depends on.
+     *
+     * Its own method rather than another `onDraftChange`, because this is the one field whose value
+     * makes an external permission suddenly relevant. Reading the grant here costs one query at the
+     * moment it matters, where doing it in [onDraftChange] would query on every keystroke.
+     */
+    fun onAutoSendChange(enabled: Boolean) {
+        val draft = backing.value.draft ?: return
+        if (enabled) refreshGrants()
+        onDraftChange(draft.copy(autoSend = enabled))
+    }
+
+    /** Appends an empty row for the user to fill in. */
+    fun onAddExtra() {
+        val draft = backing.value.draft ?: return
+        onDraftChange(draft.copy(extras = draft.extras + ExtraField()))
+    }
+
+    fun onExtraChange(index: Int, field: ExtraField) {
+        val draft = backing.value.draft ?: return
+        if (index !in draft.extras.indices) return
+        onDraftChange(
+            draft.copy(extras = draft.extras.mapIndexed { at, e -> if (at == index) field else e }),
+        )
+    }
+
+    fun onRemoveExtra(index: Int) {
+        val draft = backing.value.draft ?: return
+        if (index !in draft.extras.indices) return
+        onDraftChange(
+            draft.copy(extras = draft.extras.filterIndexed { at, _ -> at != index }),
+        )
+    }
+
+    private fun refreshGrants() {
+        val granted = runCatching { grants.current().gestureService }.getOrNull()
+        backing.update { it.copy(accessibilityGranted = granted) }
     }
 
     /**
@@ -440,10 +537,14 @@ class TagActionsViewModel @Inject constructor(
         return runCatching {
             when (draft.type) {
                 ActionType.LAUNCH_APP -> TagAction.LaunchApp(draft.packageName.trim())
-                ActionType.OPEN_URI -> TagAction.OpenUri(draft.uri.trim())
+                // Encoded here, at the draft-to-action seam, rather than as the user types: a field
+                // that rewrites itself mid-keystroke moves the cursor out from under them.
+                ActionType.OPEN_URI ->
+                    TagAction.OpenUri(draft.uri.trim().percentEncodeUnsafe())
                 ActionType.SEND_INTENT -> TagAction.SendIntent(
                     action = draft.intentAction.trim(),
-                    uri = draft.uri.trim().ifBlank { null },
+                    uri = draft.uri.trim().ifBlank { null }?.percentEncodeUnsafe(),
+                    extras = draft.extras.toExtras(),
                 )
                 ActionType.MEDIA -> TagAction.MediaCommand(draft.mediaKey)
                 // A preset: no fields to fill in, so nothing here can be half-typed.
@@ -485,6 +586,12 @@ class TagActionsViewModel @Inject constructor(
             DraftProblem.MISSING_TARGET
         draft.type == ActionType.WHATSAPP && draft.messageText.isBlank() ->
             DraftProblem.MISSING_TARGET
+        // Named before the catch-all below, which would otherwise report a bad extra as INVALID_URI
+        // and point the user at a field that is perfectly fine.
+        draft.type == ActionType.SEND_INTENT && draft.extras.hasValueWithoutKey() ->
+            DraftProblem.BLANK_EXTRA_KEY
+        draft.type == ActionType.SEND_INTENT && draft.extras.hasDuplicateKeys() ->
+            DraftProblem.DUPLICATE_EXTRA_KEY
         draftAction(draft) == null -> DraftProblem.INVALID_URI
         else -> null
     }
@@ -510,6 +617,7 @@ class TagActionsViewModel @Inject constructor(
             type = ActionType.SEND_INTENT,
             intentAction = current.action,
             uri = current.uri.orEmpty(),
+            extras = current.extras.map { (key, value) -> ExtraField(key, value) },
             isExisting = true,
         )
         is TagAction.MediaCommand -> ActionDraft(
@@ -551,4 +659,30 @@ class TagActionsViewModel @Inject constructor(
             isExisting = true,
         )
     }
+}
+
+/**
+ * The extras to store, dropping rows that are entirely empty.
+ *
+ * An untouched row someone added and never filled is not an error, so it costs nothing; a value typed
+ * against no key is, and [DraftProblem.BLANK_EXTRA_KEY] reports it rather than letting this silently
+ * swallow it.
+ */
+private fun List<ExtraField>.toExtras(): Map<String, String> =
+    filterNot { it.key.isBlank() && it.value.isBlank() }
+        .associate { it.key.trim() to it.value }
+
+/** A value typed with no key to file it under. */
+private fun List<ExtraField>.hasValueWithoutKey(): Boolean =
+    any { it.key.isBlank() && it.value.isNotBlank() }
+
+/**
+ * Two rows sharing a key.
+ *
+ * Worth naming rather than letting `associate` keep the last silently: an intent extra that vanishes
+ * because a duplicate key overwrote it is invisible until the tag misbehaves.
+ */
+private fun List<ExtraField>.hasDuplicateKeys(): Boolean {
+    val keys = filter { it.key.isNotBlank() }.map { it.key.trim() }
+    return keys.size != keys.distinct().size
 }

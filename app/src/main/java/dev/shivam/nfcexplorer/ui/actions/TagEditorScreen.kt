@@ -57,6 +57,10 @@ fun TagEditorScreen(
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
     onSelectTogglTag: (String) -> Unit,
+    onAutoSendChange: (Boolean) -> Unit,
+    onAddExtra: () -> Unit,
+    onExtraChange: (Int, ExtraField) -> Unit,
+    onRemoveExtra: (Int) -> Unit,
     onEditScanned: (TagAssignment) -> Unit,
     onScanAnother: () -> Unit,
     modifier: Modifier = Modifier,
@@ -98,6 +102,10 @@ fun TagEditorScreen(
                 onTypeChange = onTypeChange,
                 onSchemeChange = onSchemeChange,
                 onSelectTogglTag = onSelectTogglTag,
+                onAutoSendChange = onAutoSendChange,
+                onAddExtra = onAddExtra,
+                onExtraChange = onExtraChange,
+                onRemoveExtra = onRemoveExtra,
             )
 
             // Reached only if the flow was left in an impossible state, e.g. a process death that

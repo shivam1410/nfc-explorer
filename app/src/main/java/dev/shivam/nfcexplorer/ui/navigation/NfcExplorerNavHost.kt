@@ -336,6 +336,10 @@ fun NfcExplorerNavHost(
                     onTypeChange = actionsViewModel::onTypeChange,
                     onSchemeChange = actionsViewModel::onSchemeChange,
                     onSelectTogglTag = actionsViewModel::onSelectTogglTag,
+                    onAutoSendChange = actionsViewModel::onAutoSendChange,
+                    onAddExtra = actionsViewModel::onAddExtra,
+                    onExtraChange = actionsViewModel::onExtraChange,
+                    onRemoveExtra = actionsViewModel::onRemoveExtra,
                     onEditScanned = actionsViewModel::onEditScannedTag,
                     onScanAnother = actionsViewModel::onStartAddFlow,
                 )
