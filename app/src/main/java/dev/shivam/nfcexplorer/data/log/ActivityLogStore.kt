@@ -65,8 +65,12 @@ class ActivityLogStore @Inject constructor(
      */
     private fun read(): List<LogEntry> = runCatching {
         if (!file.exists()) return emptyList()
-        json.decodeFromString(ListSerializer(EntryDto.serializer()), file.readText())
-            .map { it.toDomain() }
+        // Normalised on the way in, so a file written before the numbering rule existed is repaired
+        // rather than carried forward with its duplicates.
+        LogRetention.normalise(
+            json.decodeFromString(ListSerializer(EntryDto.serializer()), file.readText())
+                .map { it.toDomain() },
+        )
     }.getOrDefault(emptyList())
 
     private fun encode(entries: List<LogEntry>): String =
