@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Narrowed to the technologies this app can actually act on. Using TAG_DISCOVERED instead would
-  claim every tag on the device, including ones nothing here understands.
+  The four RF technologies, matching the flags reader mode enables.
+
+  Every tag actions can run on belongs here, and actions are keyed on the UID, which every tag has
+  regardless of what it is made of. When this listed only NfcA a tag of any other family could be
+  scanned in the app and assigned an action, then never fire it: the system had no reason to launch
+  an app that had not claimed it. Nothing said so, and the setup flow completed exactly as it does
+  for a tag that works.
+
+  IsoDep is deliberately absent. It is ISO 14443-4 over A or B, which is what bank cards and transit
+  passes speak; claiming it would put this app in the chooser every time one is near the phone, for
+  the sake of tags nobody buys to automate. The A and B entries below still cover their RF layer.
+
+  Each tech-list is a separate alternative: the platform matches a tag when any one list is fully
+  satisfied, so these are four independent claims rather than one claim on all four at once.
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <tech-list>
@@ -9,5 +21,14 @@
     </tech-list>
     <tech-list>
         <tech>android.nfc.tech.NfcA</tech>
+    </tech-list>
+    <tech-list>
+        <tech>android.nfc.tech.NfcB</tech>
+    </tech-list>
+    <tech-list>
+        <tech>android.nfc.tech.NfcF</tech>
+    </tech-list>
+    <tech-list>
+        <tech>android.nfc.tech.NfcV</tech>
     </tech-list>
 </resources>

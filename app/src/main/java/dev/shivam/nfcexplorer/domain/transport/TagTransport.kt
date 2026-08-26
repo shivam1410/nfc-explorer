@@ -1,7 +1,5 @@
 package dev.shivam.nfcexplorer.domain.transport
 
-import java.io.Closeable
-
 /**
  * The seam between decode logic and NFC hardware.
  *
@@ -11,16 +9,16 @@ import java.io.Closeable
  * none of it would be testable without a phone in hand. See
  * `docs/adr/0001-fakeable-tag-transport.md`.
  *
+ * Refines [TagConnection] with the page-level exchange only a decodable chip supports; a tag that
+ * merely has to prove it is live needs the narrower one.
+ *
  * Implementations are not thread-safe and are valid only while the tag stays in the field.
  * Every method throws [java.io.IOException] when the tag refuses or disappears.
  */
-interface TagTransport : Closeable {
+interface TagTransport : TagConnection {
 
     /** Largest frame this technology accepts, in bytes. */
     val maxTransceiveLength: Int
-
-    /** Opens the connection. Must be called before any exchange. */
-    fun connect()
 
     /** Sends a raw command and returns the raw response. */
     fun transceive(command: ByteArray): ByteArray
