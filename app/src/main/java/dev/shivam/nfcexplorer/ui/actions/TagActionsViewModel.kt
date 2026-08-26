@@ -475,7 +475,11 @@ class TagActionsViewModel @Inject constructor(
         draft.type == ActionType.OPEN_URI && draft.uri.isBlank() -> DraftProblem.MISSING_TARGET
         draft.type == ActionType.SEND_INTENT && draft.intentAction.isBlank() ->
             DraftProblem.MISSING_TARGET
+        // Both halves are required: a tag that opens a chat with nothing in it is a tap that did
+        // not do the thing it was made for.
         draft.type == ActionType.WHATSAPP && draft.phoneNumber.none(Char::isDigit) ->
+            DraftProblem.MISSING_TARGET
+        draft.type == ActionType.WHATSAPP && draft.messageText.isBlank() ->
             DraftProblem.MISSING_TARGET
         draftAction(draft) == null -> DraftProblem.INVALID_URI
         else -> null
