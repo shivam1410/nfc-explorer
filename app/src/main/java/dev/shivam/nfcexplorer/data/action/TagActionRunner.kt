@@ -13,6 +13,7 @@ import dev.shivam.nfcexplorer.domain.action.IntentSpec
 import dev.shivam.nfcexplorer.domain.action.IntentSpecMapper
 import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,6 +35,7 @@ class TagActionRunner @Inject constructor(
     @ApplicationContext private val context: Context,
     private val notifications: NotificationProbe,
     private val gestures: ScreenGestureDispatcher,
+    private val toggl: TogglSession,
 ) : ActionPerformer {
 
     override suspend fun perform(action: TagAction): Result<Unit> =
@@ -53,8 +55,11 @@ class TagActionRunner @Inject constructor(
             is IntentSpec.ActivityIntent -> startActivity(spec)
             is IntentSpec.MediaKeyEvent -> dispatchMediaKey(spec.keyCode)
             is IntentSpec.Drag -> gestures.perform(spec).getOrThrow()
+            is IntentSpec.TogglTimer ->
+                toggl.toggle(spec.workspaceId, spec.description, spec.projectId).getOrThrow()
             is IntentSpec.Sequence -> runSequence(spec)
         }
+        Unit
     }
 
     /**

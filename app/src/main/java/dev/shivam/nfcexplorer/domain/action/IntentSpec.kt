@@ -45,6 +45,13 @@ sealed interface IntentSpec {
         val awaitForegroundMillis: Long,
     ) : IntentSpec
 
+    /** Start or stop a Toggl timer. The token is resolved by the adapter, never carried here. */
+    data class TogglTimer(
+        val workspaceId: Long,
+        val description: String,
+        val projectId: Long?,
+    ) : IntentSpec
+
     /** Perform each spec in order, pausing [gapMillis] between them. Never nested. */
     data class Sequence(val specs: List<IntentSpec>, val gapMillis: Long) : IntentSpec
 }
@@ -99,6 +106,12 @@ object IntentSpecMapper {
             steps = action.steps,
             requireForegroundPackage = action.requireForegroundPackage,
             awaitForegroundMillis = action.awaitForegroundMillis,
+        )
+
+        is TagAction.TogglToggle -> IntentSpec.TogglTimer(
+            workspaceId = action.workspaceId,
+            description = action.description,
+            projectId = action.projectId,
         )
 
         // Steps cannot contain Steps, so this recursion is exactly one level deep.

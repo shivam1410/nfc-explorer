@@ -25,7 +25,7 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** Which kind of action the editor is composing. */
-enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA, SLEEP_CYCLE }
+enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA, SLEEP_CYCLE, TOGGL }
 
 /** Why the draft cannot be saved. */
 enum class DraftProblem { NO_TAG, BLANK_LABEL, MISSING_TARGET, INVALID_URI }
@@ -45,6 +45,8 @@ data class ActionDraft(
     val uri: String = "",
     val intentAction: String = "",
     val mediaKey: MediaKey = MediaKey.PLAY_PAUSE,
+    /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
+    val togglWorkspaceId: String = "",
     val isExisting: Boolean = false,
 )
 
@@ -329,6 +331,12 @@ class TagActionsViewModel @Inject constructor(
                 ActionType.MEDIA -> TagAction.MediaCommand(draft.mediaKey)
                 // A preset: no fields to fill in, so nothing here can be half-typed.
                 ActionType.SLEEP_CYCLE -> SleepCycle.toggle()
+                // The tag's label doubles as the Toggl entry description: naming the tag "Deep work"
+                // and then typing "Deep work" again into a second field is busywork.
+                ActionType.TOGGL -> TagAction.TogglToggle(
+                    workspaceId = draft.togglWorkspaceId.trim().toLong(),
+                    description = draft.label.trim(),
+                )
             }
         }.getOrNull()
     }
@@ -344,6 +352,8 @@ class TagActionsViewModel @Inject constructor(
             DraftProblem.MISSING_TARGET
         draft.type == ActionType.OPEN_URI && draft.uri.isBlank() -> DraftProblem.MISSING_TARGET
         draft.type == ActionType.SEND_INTENT && draft.intentAction.isBlank() ->
+            DraftProblem.MISSING_TARGET
+        draft.type == ActionType.TOGGL && draft.togglWorkspaceId.isBlank() ->
             DraftProblem.MISSING_TARGET
         draftAction(draft) == null -> DraftProblem.INVALID_URI
         else -> null
@@ -382,6 +392,13 @@ class TagActionsViewModel @Inject constructor(
         // Gestures and composites are only ever produced by a preset, and the editor offers no fields
         // for them. Editing one and saving rebuilds the preset from scratch, which is the honest
         // behaviour: there is nothing here the user could have adjusted.
+        is TagAction.TogglToggle -> ActionDraft(
+            uid = uid,
+            label = label,
+            type = ActionType.TOGGL,
+            togglWorkspaceId = current.workspaceId.toString(),
+            isExisting = true,
+        )
         is TagAction.DragGesture,
         is TagAction.Steps,
         is TagAction.WhileNotificationShowing,
