@@ -30,6 +30,7 @@ import dev.shivam.nfcexplorer.ui.log.ExportResult
 import dev.shivam.nfcexplorer.domain.update.AppRelease
 import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
+import dev.shivam.nfcexplorer.ui.component.FieldShape
 import dev.shivam.nfcexplorer.ui.component.SectionCard
 
 /**
@@ -262,6 +263,7 @@ fun SettingsScreen(
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = FieldShape,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(

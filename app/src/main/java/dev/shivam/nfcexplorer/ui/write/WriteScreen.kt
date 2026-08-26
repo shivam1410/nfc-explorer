@@ -27,6 +27,7 @@ import dev.shivam.nfcexplorer.R
 import dev.shivam.nfcexplorer.domain.model.WriteBatchResult
 import dev.shivam.nfcexplorer.domain.model.WriteOutcome
 import dev.shivam.nfcexplorer.ui.component.ChipTone
+import dev.shivam.nfcexplorer.ui.component.FieldShape
 import dev.shivam.nfcexplorer.ui.component.SectionCard
 import dev.shivam.nfcexplorer.ui.component.StatusChip
 import dev.shivam.nfcexplorer.ui.theme.HexTextStyle
@@ -84,6 +85,7 @@ fun WriteScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
+                    shape = FieldShape,
                 )
             } else {
                 Text(

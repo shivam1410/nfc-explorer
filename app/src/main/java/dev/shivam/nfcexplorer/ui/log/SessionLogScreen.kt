@@ -183,7 +183,10 @@ fun SessionLogScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
-                items(dayEntries, key = LogEntry::sequence) { entry ->
+                // Composite rather than the sequence alone: the sequence is unique within one
+                // log, and this list is assembled from one of two, so the pair costs nothing and
+                // cannot collide if that ever changes.
+                items(dayEntries, key = { entry -> entry.timestampMillis.toString() + "-" + entry.sequence }) { entry ->
                     LogRow(
                         entry = entry,
                         isExpanded = expanded == entry.sequence,
