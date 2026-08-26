@@ -30,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.size
@@ -277,9 +278,35 @@ internal fun DraftEditor(
                     label = { Text(stringResource(R.string.actions_whatsapp_message)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.actions_whatsapp_autosend),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = draft.autoSend,
+                        onCheckedChange = { onDraftChange(draft.copy(autoSend = it)) },
+                    )
+                }
                 Text(
-                    text = stringResource(R.string.actions_whatsapp_explainer),
+                    text = stringResource(
+                        if (draft.autoSend) {
+                            R.string.actions_whatsapp_autosend_warning
+                        } else {
+                            R.string.actions_whatsapp_explainer
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
+                    color = if (draft.autoSend) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
 
@@ -498,6 +525,7 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
         stringResource(R.string.actions_summary_whatsapp, action.phoneNumber)
     is TagAction.TogglToggle -> stringResource(R.string.actions_summary_toggl, action.description)
     is TagAction.DragGesture -> stringResource(R.string.actions_summary_gesture)
+    is TagAction.TapNode -> stringResource(R.string.actions_summary_tap)
     is TagAction.Steps -> stringResource(R.string.actions_summary_steps, action.steps.size)
     // Named by the app it watches rather than by the mechanism: "Sleep Cycle - start or end" says
     // what the tag does, where "toggle on a notification channel" says how it is implemented.

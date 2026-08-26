@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.content.Context
 import android.graphics.Path
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.shivam.nfcexplorer.domain.action.IntentSpec
 import kotlinx.coroutines.delay
@@ -49,6 +50,43 @@ class GestureDispatchService : AccessibilityService() {
     /** The package owning the frontmost window, or null when it cannot be determined. */
     internal fun foregroundPackage(): String? =
         runCatching { rootInActiveWindow?.packageName?.toString() }.getOrNull()
+
+    /**
+     * Presses the first control matching [viewId] or [contentDescription].
+     *
+     * Tries the id first: ids are never translated, descriptions are. Walks up from the matched node
+     * to the nearest clickable ancestor, because the thing carrying the label is frequently an icon
+     * inside the button rather than the button itself.
+     */
+    internal fun clickNode(viewId: String?, contentDescription: String?): Boolean {
+        val root = runCatching { rootInActiveWindow }.getOrNull() ?: return false
+        val match = viewId?.let { findById(root, it) }
+            ?: contentDescription?.let { findByDescription(root, it) }
+            ?: return false
+        return clickable(match)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+    }
+
+    private fun findById(root: AccessibilityNodeInfo, viewId: String): AccessibilityNodeInfo? =
+        runCatching { root.findAccessibilityNodeInfosByViewId(viewId).firstOrNull() }.getOrNull()
+
+    private fun findByDescription(
+        root: AccessibilityNodeInfo,
+        description: String,
+    ): AccessibilityNodeInfo? {
+        if (root.contentDescription?.toString().equals(description, ignoreCase = true)) return root
+        for (index in 0 until root.childCount) {
+            val child = root.getChild(index) ?: continue
+            findByDescription(child, description)?.let { return it }
+        }
+        return null
+    }
+
+    /** The node itself if it handles clicks, otherwise its nearest ancestor that does. */
+    private fun clickable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var current: AccessibilityNodeInfo? = node
+        while (current != null && !current.isClickable) current = current.parent
+        return current
+    }
 
     /**
      * Runs [spec] as a chain of continued strokes.
@@ -136,6 +174,39 @@ class GestureDispatchService : AccessibilityService() {
 class ScreenGestureDispatcher @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+
+    /** Presses a control, once the app that owns it is actually in front. */
+    suspend fun tap(spec: IntentSpec.TapNode): Result<Unit> {
+        val service = GestureDispatchService.bound
+            ?: return Result.failure(
+                IllegalStateException("Accessibility service is not enabled for NFC Explorer"),
+            )
+
+        spec.requireForegroundPackage?.let { required ->
+            val actual = awaitForeground(service, required, spec.awaitForegroundMillis)
+            if (actual != required) {
+                return Result.failure(
+                    IllegalStateException(
+                        "expected $required in the foreground but found ${actual ?: "nothing"}",
+                    ),
+                )
+            }
+        }
+
+        // The control may not be drawn the instant its app reaches the foreground, so this polls
+        // for the node rather than giving up on the first look.
+        var waited = 0L
+        while (waited <= spec.awaitForegroundMillis) {
+            if (service.clickNode(spec.viewId, spec.contentDescription)) return Result.success(Unit)
+            delay(FOREGROUND_POLL_MILLIS)
+            waited += FOREGROUND_POLL_MILLIS
+        }
+        return Result.failure(
+            IllegalStateException(
+                "no control matching ${spec.viewId ?: spec.contentDescription} appeared",
+            ),
+        )
+    }
 
     suspend fun perform(spec: IntentSpec.Drag): Result<Unit> {
         val service = GestureDispatchService.bound

@@ -1,5 +1,16 @@
 package dev.shivam.nfcexplorer.ui.actions
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -94,18 +105,77 @@ fun TagEditorScreen(
     }
 }
 
+/**
+ * The waiting state: rings pulsing outward from a centre, and one line saying why.
+ *
+ * Animated rather than a static card on purpose. This screen is asking the user to do something
+ * physical with their hands, and a motionless panel of text reads as a finished page rather than as
+ * a prompt. Movement is what says "the app is listening, now tap".
+ *
+ * Three rings staggered across one cycle, each expanding and fading. Kept cheap: a single Canvas and
+ * three float animations, no recomposition per frame beyond the draw.
+ */
 @Composable
 private fun WaitingForTag() {
-    SectionCard(
-        title = stringResource(R.string.actions_add_title),
-        subtitle = stringResource(R.string.actions_add_subtitle),
+    val transition = rememberInfiniteTransition(label = "waiting")
+    val phases = List(RING_COUNT) { index ->
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(RING_CYCLE_MILLIS, easing = LinearEasing),
+                // Staggered so the rings chase each other rather than pulsing as one blob.
+                initialStartOffset = StartOffset(index * RING_CYCLE_MILLIS / RING_COUNT),
+            ),
+            label = "ring$index",
+        )
+    }
+
+    val ringColour = MaterialTheme.colorScheme.primary
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
+        Canvas(modifier = Modifier.size(RING_FIELD)) {
+            val centre = Offset(size.width / 2f, size.height / 2f)
+            val maxRadius = size.minDimension / 2f
+
+            phases.forEach { phase ->
+                val progress = phase.value
+                drawCircle(
+                    color = ringColour,
+                    radius = maxRadius * progress,
+                    center = centre,
+                    // Fades as it grows, so the outermost ring dissolves rather than clipping.
+                    alpha = (1f - progress).coerceIn(0f, 1f) * RING_MAX_ALPHA,
+                    style = Stroke(width = RING_STROKE.toPx()),
+                )
+            }
+            drawCircle(color = ringColour, radius = CORE_RADIUS.toPx(), center = centre)
+        }
+
+        Text(
+            text = stringResource(R.string.actions_add_subtitle),
+            style = MaterialTheme.typography.titleMedium,
+        )
         Text(
             text = stringResource(R.string.actions_add_waiting),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
+
+private const val RING_COUNT = 3
+private const val RING_CYCLE_MILLIS = 1_800
+private const val RING_MAX_ALPHA = 0.55f
+private val RING_FIELD = 176.dp
+private val RING_STROKE = 2.dp
+private val CORE_RADIUS = 6.dp
 
 /**
  * The tag already does something.

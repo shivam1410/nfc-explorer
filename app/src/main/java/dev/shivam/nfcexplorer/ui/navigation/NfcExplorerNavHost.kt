@@ -132,6 +132,12 @@ fun NfcExplorerNavHost(
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
+                            // The editor is pushed over a tab, and restoreState would bring it back
+                            // with that tab. Tapping a tab should land on the tab, so the editor is
+                            // popped first and its draft abandoned.
+                            if (navController.popBackStack(EDITOR_ROUTE, inclusive = true)) {
+                                actionsViewModel.onLeaveAddFlow()
+                            }
                             navController.navigate(destination.route) {
                                 // Single instance per destination and no growing back stack:
                                 // these are peers the user moves between repeatedly.
@@ -228,6 +234,8 @@ fun NfcExplorerNavHost(
                     onOpenAccessibilitySettings = settingsViewModel::onOpenAccessibilitySettings,
                     onCheckForUpdates = settingsViewModel::onCheckForUpdates,
                     onOpenRelease = settingsViewModel::onOpenRelease,
+                    onDownloadAndInstall = settingsViewModel::onDownloadAndInstall,
+                    onAllowInstalls = settingsViewModel::onAllowInstalls,
                     onSyncNow = settingsViewModel::onSyncNow,
                     onTogglDraftChange = settingsViewModel::onTogglDraftChange,
                     onSaveTogglToken = settingsViewModel::onSaveTogglToken,

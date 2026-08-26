@@ -15,6 +15,16 @@ object WhatsApp {
     const val PACKAGE = "com.whatsapp"
 
     /**
+     * The send control.
+     *
+     * Both are given because either can fail on its own: the view id is locale-proof but changes
+     * when WhatsApp reshuffles its layout, while the description survives redesigns but is
+     * translated. Trying the id first and the description second covers more versions than either.
+     */
+    const val SEND_BUTTON_ID = "com.whatsapp:id/send"
+    const val SEND_BUTTON_DESCRIPTION = "Send"
+
+    /**
      * Digits only.
      *
      * `wa.me` wants a full international number with no punctuation and no leading `+`. Anything a
