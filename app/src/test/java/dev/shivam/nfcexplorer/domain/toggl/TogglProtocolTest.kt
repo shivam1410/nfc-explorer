@@ -39,7 +39,7 @@ class TogglProtocolTest {
     /** A running entry is denoted by a negative duration equal to minus the start. */
     @Test
     fun `a started entry is marked running by a negative duration`() {
-        val body = TogglProtocol.startBody(42, "Deep work", null, 1_700_000_000)
+        val body = TogglProtocol.startBody(42, "Deep work", emptyList(), null, 1_700_000_000)
 
         assertTrue(body.contains("\"duration\":-1700000000"), body)
         assertTrue(body.contains("\"workspace_id\":42"), body)
@@ -48,14 +48,14 @@ class TogglProtocolTest {
 
     @Test
     fun `a project is included only when given`() {
-        assertTrue(TogglProtocol.startBody(1, "x", 99, 10).contains("\"project_id\":99"))
-        assertTrue(!TogglProtocol.startBody(1, "x", null, 10).contains("project_id"))
+        assertTrue(TogglProtocol.startBody(1, "x", emptyList(), 99, 10).contains("\"project_id\":99"))
+        assertTrue(!TogglProtocol.startBody(1, "x", emptyList(), null, 10).contains("project_id"))
     }
 
     /** Descriptions are user text and routinely contain quotes; unescaped they corrupt the body. */
     @Test
     fun `quotes and backslashes in a description are escaped`() {
-        val body = TogglProtocol.startBody(1, """say "hi" \ now""", null, 10)
+        val body = TogglProtocol.startBody(1, """say "hi" \ now""", emptyList(), null, 10)
 
         assertTrue(body.contains("""\"hi\""""), body)
         assertTrue(body.contains("""\\"""), body)
@@ -64,5 +64,27 @@ class TogglProtocolTest {
     @Test
     fun `the start time is RFC3339 in UTC`() {
         assertEquals("2023-11-14T22:13:20Z", TogglProtocol.isoUtc(1_700_000_000))
+    }
+
+    @Test
+    fun `tags are sent by name so unseen ones are created`() {
+        val body = TogglProtocol.startBody(1, "x", listOf("focus", "deep work"), null, 10)
+
+        assertTrue(body.contains("\"tags\":[\"focus\",\"deep work\"]"), body)
+    }
+
+    /** An empty list must omit the field: Toggl treats an empty array as "clear the tags". */
+    @Test
+    fun `no tags means no tags field at all`() {
+        val body = TogglProtocol.startBody(1, "x", emptyList(), null, 10)
+
+        assertTrue(!body.contains("tags"), body)
+    }
+
+    @Test
+    fun `quotes in a tag name are escaped`() {
+        val body = TogglProtocol.startBody(1, "x", listOf("a\"b"), null, 10)
+
+        assertTrue(body.contains("\"tags\":[\"a\\\"b\"]"), body)
     }
 }

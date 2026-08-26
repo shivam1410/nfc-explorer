@@ -58,6 +58,9 @@ data class ActionDraft(
     /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
     val phoneNumber: String = "",
     val messageText: String = "",
+    val togglDescription: String = "",
+    /** Comma-separated as typed; split only when the action is built. */
+    val togglTags: String = "",
     val autoSend: Boolean = false,
     val isExisting: Boolean = false,
 )
@@ -366,9 +369,14 @@ class TagActionsViewModel @Inject constructor(
                     message = draft.messageText.trim(),
                     autoSend = draft.autoSend,
                 )
-                // No fields: the workspace comes from settings and the description is the tag's
-                // own label, so there is nothing left to ask for.
-                ActionType.TOGGL -> TagAction.TogglToggle(description = draft.label.trim())
+                ActionType.TOGGL -> TagAction.TogglToggle(
+                    // Falls back to the tag's own label, so a description is genuinely optional
+                    // rather than a field you must fill to save.
+                    description = draft.togglDescription.trim().ifBlank { draft.label.trim() },
+                    tags = draft.togglTags.split(',')
+                        .map(String::trim)
+                        .filter(String::isNotEmpty),
+                )
             }
         }.getOrNull()
     }
@@ -437,6 +445,8 @@ class TagActionsViewModel @Inject constructor(
             uid = uid,
             label = label,
             type = ActionType.TOGGL,
+            togglDescription = current.description,
+            togglTags = current.tags.joinToString(", "),
             isExisting = true,
         )
         is TagAction.DragGesture,

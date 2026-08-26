@@ -104,6 +104,7 @@ object TagActionSerializer {
             type = TYPE_TOGGL,
             // Reused rather than a new column: the description is the human label of the entry.
             intentAction = action.description,
+            togglTags = action.tags,
             projectId = action.projectId,
         )
         is TagAction.Steps -> ActionDto(
@@ -183,6 +184,7 @@ object TagActionSerializer {
             // settings, so an action that carries one is simply out of date, not unusable.
             TYPE_TOGGL -> TagAction.TogglToggle(
                 description = dto.intentAction.orEmpty(),
+                tags = dto.togglTags,
                 projectId = dto.projectId,
             )
             TYPE_DRAG -> dto.drag?.let { drag ->
@@ -256,6 +258,7 @@ object TagActionSerializer {
         @SerialName("drag") val drag: DragDto? = null,
         @SerialName("workspaceId") val workspaceId: Long? = null,
         @SerialName("projectId") val projectId: Long? = null,
+        @SerialName("togglTags") val togglTags: List<String> = emptyList(),
         @SerialName("autoSend") val autoSend: Boolean = false,
     )
 
