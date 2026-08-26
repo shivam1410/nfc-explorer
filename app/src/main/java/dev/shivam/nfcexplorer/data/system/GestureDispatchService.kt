@@ -52,15 +52,20 @@ class GestureDispatchService : AccessibilityService() {
         runCatching { rootInActiveWindow?.packageName?.toString() }.getOrNull()
 
     /**
-     * Presses the first control matching [viewId] or [contentDescription].
+     * Presses the first control matching any of [viewIds], or failing that [contentDescription].
      *
-     * Tries the id first: ids are never translated, descriptions are. Walks up from the matched node
-     * to the nearest clickable ancestor, because the thing carrying the label is frequently an icon
-     * inside the button rather than the button itself.
+     * Ids first and in order, because they are never translated where a description is; several are
+     * accepted because a view id carries its package, so one app shipping under two package names
+     * has two ids for the same button. Walks up from the matched node to the nearest clickable
+     * ancestor, because the thing carrying the label is frequently an icon inside the button rather
+     * than the button itself.
+     *
+     * The id route needs `flagReportViewIds` on the service, without which the platform reports no
+     * ids at all and every lookup here quietly returns nothing -- see the service's XML.
      */
-    internal fun clickNode(viewId: String?, contentDescription: String?): Boolean {
+    internal fun clickNode(viewIds: List<String>, contentDescription: String?): Boolean {
         val root = runCatching { rootInActiveWindow }.getOrNull() ?: return false
-        val match = viewId?.let { findById(root, it) }
+        val match = viewIds.firstNotNullOfOrNull { findById(root, it) }
             ?: contentDescription?.let { findByDescription(root, it) }
             ?: return false
         return clickable(match)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
@@ -179,15 +184,20 @@ class ScreenGestureDispatcher @Inject constructor(
     suspend fun tap(spec: IntentSpec.TapNode): Result<Unit> {
         val service = GestureDispatchService.bound
             ?: return Result.failure(
-                IllegalStateException("Accessibility service is not enabled for NFC Explorer"),
+                IllegalStateException(ACCESSIBILITY_OFF),
             )
 
-        spec.requireForegroundPackage?.let { required ->
-            val actual = awaitForeground(service, required, spec.awaitForegroundMillis)
-            if (actual != required) {
+        if (spec.requireForegroundPackages.isNotEmpty()) {
+            val actual = awaitForeground(
+                service,
+                spec.requireForegroundPackages,
+                spec.awaitForegroundMillis,
+            )
+            if (actual == null || actual !in spec.requireForegroundPackages) {
                 return Result.failure(
                     IllegalStateException(
-                        "expected $required in the foreground but found ${actual ?: "nothing"}",
+                        "expected ${spec.requireForegroundPackages.joinToString(" or ")} in the " +
+                            "foreground but found ${actual ?: "nothing"}",
                     ),
                 )
             }
@@ -197,25 +207,20 @@ class ScreenGestureDispatcher @Inject constructor(
         // for the node rather than giving up on the first look.
         var waited = 0L
         while (waited <= spec.awaitForegroundMillis) {
-            if (service.clickNode(spec.viewId, spec.contentDescription)) return Result.success(Unit)
+            if (service.clickNode(spec.viewIds, spec.contentDescription)) return Result.success(Unit)
             delay(FOREGROUND_POLL_MILLIS)
             waited += FOREGROUND_POLL_MILLIS
         }
-        return Result.failure(
-            IllegalStateException(
-                "no control matching ${spec.viewId ?: spec.contentDescription} appeared",
-            ),
-        )
+        val target = spec.viewIds.joinToString(" or ").ifEmpty { spec.contentDescription.orEmpty() }
+        return Result.failure(IllegalStateException("no control matching $target appeared"))
     }
 
     suspend fun perform(spec: IntentSpec.Drag): Result<Unit> {
         val service = GestureDispatchService.bound
-            ?: return Result.failure(
-                IllegalStateException("Accessibility service is not enabled for NFC Explorer"),
-            )
+            ?: return Result.failure(IllegalStateException(ACCESSIBILITY_OFF))
 
         spec.requireForegroundPackage?.let { required ->
-            val actual = awaitForeground(service, required, spec.awaitForegroundMillis)
+            val actual = awaitForeground(service, setOf(required), spec.awaitForegroundMillis)
             if (actual != required) {
                 return Result.failure(
                     IllegalStateException(
@@ -243,12 +248,12 @@ class ScreenGestureDispatcher @Inject constructor(
      */
     private suspend fun awaitForeground(
         service: GestureDispatchService,
-        required: String,
+        required: Set<String>,
         budgetMillis: Long,
     ): String? {
         var waited = 0L
         var actual = service.foregroundPackage()
-        while (actual != required && waited < budgetMillis) {
+        while (actual !in required && waited < budgetMillis) {
             delay(FOREGROUND_POLL_MILLIS)
             waited += FOREGROUND_POLL_MILLIS
             actual = service.foregroundPackage()
@@ -258,5 +263,13 @@ class ScreenGestureDispatcher @Inject constructor(
 
     private companion object {
         const val FOREGROUND_POLL_MILLIS = 150L
+
+        /**
+         * Named once, because this is the failure the user actually hits.
+         *
+         * The grant is revoked by any reinstall -- including the app's own in-app update -- and
+         * nothing about a silent tap says which of the many possible reasons applied.
+         */
+        const val ACCESSIBILITY_OFF = "Accessibility service is not enabled for NFC Explorer"
     }
 }

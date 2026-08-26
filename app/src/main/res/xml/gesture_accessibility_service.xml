@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Declares the narrowest service that can still drag a finger.
+  Declares the narrowest service that can still drag a finger and press a button.
 
   canPerformGestures is the whole reason this exists: injecting a touch into another app is not
   possible any other way, and Sleep Cycle's slide-to-stop is a gesture with no intent behind it.
 
-  canRetrieveWindowContent is on only to read the frontmost package name, which is the safety check
-  that stops a drag landing on whatever app happens to have stolen focus. No window text is read and
-  no accessibility events are acted on; onAccessibilityEvent is deliberately empty.
+  canRetrieveWindowContent is needed twice over: to read the frontmost package name, which is the
+  safety check that stops a drag landing on whatever app happens to have stolen focus, and to locate
+  the control that WhatsApp auto-send presses.
+
+  flagReportViewIds is required for findAccessibilityNodeInfosByViewId to return anything at all.
+  Without it the platform does not report view ids, so the lookup silently finds nothing and every
+  tap falls through to matching a *translated* content description, which is the exact fragile path
+  the view id exists to avoid. It was missing from the day auto-send shipped: this file was written
+  for the drag gesture, which needs no node lookup, and was not revisited when the tap arrived. No
+  accessibility *events* are acted on either way; onAccessibilityEvent stays empty.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"

@@ -14,14 +14,34 @@ object WhatsApp {
 
     const val PACKAGE = "com.whatsapp"
 
+    /** WhatsApp Business, a separate app with its own package and its own copy of every view id. */
+    const val BUSINESS_PACKAGE = "com.whatsapp.w4b"
+
     /**
-     * The send control.
+     * Both WhatsApp apps.
      *
-     * Both are given because either can fail on its own: the view id is locale-proof but changes
-     * when WhatsApp reshuffles its layout, while the description survives redesigns but is
-     * translated. Trying the id first and the description second covers more versions than either.
+     * Auto-send used to require `com.whatsapp` in the foreground and nothing else, so on a phone
+     * running WhatsApp Business it failed outright with "expected com.whatsapp in the foreground but
+     * found com.whatsapp.w4b" -- the chat opened, the message sat there, and nothing was pressed.
+     * Which of the two answers a `wa.me` link is the user's choice, not ours, so both are accepted.
      */
-    const val SEND_BUTTON_ID = "com.whatsapp:id/send"
+    val PACKAGES = setOf(PACKAGE, BUSINESS_PACKAGE)
+
+    /**
+     * The send control, by view id, one per app.
+     *
+     * A view id is package-qualified, so there is no single id that covers both apps and the caller
+     * has to try each. Ids are the preferred route because they are never translated.
+     */
+    val SEND_BUTTON_IDS = PACKAGES.map { "$it:id/send" }
+
+    /**
+     * The send control, by accessibility label.
+     *
+     * The fallback for when no id matches -- a WhatsApp layout change, or a build that labels the
+     * button differently. Kept because it survives redesigns that move ids around, but it cannot be
+     * the primary route: it is English, so on a translated WhatsApp it matches nothing.
+     */
     const val SEND_BUTTON_DESCRIPTION = "Send"
 
     /**

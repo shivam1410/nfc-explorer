@@ -54,11 +54,19 @@ sealed interface IntentSpec {
         val projectId: Long?,
     ) : IntentSpec
 
-    /** Press a control located by id or accessibility label. */
+    /**
+     * Press a control located by view id or accessibility label.
+     *
+     * Plural on both counts, because one target is not enough for an app that ships under two
+     * package names: a view id is package-qualified, so WhatsApp and WhatsApp Business need one
+     * each, and the foreground guard has to accept whichever of them the user actually has.
+     *
+     * [viewIds] are tried in order and before [contentDescription], since ids are never translated.
+     */
     data class TapNode(
-        val viewId: String?,
+        val viewIds: List<String>,
         val contentDescription: String?,
-        val requireForegroundPackage: String?,
+        val requireForegroundPackages: Set<String>,
         val awaitForegroundMillis: Long,
     ) : IntentSpec
 
@@ -106,10 +114,12 @@ object IntentSpecMapper {
             },
         )
 
+        // A stored TapNode names a single target; the spec allows several, so this is the one-element
+        // case rather than a different shape.
         is TagAction.TapNode -> IntentSpec.TapNode(
-            viewId = action.viewId,
+            viewIds = listOfNotNull(action.viewId),
             contentDescription = action.contentDescription,
-            requireForegroundPackage = action.requireForegroundPackage,
+            requireForegroundPackages = setOfNotNull(action.requireForegroundPackage),
             awaitForegroundMillis = action.awaitForegroundMillis,
         )
 
@@ -139,9 +149,9 @@ object IntentSpecMapper {
                     specs = listOf(
                         open,
                         IntentSpec.TapNode(
-                            viewId = WhatsApp.SEND_BUTTON_ID,
+                            viewIds = WhatsApp.SEND_BUTTON_IDS,
                             contentDescription = WhatsApp.SEND_BUTTON_DESCRIPTION,
-                            requireForegroundPackage = WhatsApp.PACKAGE,
+                            requireForegroundPackages = WhatsApp.PACKAGES,
                             awaitForegroundMillis = TagAction.DEFAULT_AWAIT_FOREGROUND_MILLIS,
                         ),
                     ),

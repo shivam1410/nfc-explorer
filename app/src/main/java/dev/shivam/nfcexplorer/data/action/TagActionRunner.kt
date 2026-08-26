@@ -107,7 +107,10 @@ class TagActionRunner @Inject constructor(
                 gestures.tap(spec).getOrThrow()
                 note(
                     "tapped control",
-                    mapOf("target" to (spec.viewId ?: spec.contentDescription ?: "")),
+                    mapOf(
+                        "target" to spec.viewIds.joinToString(", ")
+                            .ifEmpty { spec.contentDescription.orEmpty() },
+                    ),
                 )
             }
 

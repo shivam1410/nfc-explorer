@@ -141,4 +141,116 @@ class IntentSpecMapperTest {
             TagAction.SendIntent(action = "A", uri = "no-scheme/path")
         }
     }
+
+    // --- WhatsApp ---
+    //
+    // This branch had no coverage at all, which is how three defects reached a release: the send
+    // button was sought by a view id the service was not configured to report, the label fallback is
+    // English-only, and WhatsApp Business was refused outright by the foreground guard.
+
+    @Test
+    fun `a whatsapp message without auto-send is just a view of the wa_me link`() {
+        val spec = IntentSpecMapper.map(
+            TagAction.WhatsAppMessage(phoneNumber = "+91 79822 42069", message = "on my way"),
+        )
+
+        assertEquals(
+            IntentSpec.ActivityIntent(
+                action = IntentSpecMapper.ACTION_VIEW,
+                uri = "https://wa.me/917982242069?text=on%20my%20way",
+            ),
+            spec,
+        )
+    }
+
+    @Test
+    fun `auto-send opens the chat and then presses send`() {
+        val spec = IntentSpecMapper.map(
+            TagAction.WhatsAppMessage(
+                phoneNumber = "919999900000",
+                message = "on my way",
+                autoSend = true,
+            ),
+        )
+
+        val sequence = assertIs<IntentSpec.Sequence>(spec)
+        assertEquals(2, sequence.specs.size)
+        assertIs<IntentSpec.ActivityIntent>(sequence.specs[0])
+        assertIs<IntentSpec.TapNode>(sequence.specs[1])
+        // The gap is load-bearing: the button does not exist until the conversation is drawn.
+        assertEquals(TagAction.DEFAULT_GAP_MILLIS, sequence.gapMillis)
+    }
+
+    @Test
+    fun `auto-send accepts either WhatsApp app in the foreground`() {
+        // Requiring com.whatsapp alone failed outright on a phone running WhatsApp Business.
+        val sequence = assertIs<IntentSpec.Sequence>(
+            IntentSpecMapper.map(
+                TagAction.WhatsAppMessage(
+                    phoneNumber = "919999900000",
+                    message = "hi",
+                    autoSend = true,
+                ),
+            ),
+        )
+
+        val tap = assertIs<IntentSpec.TapNode>(sequence.specs[1])
+        assertEquals(setOf("com.whatsapp", "com.whatsapp.w4b"), tap.requireForegroundPackages)
+    }
+
+    @Test
+    fun `auto-send looks for a send button in both WhatsApp apps`() {
+        // A view id carries its package, so one id cannot cover both apps.
+        val sequence = assertIs<IntentSpec.Sequence>(
+            IntentSpecMapper.map(
+                TagAction.WhatsAppMessage(
+                    phoneNumber = "919999900000",
+                    message = "hi",
+                    autoSend = true,
+                ),
+            ),
+        )
+
+        val tap = assertIs<IntentSpec.TapNode>(sequence.specs[1])
+        assertEquals(
+            listOf("com.whatsapp:id/send", "com.whatsapp.w4b:id/send"),
+            tap.viewIds,
+        )
+    }
+
+    @Test
+    fun `auto-send keeps a label fallback for when no id matches`() {
+        val sequence = assertIs<IntentSpec.Sequence>(
+            IntentSpecMapper.map(
+                TagAction.WhatsAppMessage(
+                    phoneNumber = "919999900000",
+                    message = "hi",
+                    autoSend = true,
+                ),
+            ),
+        )
+
+        val tap = assertIs<IntentSpec.TapNode>(sequence.specs[1])
+        assertEquals("Send", tap.contentDescription)
+    }
+
+    @Test
+    fun `a stored tap node names one target rather than several`() {
+        val spec = IntentSpecMapper.map(
+            TagAction.TapNode(viewId = "com.example:id/go", requireForegroundPackage = "com.example"),
+        )
+
+        val tap = assertIs<IntentSpec.TapNode>(spec)
+        assertEquals(listOf("com.example:id/go"), tap.viewIds)
+        assertEquals(setOf("com.example"), tap.requireForegroundPackages)
+    }
+
+    @Test
+    fun `a tap node with only a label carries no view ids`() {
+        val spec = IntentSpecMapper.map(TagAction.TapNode(contentDescription = "Go"))
+
+        val tap = assertIs<IntentSpec.TapNode>(spec)
+        assertEquals(emptyList(), tap.viewIds)
+        assertEquals(emptySet(), tap.requireForegroundPackages)
+    }
 }
