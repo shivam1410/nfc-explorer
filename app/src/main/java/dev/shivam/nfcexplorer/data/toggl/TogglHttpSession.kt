@@ -67,6 +67,27 @@ class TogglHttpSession @Inject constructor(
         }
     }
 
+    override suspend fun tags(): Result<List<String>> = withContext(io) {
+        runCatching {
+            val token = secrets.read(SecretStore.TOGGL_TOKEN)
+                ?: error("No Toggl API token saved.")
+            val auth = TogglProtocol.authHeader(token)
+            val workspaceId = config.workspaceId()
+                ?: fetchAccount(auth).workspaceId
+                ?: error("Your Toggl account reports no default workspace.")
+
+            val body = request("GET", TogglProtocol.tagsPath(workspaceId), auth, null)
+            if (body.isBlank() || body.trim() == "null") {
+                emptyList()
+            } else {
+                json.decodeFromString(TagListSerializer, body)
+                    .mapNotNull { it.name?.takeIf(String::isNotBlank) }
+                    .distinct()
+                    .sortedBy(String::lowercase)
+            }
+        }
+    }
+
     /** Reads `/me` and remembers the default workspace, so this happens once rather than per tap. */
     private fun fetchAccount(auth: String): TogglAccount {
         val body = request("GET", TogglProtocol.ME_PATH, auth, null)
@@ -138,6 +159,9 @@ class TogglHttpSession @Inject constructor(
     }
 
     @Serializable
+    private data class TagDto(@SerialName("name") val name: String? = null)
+
+    @Serializable
     private data class MeDto(
         @SerialName("fullname") val fullName: String? = null,
         @SerialName("email") val email: String? = null,
@@ -154,5 +178,6 @@ class TogglHttpSession @Inject constructor(
     private companion object {
         const val TIMEOUT_MILLIS = 15_000
         val json = Json { ignoreUnknownKeys = true }
+        val TagListSerializer = kotlinx.serialization.builtins.ListSerializer(TagDto.serializer())
     }
 }

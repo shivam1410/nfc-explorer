@@ -130,6 +130,10 @@ private fun AssignmentCard(
     }
 }
 
+/** Reads the fetched options off the state, so the editor signature stays as it was. */
+private fun ActionDraft.togglTagOptionsFrom(state: TagActionsUiState): List<String> =
+    state.togglTagOptions
+
 @Composable
 internal fun DraftEditor(
     state: TagActionsUiState,
@@ -142,6 +146,7 @@ internal fun DraftEditor(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
+    onToggleTogglTag: (String) -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -319,6 +324,23 @@ internal fun DraftEditor(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // Chips for what the workspace already has; the field stays for anything new.
+                // Both edit the same value, so there is no second copy to reconcile.
+                if (draft.togglTagOptionsFrom(state).isNotEmpty()) {
+                    val chosen = draft.togglTags.split(',').map(String::trim).toSet()
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        draft.togglTagOptionsFrom(state).forEach { name ->
+                            FilterChip(
+                                selected = name in chosen,
+                                onClick = { onToggleTogglTag(name) },
+                                label = { Text(name) },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = draft.togglTags,
                     onValueChange = { onDraftChange(draft.copy(togglTags = it)) },

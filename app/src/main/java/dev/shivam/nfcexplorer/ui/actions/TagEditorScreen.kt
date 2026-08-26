@@ -56,6 +56,7 @@ fun TagEditorScreen(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
+    onToggleTogglTag: (String) -> Unit,
     onEditScanned: (TagAssignment) -> Unit,
     onScanAnother: () -> Unit,
     modifier: Modifier = Modifier,
@@ -96,6 +97,7 @@ fun TagEditorScreen(
                 onPickApp = onPickApp,
                 onTypeChange = onTypeChange,
                 onSchemeChange = onSchemeChange,
+                onToggleTogglTag = onToggleTogglTag,
             )
 
             // Reached only if the flow was left in an impossible state, e.g. a process death that

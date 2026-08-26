@@ -44,6 +44,9 @@ object TogglProtocol {
 
     fun startPath(workspaceId: Long): String = "/workspaces/$workspaceId/time_entries"
 
+    /** Tags already defined in the workspace, so the editor can offer them rather than ask. */
+    fun tagsPath(workspaceId: Long): String = "/workspaces/$workspaceId/tags"
+
     fun stopPath(workspaceId: Long, entryId: Long): String =
         "/workspaces/$workspaceId/time_entries/$entryId/stop"
 
@@ -133,4 +136,12 @@ interface TogglSession {
      * typo at bedtime, as a tag that silently does nothing.
      */
     suspend fun account(): Result<TogglAccount>
+
+    /**
+     * Tag names already defined in the workspace.
+     *
+     * Offered as a list because typing them invites a typo, and Toggl answers a typo by silently
+     * creating a second, near-identical tag that then splits your reports.
+     */
+    suspend fun tags(): Result<List<String>>
 }
