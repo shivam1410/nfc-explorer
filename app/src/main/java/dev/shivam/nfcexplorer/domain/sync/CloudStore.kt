@@ -15,15 +15,15 @@ interface CloudStore {
     /** Creates or replaces [name]. */
     suspend fun write(name: String, content: String): Result<Unit>
 
-    /** Document names currently present, for finding session logs written by other devices. */
+    /** Document names currently present, for finding logs left by earlier versions. */
     suspend fun list(prefix: String): Result<List<String>>
+
+    /** Removes [name]. Succeeds whether or not it was there, so pruning can be run repeatedly. */
+    suspend fun delete(name: String): Result<Unit>
 
     companion object {
         /** The single merged assignment document. */
         const val ACTIONS_DOCUMENT = "actions.json"
-
-        /** Session logs are append-only, so each gets its own file and none can ever conflict. */
-        const val LOG_PREFIX = "log-"
     }
 }
 

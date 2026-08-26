@@ -1,6 +1,8 @@
 package dev.shivam.nfcexplorer.data.sync
 
 import dev.shivam.nfcexplorer.data.action.TagActionSerializer
+import dev.shivam.nfcexplorer.data.log.ActivityLogStore
+import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.sync.CloudStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
@@ -23,13 +25,17 @@ import javax.inject.Singleton
  * reporting what happened.
  *
  * Assignments and logs are treated completely differently on purpose. Assignments are mutable and
- * shared, so they need a merge. Logs are append-only and belong to one session on one device, so each
- * becomes its own file and no two devices can ever contend for it.
+ * shared, so they need a merge. Logs belong to one device, so each device owns its own documents and
+ * no two can ever contend for one.
+ *
+ * Which logs are worth uploading at all is [LogRetention]'s decision: what the user is shown is kept,
+ * and the rest rotates.
  */
 @Singleton
 class CloudSyncService @Inject constructor(
     private val repository: TagActionRepository,
     private val logger: SessionLogger,
+    private val activityLog: ActivityLogStore,
     private val cloud: CloudStore,
     private val deviceId: SyncDeviceId,
     private val syncState: SyncState,
@@ -71,7 +77,8 @@ class CloudSyncService @Inject constructor(
             ).getOrThrow()
         }
 
-        val logsUploaded = uploadSessionLog(nowMillis)
+        val logsUploaded = uploadLogs()
+        pruneLegacyLogs()
 
         // Stamped only here, at the end of a run that threw nothing: a half-finished sync must not
         // be able to claim the data is current.
@@ -85,23 +92,74 @@ class CloudSyncService @Inject constructor(
     }
 
     /**
-     * Writes this session's log under a name unique to the device and session.
+     * Uploads this device's logs, in two documents with two different lifetimes.
      *
-     * Overwrites the same file for the life of the session rather than appending a new one per sync,
-     * so syncing twice in a session does not leave two partial copies of the same log.
+     * The kept history is the whole persisted store, rewritten in place -- so a phone that is wiped
+     * and set up again finds its taps and scans still in the folder. The diagnostics are only this
+     * session's, overwritten each time the app runs, so the previous session's are dumped rather
+     * than piling up: they explain a failure while it is happening and nothing reads them later.
+     *
+     * Both are one document per device. Rewriting in place is what stops the folder growing without
+     * bound, which is exactly what the earlier one-file-per-session scheme did.
      */
-    private suspend fun uploadSessionLog(nowMillis: Long): Int {
-        val entries = logger.entries.value
-        if (entries.isEmpty()) return 0
+    private suspend fun uploadLogs(): Int {
+        var uploaded = 0
 
-        val name = "${CloudStore.LOG_PREFIX}${deviceId.value}-${deviceId.sessionStartedAt}.json"
-        val payload = json.encodeToString(
-            ListSerializer(LogEntryDto.serializer()),
-            entries.map(::toDto),
-        )
-        cloud.write(name, payload).getOrThrow()
-        return 1
+        val retained = activityLog.entries.value
+        if (retained.isNotEmpty()) {
+            cloud.write(
+                LogRetention.activityDocument(deviceId.value),
+                encode(retained),
+            ).getOrThrow()
+            uploaded++
+        }
+
+        val diagnostics = logger.entries.value.filterNot { LogRetention.retains(it.category) }
+        if (diagnostics.isNotEmpty()) {
+            cloud.write(
+                LogRetention.diagnosticDocument(deviceId.value),
+                encode(diagnostics),
+            ).getOrThrow()
+            uploaded++
+        }
+
+        return uploaded
     }
+
+    /**
+     * Removes the per-session log documents left by earlier versions.
+     *
+     * Failures are logged and swallowed rather than failing the sync. By the time this runs the
+     * assignments are already reconciled and the logs already uploaded -- reporting that as a
+     * failed sync because some old file could not be tidied would be a lie about the data.
+     */
+    private suspend fun pruneLegacyLogs() {
+        val present = cloud.list(LogRetention.LEGACY_PREFIX)
+            .getOrElse { failure ->
+                logger.warn(CATEGORY, "could not list old logs", mapOf("error" to describe(failure)))
+                return
+            }
+
+        val stale = LogRetention.stale(present)
+        if (stale.isEmpty()) return
+
+        var removed = 0
+        stale.forEach { name ->
+            cloud.delete(name)
+                .onSuccess { removed++ }
+                .onFailure { failure ->
+                    logger.warn(CATEGORY, "could not remove old log", mapOf("name" to name, "error" to describe(failure)))
+                }
+        }
+        logger.info(CATEGORY, "removed old logs", mapOf("count" to removed.toString()))
+    }
+
+    private fun describe(failure: Throwable): String = failure.message ?: failure::class.java.simpleName
+
+    private fun encode(entries: List<LogEntry>): String = json.encodeToString(
+        ListSerializer(LogEntryDto.serializer()),
+        entries.map(::toDto),
+    )
 
     private fun toDto(entry: LogEntry) = LogEntryDto(
         sequence = entry.sequence,
