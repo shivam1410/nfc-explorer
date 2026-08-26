@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.NFC" />
 
+    <!-- Update check only: one unauthenticated GET against the GitHub releases API. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="true" />

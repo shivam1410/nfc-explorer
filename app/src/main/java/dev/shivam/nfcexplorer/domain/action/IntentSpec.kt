@@ -42,6 +42,7 @@ sealed interface IntentSpec {
         val travelMillis: Long,
         val steps: Int,
         val requireForegroundPackage: String?,
+        val awaitForegroundMillis: Long,
     ) : IntentSpec
 
     /** Perform each spec in order, pausing [gapMillis] between them. Never nested. */
@@ -97,6 +98,7 @@ object IntentSpecMapper {
             travelMillis = action.travelMillis,
             steps = action.steps,
             requireForegroundPackage = action.requireForegroundPackage,
+            awaitForegroundMillis = action.awaitForegroundMillis,
         )
 
         // Steps cannot contain Steps, so this recursion is exactly one level deep.
