@@ -119,6 +119,27 @@ sealed interface TagAction {
     }
 
     /**
+     * Opens a WhatsApp chat with a number, optionally pre-filling a message.
+     *
+     * Stored as the number and the text rather than as a finished link, so the two are editable
+     * separately and the link-building rules stay in one tested place. It resolves to an ordinary
+     * `VIEW` of a `wa.me` URL, which is why it needs no WhatsApp-specific permission and works
+     * whether the recipient uses WhatsApp or WhatsApp Business.
+     *
+     * Nothing is sent automatically: WhatsApp opens the chat with the text ready and the user presses
+     * send. That is WhatsApp's design, not a limitation of this app, and it is the right side of the
+     * line for a tag that could be tapped by accident.
+     */
+    data class WhatsAppMessage(
+        val phoneNumber: String,
+        val message: String = "",
+    ) : Leaf {
+        init {
+            require(phoneNumber.any(Char::isDigit)) { "phoneNumber must contain digits" }
+        }
+    }
+
+    /**
      * Starts a Toggl time entry, or stops the one already running.
      *
      * A named integration rather than a generic HTTP action, and worth justifying since [SendIntent]

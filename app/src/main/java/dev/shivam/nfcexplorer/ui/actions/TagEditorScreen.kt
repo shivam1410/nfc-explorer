@@ -1,0 +1,138 @@
+package dev.shivam.nfcexplorer.ui.actions
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import dev.shivam.nfcexplorer.R
+import dev.shivam.nfcexplorer.domain.action.InstalledApp
+import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.ui.component.SectionCard
+
+/**
+ * The page for adding or editing one tag's action.
+ *
+ * One page serves both, reached from the + button and from a card's Edit. A second editor for the
+ * add path would drift from this one the first time either changed, and the two are the same job:
+ * name a tag and choose what it does.
+ *
+ * Three states, in the order the add flow moves through them: wait for a tap, report that the tag is
+ * already spoken for, or edit. Arriving from Edit skips straight to the third.
+ */
+@Composable
+fun TagEditorScreen(
+    state: TagActionsUiState,
+    onDraftChange: (ActionDraft) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    onTestDraft: () -> Unit,
+    onAppQueryChange: (String) -> Unit,
+    onPickApp: (InstalledApp) -> Unit,
+    onTypeChange: (ActionType) -> Unit,
+    onSchemeChange: (String) -> Unit,
+    onEditScanned: (TagAssignment) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val draft = state.draft
+        when {
+            state.addTag is AddTagState.WaitingForTag -> WaitingForTag()
+
+            state.addTag is AddTagState.AlreadyAssigned -> AlreadyAssigned(
+                assignment = state.addTag.assignment,
+                onEdit = onEditScanned,
+                onCancel = onCancel,
+            )
+
+            draft != null -> DraftEditor(
+                state = state,
+                draft = draft,
+                onDraftChange = onDraftChange,
+                onSave = onSave,
+                onCancel = onCancel,
+                onTestDraft = onTestDraft,
+                onAppQueryChange = onAppQueryChange,
+                onPickApp = onPickApp,
+                onTypeChange = onTypeChange,
+                onSchemeChange = onSchemeChange,
+            )
+
+            // Reached only if the flow was left in an impossible state, e.g. a process death that
+            // restored the route but not the draft. Saying so beats a blank page.
+            else -> Text(
+                text = stringResource(R.string.actions_editor_gone),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        state.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WaitingForTag() {
+    SectionCard(
+        title = stringResource(R.string.actions_add_title),
+        subtitle = stringResource(R.string.actions_add_subtitle),
+    ) {
+        Text(
+            text = stringResource(R.string.actions_add_waiting),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+/**
+ * The tag already does something.
+ *
+ * Offering to edit rather than silently starting a fresh assignment: overwriting a working tag
+ * because it happened to be the one in reach is not a mistake worth making quietly.
+ */
+@Composable
+private fun AlreadyAssigned(
+    assignment: TagAssignment,
+    onEdit: (TagAssignment) -> Unit,
+    onCancel: () -> Unit,
+) {
+    SectionCard(
+        title = stringResource(R.string.actions_add_taken_title),
+        subtitle = assignment.uid.toString(),
+    ) {
+        Text(
+            text = stringResource(R.string.actions_add_taken, assignment.label),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Button(
+            onClick = { onEdit(assignment) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.actions_add_edit_existing))
+        }
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.actions_add_scan_another))
+        }
+    }
+}

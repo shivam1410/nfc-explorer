@@ -21,6 +21,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import android.content.Intent
+import android.provider.ContactsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.MaterialTheme
@@ -63,16 +67,8 @@ fun TagActionsScreen(
     lastScannedUid: ByteBlock?,
     onCreateFor: (ByteBlock?) -> Unit,
     onEdit: (TagAssignment) -> Unit,
-    onDraftChange: (ActionDraft) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
     onDelete: (ByteBlock) -> Unit,
     onTest: (TagAction) -> Unit,
-    onTestDraft: () -> Unit,
-    onAppQueryChange: (String) -> Unit,
-    onPickApp: (InstalledApp) -> Unit,
-    onTypeChange: (ActionType) -> Unit,
-    onSchemeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -88,32 +84,19 @@ fun TagActionsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (state.draft == null) {
-            Button(
-                onClick = { onCreateFor(lastScannedUid) },
-                enabled = lastScannedUid != null,
-            ) {
-                Text(stringResource(R.string.actions_assign_last_scan))
-            }
-            if (lastScannedUid == null) {
-                Text(
-                    text = stringResource(R.string.actions_scan_first),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
-            }
-        } else {
-            DraftEditor(
-                state = state,
-                draft = state.draft,
-                onDraftChange = onDraftChange,
-                onSave = onSave,
-                onCancel = onCancel,
-                onTestDraft = onTestDraft,
-                onAppQueryChange = onAppQueryChange,
-                onPickApp = onPickApp,
-                onTypeChange = onTypeChange,
-                onSchemeChange = onSchemeChange,
+        // Assigning whatever was scanned most recently, kept alongside the + button: the button
+        // starts from a fresh tap, this starts from a tag already read on the Discovery screen.
+        Button(
+            onClick = { onCreateFor(lastScannedUid) },
+            enabled = lastScannedUid != null,
+        ) {
+            Text(stringResource(R.string.actions_assign_last_scan))
+        }
+        if (lastScannedUid == null) {
+            Text(
+                text = stringResource(R.string.actions_scan_first),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
             )
         }
 
@@ -164,7 +147,7 @@ private fun AssignmentCard(
 }
 
 @Composable
-private fun DraftEditor(
+internal fun DraftEditor(
     state: TagActionsUiState,
     draft: ActionDraft,
     onDraftChange: (ActionDraft) -> Unit,
@@ -271,6 +254,50 @@ private fun DraftEditor(
                         label = { Text(stringResource(key.labelRes())) },
                     )
                 }
+            }
+
+            ActionType.WHATSAPP -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val context = LocalContext.current
+                // ACTION_PICK on the phone table, not PickContact: the result URI points straight at
+                // the chosen number and carries read permission for that one row, so this needs no
+                // READ_CONTACTS grant at all. Asking for the whole address book to read one number
+                // would be wildly disproportionate.
+                val picker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult(),
+                ) { result ->
+                    result.data?.data?.let { uri ->
+                        readPhoneNumber(context, uri)?.let { number ->
+                            onDraftChange(draft.copy(phoneNumber = number))
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = draft.phoneNumber,
+                    onValueChange = { onDraftChange(draft.copy(phoneNumber = it)) },
+                    label = { Text(stringResource(R.string.actions_whatsapp_number)) },
+                    isError = state.problem == DraftProblem.MISSING_TARGET,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedButton(
+                    onClick = {
+                        picker.launch(
+                            Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI),
+                        )
+                    },
+                ) { Text(stringResource(R.string.actions_whatsapp_pick)) }
+
+                OutlinedTextField(
+                    value = draft.messageText,
+                    onValueChange = { onDraftChange(draft.copy(messageText = it)) },
+                    label = { Text(stringResource(R.string.actions_whatsapp_message)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(R.string.actions_whatsapp_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
 
             ActionType.TOGGL -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -450,6 +477,8 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
     is TagAction.SendIntent -> stringResource(R.string.actions_summary_intent, action.action)
     is TagAction.MediaCommand ->
         stringResource(R.string.actions_summary_media, stringResource(action.key.labelRes()))
+    is TagAction.WhatsAppMessage ->
+        stringResource(R.string.actions_summary_whatsapp, action.phoneNumber)
     is TagAction.TogglToggle -> stringResource(R.string.actions_summary_toggl, action.description)
     is TagAction.DragGesture -> stringResource(R.string.actions_summary_gesture)
     is TagAction.Steps -> stringResource(R.string.actions_summary_steps, action.steps.size)
@@ -459,23 +488,46 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
         stringResource(R.string.actions_summary_toggle, appNameOf(action.packageName))
 }
 
+
+/**
+ * The number behind a contact-picker result, or null.
+ *
+ * Read through the returned URI rather than by querying the contacts provider directly: that URI
+ * carries a one-row read grant, which is why this works without READ_CONTACTS. Failures return null
+ * — a picker that yielded nothing usable should leave the field alone, not crash the editor.
+ */
+private fun readPhoneNumber(context: android.content.Context, uri: android.net.Uri): String? =
+    runCatching {
+        context.contentResolver.query(
+            uri,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull()
+
 /** Screen-reader users get the label; the icon is decoration, so it carries no description. */
-private fun ActionType.iconRes(): Int = when (this) {
+internal fun ActionType.iconRes(): Int = when (this) {
     ActionType.LAUNCH_APP -> R.drawable.ic_action_app
     ActionType.OPEN_URI -> R.drawable.ic_action_link
     ActionType.SEND_INTENT -> R.drawable.ic_action_intent
     ActionType.MEDIA -> R.drawable.ic_action_media
     ActionType.SLEEP_CYCLE -> R.drawable.ic_action_sleep
     ActionType.TOGGL -> R.drawable.ic_action_timer
+    ActionType.WHATSAPP -> R.drawable.ic_action_message
 }
 
-private fun ActionType.labelRes(): Int = when (this) {
+internal fun ActionType.labelRes(): Int = when (this) {
     ActionType.LAUNCH_APP -> R.string.actions_type_launch
     ActionType.OPEN_URI -> R.string.actions_type_uri
     ActionType.SEND_INTENT -> R.string.actions_type_intent
     ActionType.MEDIA -> R.string.actions_type_media
     ActionType.SLEEP_CYCLE -> R.string.actions_type_sleep_cycle
     ActionType.TOGGL -> R.string.actions_type_toggl
+    ActionType.WHATSAPP -> R.string.actions_type_whatsapp
 }
 
 private fun MediaKey.labelRes(): Int = when (this) {

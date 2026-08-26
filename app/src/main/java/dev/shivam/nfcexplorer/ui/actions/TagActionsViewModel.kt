@@ -22,7 +22,20 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** Which kind of action the editor is composing. */
-enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA, SLEEP_CYCLE, TOGGL }
+enum class ActionType { LAUNCH_APP, OPEN_URI, SEND_INTENT, MEDIA, SLEEP_CYCLE, TOGGL, WHATSAPP }
+
+/**
+ * Where the add-a-tag flow has got to.
+ *
+ * Null means the flow is not running, which is different from [WaitingForTag]: the editor can also be
+ * opened from the assignment list, and that path never waits for a scan.
+ */
+sealed interface AddTagState {
+    data object WaitingForTag : AddTagState
+
+    /** The scanned tag already does something. Offering to edit beats silently overwriting it. */
+    data class AlreadyAssigned(val assignment: TagAssignment) : AddTagState
+}
 
 /** Why the draft cannot be saved. */
 enum class DraftProblem { NO_TAG, BLANK_LABEL, MISSING_TARGET, INVALID_URI }
@@ -44,6 +57,8 @@ data class ActionDraft(
     val mediaKey: MediaKey = MediaKey.PLAY_PAUSE,
     /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
     val togglWorkspaceId: String = "",
+    val phoneNumber: String = "",
+    val messageText: String = "",
     val isExisting: Boolean = false,
 )
 
@@ -54,6 +69,7 @@ data class TagActionsUiState(
     val message: String? = null,
     val apps: List<InstalledApp> = emptyList(),
     val appQuery: String = "",
+    val addTag: AddTagState? = null,
 ) {
     val isEditing: Boolean get() = draft != null
     val canSave: Boolean get() = draft != null && problem == null
@@ -113,6 +129,43 @@ class TagActionsViewModel @Inject constructor(
         // screen first. Loading it later meant every card read as a raw package name until the user
         // happened to open an editor.
         loadApps()
+    }
+
+    /** Enters the add flow: clear any open draft and wait for a tap. */
+    fun onStartAddFlow() {
+        backing.update {
+            it.copy(addTag = AddTagState.WaitingForTag, draft = null, problem = null, message = null)
+        }
+    }
+
+    /**
+     * Handles the tag tapped while the add flow is waiting.
+     *
+     * Ignored unless the flow is actually waiting, because the reader stays live for the whole app:
+     * without the guard, a second tap while the user is mid-edit would throw away what they had typed.
+     */
+    fun onTagScanned(uid: ByteBlock) {
+        if (backing.value.addTag !is AddTagState.WaitingForTag) return
+        viewModelScope.launch {
+            val existing = repository.find(uid)
+            if (existing != null) {
+                backing.update { it.copy(addTag = AddTagState.AlreadyAssigned(existing)) }
+            } else {
+                backing.update { it.copy(addTag = null) }
+                onCreateFor(uid)
+            }
+        }
+    }
+
+    /** Opens the existing assignment in the same editor rather than a second, divergent one. */
+    fun onEditScannedTag(assignment: TagAssignment) {
+        backing.update { it.copy(addTag = null) }
+        onEdit(assignment)
+    }
+
+    /** Leaving the flow abandons whatever it was holding, including an unsaved draft. */
+    fun onLeaveAddFlow() {
+        backing.update { it.copy(addTag = null, draft = null, problem = null, message = null) }
     }
 
     fun onCreateFor(uid: ByteBlock?) {
@@ -306,6 +359,10 @@ class TagActionsViewModel @Inject constructor(
                 ActionType.SLEEP_CYCLE -> SleepCycle.toggle()
                 // The tag's label doubles as the Toggl entry description: naming the tag "Deep work"
                 // and then typing "Deep work" again into a second field is busywork.
+                ActionType.WHATSAPP -> TagAction.WhatsAppMessage(
+                    phoneNumber = draft.phoneNumber.trim(),
+                    message = draft.messageText.trim(),
+                )
                 ActionType.TOGGL -> TagAction.TogglToggle(
                     workspaceId = draft.togglWorkspaceId.trim().toLong(),
                     description = draft.label.trim(),
@@ -327,6 +384,8 @@ class TagActionsViewModel @Inject constructor(
         draft.type == ActionType.SEND_INTENT && draft.intentAction.isBlank() ->
             DraftProblem.MISSING_TARGET
         draft.type == ActionType.TOGGL && draft.togglWorkspaceId.isBlank() ->
+            DraftProblem.MISSING_TARGET
+        draft.type == ActionType.WHATSAPP && draft.phoneNumber.none(Char::isDigit) ->
             DraftProblem.MISSING_TARGET
         draftAction(draft) == null -> DraftProblem.INVALID_URI
         else -> null
@@ -365,6 +424,14 @@ class TagActionsViewModel @Inject constructor(
         // Gestures and composites are only ever produced by a preset, and the editor offers no fields
         // for them. Editing one and saving rebuilds the preset from scratch, which is the honest
         // behaviour: there is nothing here the user could have adjusted.
+        is TagAction.WhatsAppMessage -> ActionDraft(
+            uid = uid,
+            label = label,
+            type = ActionType.WHATSAPP,
+            phoneNumber = current.phoneNumber,
+            messageText = current.message,
+            isExisting = true,
+        )
         is TagAction.TogglToggle -> ActionDraft(
             uid = uid,
             label = label,

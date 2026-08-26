@@ -86,6 +86,11 @@ object TagActionSerializer {
                 requireForegroundPackage = action.requireForegroundPackage,
             ),
         )
+        is TagAction.WhatsAppMessage -> ActionDto(
+            type = TYPE_WHATSAPP,
+            packageName = action.phoneNumber,
+            intentAction = action.message,
+        )
         is TagAction.TogglToggle -> ActionDto(
             type = TYPE_TOGGL,
             workspaceId = action.workspaceId,
@@ -153,6 +158,9 @@ object TagActionSerializer {
             TYPE_MEDIA -> dto.mediaKey
                 ?.let { name -> MediaKey.entries.firstOrNull { it.name == name } }
                 ?.let(TagAction::MediaCommand)
+            TYPE_WHATSAPP -> dto.packageName?.let { number ->
+                TagAction.WhatsAppMessage(phoneNumber = number, message = dto.intentAction.orEmpty())
+            }
             TYPE_TOGGL -> dto.workspaceId?.let { workspace ->
                 TagAction.TogglToggle(
                     workspaceId = workspace,
@@ -189,6 +197,7 @@ object TagActionSerializer {
     private const val TYPE_DRAG = "dragGesture"
     private const val TYPE_STEPS = "steps"
     private const val TYPE_TOGGL = "togglToggle"
+    private const val TYPE_WHATSAPP = "whatsAppMessage"
     private const val TYPE_WHILE_NOTIFICATION = "whileNotificationShowing"
 
     @Serializable

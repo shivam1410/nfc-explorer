@@ -1,5 +1,7 @@
 package dev.shivam.nfcexplorer.domain.action
 
+import dev.shivam.nfcexplorer.domain.whatsapp.WhatsApp
+
 /**
  * A platform-agnostic description of what an action should produce.
  *
@@ -106,6 +108,11 @@ object IntentSpecMapper {
             steps = action.steps,
             requireForegroundPackage = action.requireForegroundPackage,
             awaitForegroundMillis = action.awaitForegroundMillis,
+        )
+
+        is TagAction.WhatsAppMessage -> IntentSpec.ActivityIntent(
+            action = ACTION_VIEW,
+            uri = WhatsApp.linkFor(action.phoneNumber, action.message),
         )
 
         is TagAction.TogglToggle -> IntentSpec.TogglTimer(
