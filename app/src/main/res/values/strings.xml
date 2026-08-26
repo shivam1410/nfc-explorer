@@ -181,8 +181,6 @@
     <string name="settings_update_available">%1$s is available. You have %2$s.</string>
     <string name="settings_update_open">Open release</string>
     <string name="actions_explanation">Tapping an assigned tag runs its action even when this app is closed. A tag with no action does nothing at all — no app opens, nothing appears. Close this app when using tags for automation, otherwise it holds the NFC radio and swallows the tap.</string>
-    <string name="actions_assign_last_scan">Assign the last scanned tag</string>
-    <string name="actions_scan_first">Scan a tag first — an action is bound to a tag\'s UID.</string>
     <string name="actions_none_yet">No tags assigned yet.</string>
     <string name="actions_new_title">New assignment</string>
     <string name="actions_edit_title">Edit assignment</string>
@@ -222,6 +220,7 @@
     <string name="accessibility_service_label">NFC Explorer gestures</string>
     <string name="accessibility_service_description">Lets a tag end a Sleep Cycle sleep session by performing its slide-to-stop gesture. Used only when a tag with that action is tapped.</string>
     <string name="actions_app_search">Search installed apps</string>
+    <string name="actions_app_more">%1$d more — keep typing to narrow</string>
     <string name="actions_app_none">No installed app matches that.</string>
     <string name="actions_app_loading">Reading installed apps…</string>
     <string name="actions_app_chosen">Opens %1$s</string>

@@ -64,8 +64,6 @@ import androidx.core.graphics.drawable.toBitmap
 @Composable
 fun TagActionsScreen(
     state: TagActionsUiState,
-    lastScannedUid: ByteBlock?,
-    onCreateFor: (ByteBlock?) -> Unit,
     onEdit: (TagAssignment) -> Unit,
     onDelete: (ByteBlock) -> Unit,
     onTest: (TagAction) -> Unit,
@@ -84,21 +82,6 @@ fun TagActionsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        // Assigning whatever was scanned most recently, kept alongside the + button: the button
-        // starts from a fresh tap, this starts from a tag already read on the Discovery screen.
-        Button(
-            onClick = { onCreateFor(lastScannedUid) },
-            enabled = lastScannedUid != null,
-        ) {
-            Text(stringResource(R.string.actions_assign_last_scan))
-        }
-        if (lastScannedUid == null) {
-            Text(
-                text = stringResource(R.string.actions_scan_first),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-        }
 
         state.message?.let { message ->
             Text(
@@ -407,7 +390,15 @@ private fun AppPicker(
             expanded = isOpen && matches.isNotEmpty(),
             onDismissRequest = { isOpen = false },
         ) {
-            matches.forEach { app ->
+            // Only a window of the matches is built.
+            //
+            // ExposedDropdownMenu is not lazy, so every item it is given is composed immediately --
+            // and each one rasterises an app icon on the main thread. On a phone with hundreds of
+            // launchable apps that is hundreds of PackageManager loads before the menu can draw,
+            // which is exactly the stall this had. Capping it makes opening the menu constant-time
+            // regardless of how many apps are installed, and the search field is how the rest are
+            // reached.
+            matches.take(APP_MENU_LIMIT).forEach { app ->
                 DropdownMenuItem(
                     text = { Text(app.label) },
                     leadingIcon = { AppIcon(app.packageName) },
@@ -415,6 +406,24 @@ private fun AppPicker(
                         onPick(app)
                         isOpen = false
                     },
+                )
+            }
+
+            // Says the rest exist rather than pretending the list is complete. A silently truncated
+            // picker reads as "that app is not installed".
+            if (matches.size > APP_MENU_LIMIT) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(
+                                R.string.actions_app_more,
+                                matches.size - APP_MENU_LIMIT,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    },
+                    onClick = {},
+                    enabled = false,
                 )
             }
         }
@@ -461,6 +470,14 @@ private const val ICON_PIXELS = 96
 private val ICON_SIZE = 28.dp
 
 private val ACTION_ICON_SIZE = 18.dp
+
+/**
+ * How many apps the picker builds at once.
+ *
+ * Chosen for composition cost, not for taste: each row loads and rasterises an icon synchronously,
+ * so this is the number of icon decodes the menu pays for on open.
+ */
+private const val APP_MENU_LIMIT = 30
 
 /**
  * One line describing what a tag will do.
