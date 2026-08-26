@@ -24,8 +24,20 @@ object LogRetention {
     /** Reading the card itself: identity, memory, lock bits. */
     val SCANS = setOf("session", "read", "write")
 
-    /** Everything shown to the user, and so everything kept. */
+    /** Everything shown to the user, and so everything kept on disk. */
     val RETAINED: Set<String> = TAPS + SCANS
+
+    /**
+     * What is worth a copy in the user's Drive: the taps, and nothing else.
+     *
+     * Narrower than what is kept on disk, because the two answer different questions. On the phone,
+     * scan detail explains why the card in your hand behaved oddly this morning. In the cloud the
+     * question is what a new phone should be handed, and the answer is what your tags did -- not
+     * page-level forensics of a card you were holding on a device you no longer have.
+     */
+    val SYNCED: Set<String> = TAPS
+
+    fun syncs(category: String): Boolean = category in SYNCED
 
     /**
      * Bounds, per tier.
@@ -96,28 +108,29 @@ object LogRetention {
     /** The document holding a device's kept history. One per device, rewritten in place. */
     fun activityDocument(deviceId: String): String = "$ACTIVITY_PREFIX$deviceId.json"
 
-    /** The document holding a device's diagnostics. One per device, overwritten each session. */
-    fun diagnosticDocument(deviceId: String): String = "$DIAGNOSTIC_PREFIX$deviceId.json"
-
     /**
      * Which of [present] are dead weight.
      *
-     * Only the session-per-file logs from the first scheme. That scheme wrote a new document every
-     * time the app was launched and never removed one, so the folder grows without bound -- and
-     * nothing reads them, which is what makes them safe to drop.
+     * The schemes this app has retired: the session-per-file logs of the first, which wrote a new
+     * document on every launch and removed none, and the diagnostic documents of the second, which
+     * uploaded sync and export chatter that nothing ever read back and no one asked to keep.
      *
-     * Deliberately blind to the current documents, including other devices'. Those are one per
-     * device and rewritten in place, so they never accumulate; deleting one because this device
-     * does not recognise the name would throw away another phone's history.
+     * Deliberately blind to the documents still in use, including other devices'. Those are one per
+     * device and rewritten in place, so they never accumulate; deleting one because this device does
+     * not recognise the name would throw away another phone's history.
      *
      * A device's own taps survive this: they are held on its disk and re-uploaded on its next sync.
      */
     fun stale(present: List<String>): List<String> =
-        present.filter { it.startsWith(LEGACY_PREFIX) }
+        present.filter { name -> RETIRED_PREFIXES.any(name::startsWith) }
 
     /** Session-per-file logs from the first scheme. Named only so they can be cleaned up. */
-    const val LEGACY_PREFIX = "log-"
+    private const val LEGACY_PREFIX = "log-"
 
     private const val ACTIVITY_PREFIX = "activity-"
+
+    /** No longer written. Named so the ones already uploaded can be removed. */
     private const val DIAGNOSTIC_PREFIX = "diagnostic-"
+
+    private val RETIRED_PREFIXES = listOf(LEGACY_PREFIX, DIAGNOSTIC_PREFIX)
 }

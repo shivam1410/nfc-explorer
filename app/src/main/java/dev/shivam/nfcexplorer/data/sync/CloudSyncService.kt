@@ -94,7 +94,7 @@ class CloudSyncService @Inject constructor(
         }
 
         val logsUploaded = uploadLogs()
-        pruneLegacyLogs()
+        pruneRetiredLogs()
 
         // Stamped only here, at the end of a run that threw nothing: a half-finished sync must not
         // be able to claim the data is current.
@@ -108,49 +108,38 @@ class CloudSyncService @Inject constructor(
     }
 
     /**
-     * Uploads this device's logs, in two documents with two different lifetimes.
+     * Uploads this device's taps.
      *
-     * The kept history is the whole persisted store, rewritten in place -- so a phone that is wiped
-     * and set up again finds its taps and scans still in the folder. The diagnostics are only this
-     * session's, overwritten each time the app runs, so the previous session's are dumped rather
-     * than piling up: they explain a failure while it is happening and nothing reads them later.
+     * One document per device, rewritten in place, so a phone that is wiped and set up again finds
+     * its history still in the folder and the folder never grows.
      *
-     * Both are one document per device. Rewriting in place is what stops the folder growing without
-     * bound, which is exactly what the earlier one-file-per-session scheme did.
+     * Only the taps. Scan detail is kept on the phone, where it explains a card that behaved oddly
+     * while you still have that card; a copy in the cloud answers a question nobody asked. The sync
+     * and export chatter that briefly went up beside it is not written at all any more, and the
+     * documents holding it are removed by [pruneRetiredLogs].
      */
     private suspend fun uploadLogs(): Int {
-        var uploaded = 0
+        val synced = activityLog.entries.value.filter { LogRetention.syncs(it.category) }
+        if (synced.isEmpty()) return 0
 
-        val retained = activityLog.entries.value
-        if (retained.isNotEmpty()) {
-            cloud.write(
-                LogRetention.activityDocument(deviceId.value),
-                encode(retained),
-            ).getOrThrow()
-            uploaded++
-        }
-
-        val diagnostics = logger.entries.value.filterNot { LogRetention.retains(it.category) }
-        if (diagnostics.isNotEmpty()) {
-            cloud.write(
-                LogRetention.diagnosticDocument(deviceId.value),
-                encode(diagnostics),
-            ).getOrThrow()
-            uploaded++
-        }
-
-        return uploaded
+        cloud.write(
+            LogRetention.activityDocument(deviceId.value),
+            encode(synced),
+        ).getOrThrow()
+        return 1
     }
 
     /**
-     * Removes the per-session log documents left by earlier versions.
+     * Removes the log documents of schemes this app no longer writes.
      *
      * Failures are logged and swallowed rather than failing the sync. By the time this runs the
      * assignments are already reconciled and the logs already uploaded -- reporting that as a
      * failed sync because some old file could not be tidied would be a lie about the data.
      */
-    private suspend fun pruneLegacyLogs() {
-        val present = cloud.list(LogRetention.LEGACY_PREFIX)
+    private suspend fun pruneRetiredLogs() {
+        // Listed unfiltered, because two different prefixes are being retired and the store filters
+        // by only one. LogRetention decides what goes; this asks for everything and lets it choose.
+        val present = cloud.list("")
             .getOrElse { failure ->
                 logger.warn(CATEGORY, "could not list old logs", mapOf("error" to describe(failure)))
                 return

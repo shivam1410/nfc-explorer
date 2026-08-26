@@ -48,6 +48,27 @@ class LogRetentionTest {
         }
     }
 
+    // --- What is copied to the cloud ---
+
+    @Test
+    fun `taps are copied to the cloud`() {
+        LogRetention.TAPS.forEach { category ->
+            assertTrue(LogRetention.syncs(category), "$category is the history a new phone wants")
+        }
+    }
+
+    /**
+     * Scan detail explains a card you are still holding, on the phone that read it. A copy in the
+     * user's Drive answers a question nobody asked, and they asked for it not to be there.
+     */
+    @Test
+    fun `scan detail stays on the phone`() {
+        LogRetention.SCANS.forEach { category ->
+            assertTrue(!LogRetention.syncs(category), "$category must not be uploaded")
+            assertTrue(LogRetention.retains(category), "$category must still be kept on disk")
+        }
+    }
+
     // --- Numbering ---
 
     /** The crash this guards: a list keyed by sequence, with two entries numbered 0. */
@@ -176,14 +197,17 @@ class LogRetentionTest {
     // --- Documents ---
 
     @Test
-    fun `each device owns one document per tier`() {
+    fun `each device owns one document`() {
         assertEquals("activity-abc123.json", LogRetention.activityDocument("abc123"))
-        assertEquals("diagnostic-abc123.json", LogRetention.diagnosticDocument("abc123"))
     }
 
     @Test
-    fun `the per-session logs of the old scheme are stale`() {
-        val present = listOf("log-abc123-1700000000000.json", "log-abc123-1700000900000.json")
+    fun `the documents of both retired schemes are stale`() {
+        val present = listOf(
+            "log-abc123-1700000000000.json",
+            "log-abc123-1700000900000.json",
+            "diagnostic-abc123.json",
+        )
 
         assertEquals(present, LogRetention.stale(present))
     }
@@ -199,7 +223,6 @@ class LogRetentionTest {
     fun `another device's current documents are left alone`() {
         val present = listOf(
             "activity-otherdevice.json",
-            "diagnostic-otherdevice.json",
             "actions.json",
             "log-otherdevice-1700000000000.json",
         )
