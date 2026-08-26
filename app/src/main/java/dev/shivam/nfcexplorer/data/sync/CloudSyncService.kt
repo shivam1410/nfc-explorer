@@ -41,7 +41,23 @@ class CloudSyncService @Inject constructor(
     private val syncState: SyncState,
 ) : CloudSync {
 
-    override suspend fun sync(nowMillis: Long): Result<SyncReport> = runCatching {
+    override suspend fun sync(nowMillis: Long): Result<SyncReport> = runSync(nowMillis)
+        .onFailure { failure ->
+            // The first thing a sync does is read the remote document, and until now a failure
+            // there produced no log line at all: the run threw before reaching the first one. A
+            // sync that fails silently is indistinguishable on the log from a sync never started,
+            // and those need completely different fixes.
+            logger.error(
+                category = CATEGORY,
+                message = "sync failed",
+                payload = mapOf(
+                    "exception" to (failure::class.simpleName ?: "Throwable"),
+                    "message" to (failure.message ?: ""),
+                ),
+            )
+        }
+
+    private suspend fun runSync(nowMillis: Long): Result<SyncReport> = runCatching {
         // Raw, so tombstones are included: a deletion that sync cannot see cannot propagate.
         val local = repository.snapshotForSync()
 
