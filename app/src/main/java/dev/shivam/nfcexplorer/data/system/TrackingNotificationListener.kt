@@ -1,11 +1,7 @@
 package dev.shivam.nfcexplorer.data.system
 
-import android.content.ComponentName
-import android.content.Context
-import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.NotificationState
 import javax.inject.Inject
@@ -51,11 +47,11 @@ class TrackingNotificationListener : NotificationListenerService() {
  */
 @Singleton
 class ActiveNotificationProbe @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val grants: AndroidSystemGrants,
 ) : NotificationProbe {
 
     override fun stateOf(packageName: String, channelId: String): NotificationState {
-        if (!isAccessGranted()) {
+        if (!grants.isNotificationAccessGranted()) {
             return NotificationState.Unavailable(
                 "Notification access is not granted to NFC Explorer",
             )
@@ -73,24 +69,4 @@ class ActiveNotificationProbe @Inject constructor(
         return if (showing) NotificationState.Showing else NotificationState.Absent
     }
 
-    /**
-     * Whether the user has granted notification access.
-     *
-     * Read from `Settings.Secure` rather than inferred from a null binder, so "you never granted
-     * this" and "the service has not bound yet" stay distinguishable — they need different fixes.
-     */
-    private fun isAccessGranted(): Boolean {
-        val enabled = runCatching {
-            Settings.Secure.getString(context.contentResolver, ENABLED_LISTENERS)
-        }.getOrNull().orEmpty()
-
-        val us = ComponentName(context, TrackingNotificationListener::class.java)
-        return enabled.split(':').any { entry ->
-            ComponentName.unflattenFromString(entry) == us
-        }
-    }
-
-    private companion object {
-        const val ENABLED_LISTENERS = "enabled_notification_listeners"
-    }
 }

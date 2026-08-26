@@ -68,6 +68,8 @@ fun TagActionsScreen(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
+    onOpenNotificationAccess: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -109,6 +111,8 @@ fun TagActionsScreen(
                 onPickApp = onPickApp,
                 onTypeChange = onTypeChange,
                 onSchemeChange = onSchemeChange,
+                onOpenNotificationAccess = onOpenNotificationAccess,
+                onOpenAccessibilitySettings = onOpenAccessibilitySettings,
             )
         }
 
@@ -170,6 +174,8 @@ private fun DraftEditor(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
+    onOpenNotificationAccess: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -257,12 +263,27 @@ private fun DraftEditor(
                 }
             }
 
-            // Nothing to configure. The explainer earns its place by naming the two permissions,
-            // because without them the tag does nothing and the reason is not otherwise visible.
-            ActionType.SLEEP_CYCLE -> Text(
-                text = stringResource(R.string.actions_sleep_cycle_explainer),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            // Nothing to configure, but the two grants are shown and reachable from here. Without
+            // them the tag silently does nothing, and a tap that does nothing for an unstated reason
+            // is the failure mode this app works hardest to avoid.
+            ActionType.SLEEP_CYCLE -> Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.actions_sleep_cycle_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                GrantRow(
+                    granted = state.grants.notificationAccess,
+                    labelRes = R.string.actions_grant_notifications,
+                    onOpen = onOpenNotificationAccess,
+                )
+                GrantRow(
+                    granted = state.grants.gestureService,
+                    labelRes = R.string.actions_grant_accessibility,
+                    onOpen = onOpenAccessibilitySettings,
+                )
+            }
         }
 
         state.problem?.let { problem ->
@@ -424,6 +445,40 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
     // what the tag does, where "toggle on a notification channel" says how it is implemented.
     is TagAction.WhileNotificationShowing ->
         stringResource(R.string.actions_summary_toggle, appNameOf(action.packageName))
+}
+
+/**
+ * One permission, its current state, and the way to change it.
+ *
+ * States granted/not granted in words rather than by colour alone, the same rule the lock verdicts
+ * follow: a green dot is not a fact anyone can act on.
+ */
+@Composable
+private fun GrantRow(granted: Boolean, labelRes: Int, onOpen: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(
+                if (granted) R.string.actions_grant_on else R.string.actions_grant_off,
+            ),
+            style = MaterialTheme.typography.labelSmall,
+        )
+        TextButton(onClick = onOpen) {
+            Text(
+                stringResource(
+                    if (granted) R.string.actions_grant_review else R.string.actions_grant_open,
+                ),
+            )
+        }
+    }
 }
 
 private fun ActionType.labelRes(): Int = when (this) {

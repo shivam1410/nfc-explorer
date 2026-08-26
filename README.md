@@ -22,7 +22,7 @@ Phase 1 MVP complete. **406 unit tests, 0 failures.**
 | Guarded write: text, hex, bulk wipe, arm-and-confirm | done |
 | Session log and JSON/TXT export via the system file picker | done |
 | Tag actions: launch, link, intent, media | done |
-| Sleep Cycle start/stop toggle on one tag | code complete, gesture unverified on hardware |
+| Sleep Cycle start/stop toggle on one tag | done, verified on device |
 | MIFARE Classic, DESFire, NTAG21x, IsoDep | not started |
 | NDEF decode, raw transceive console, hex editor | not started |
 

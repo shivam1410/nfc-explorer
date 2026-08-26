@@ -165,6 +165,12 @@
     <string name="actions_type_intent">Send intent</string>
     <string name="actions_type_media">Media</string>
     <string name="actions_type_sleep_cycle">Sleep Cycle</string>
+    <string name="actions_grant_notifications">Notification access — to see if a session is running</string>
+    <string name="actions_grant_accessibility">Accessibility — to work the slide-to-stop control</string>
+    <string name="actions_grant_on">Granted</string>
+    <string name="actions_grant_off">Not granted</string>
+    <string name="actions_grant_open">Grant</string>
+    <string name="actions_grant_review">Review</string>
     <string name="actions_sleep_cycle_explainer">One tap starts a Sleep Cycle session; tapping again while one is running ends it. Needs notification access (to see whether a session is running) and the accessibility service (to work the slide-to-stop control, which Sleep Cycle exposes no other way).</string>
     <string name="notification_listener_label">NFC Explorer session detection</string>
     <string name="accessibility_service_label">NFC Explorer gestures</string>

@@ -139,9 +139,35 @@ guesses has even odds of starting a second recording or ending a real night's sl
 | Forged wear message is dropped | On device: no app-side log |
 | Smooth swipe does not move the slider | On device, twice |
 | Stepped drag to y=1100 ends the session | On device, twice |
-| **This app's gesture implementation** | **Not yet run on hardware** |
+| This app's gesture implementation | On device: session ended via `dispatchGesture` |
+| Tag dispatch needs an unlocked screen | On device: `NfcService screenState = ON_LOCKED` refuses |
 
-The last row is the open one. The stepped drag was proven with `adb`; this app performs the equivalent
-through `AccessibilityService.dispatchGesture` with chained continuation strokes, which is the closest
-available analogue but is not the same code path. If the stop half misbehaves, that is the first place
-to look, and `SleepCycle.STOP_*_RATIO` plus `DragGesture.holdMillis`/`steps` are the dials.
+All verified. The observed stop, driven through the app's own code path:
+
+```
+t+1s  session=1  top=com.northcube.sleepcycle/.ui.SleepActivity   intent raised the sleep screen
+t+3s  session=0  top=com.northcube.sleepcycle/.ui.MainActivity    drag landed, session ended
+```
+
+If the stop half ever misbehaves after a Sleep Cycle update, `SleepCycle.STOP_*_RATIO` and
+`DragGesture.holdMillis`/`steps` are the dials.
+
+## Two things that bit during verification
+
+**The trigger activity must not run the action in its own scope.** `TagActionActivity` is `noHistory`
+and draws nothing, so it is destroyed the moment it raises another app's screen. With
+`ActionPerformer.perform` suspending, that cancelled the action mid-flight and the log filled with
+`action failed {exception=JobCancellationException}` on a tag that had visibly started a session
+seconds earlier. Starting worked, because a single intent completes before the activity dies; stopping
+never did, because it waits between its two steps. Actions now run on an application-scoped
+`CoroutineScope` (see `@ApplicationScope`), which the process keeps alive anyway because this app hosts
+a notification listener and an accessibility service.
+
+**A tag cannot be tapped while the phone is locked.** Android's NFC service reports
+`applyScreenState: screenState = ON_LOCKED` and dispatches nothing to apps. Sleep Cycle's start intent
+works fine over the keyguard, but that does not help, because the tap never reaches this app to send
+it. In practice the phone must be woken and unlocked before either tap — at bedtime and again in the
+morning. Worth knowing before wiring a tag to the bedside table.
+
+**A charging phone dreams.** The screensaver re-engaged repeatedly during testing and it locks the
+device, which is the state above. Anything automated around a charging phone has to account for it.
