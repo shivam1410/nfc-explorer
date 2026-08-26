@@ -327,8 +327,13 @@ fun NfcExplorerNavHost(
             composable(Destination.LOG.route) {
                 val viewModel: SessionLogViewModel = hiltViewModel()
                 val entries by viewModel.entries.collectAsStateWithLifecycle()
+                val activity by viewModel.activityEntries.collectAsStateWithLifecycle()
 
-                SessionLogScreen(entries = entries)
+                SessionLogScreen(
+                    entries = entries,
+                    activityEntries = activity,
+                    onClearActivity = viewModel::clearActivity,
+                )
             }
         }
     }

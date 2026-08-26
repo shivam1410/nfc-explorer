@@ -125,13 +125,13 @@ class TogglHttpSession @Inject constructor(
     private fun request(method: String, path: String, auth: String, body: String?): String {
         val url = URL(TogglProtocol.BASE_URL + path)
         val connection = (url.openConnection() as HttpURLConnection).apply {
-            // HttpURLConnection refuses PATCH outright; the override header is how Toggl and most
-            // servers accept it over a POST.
-            if (method == "PATCH") {
+            // A real PATCH. Android's HttpURLConnection is OkHttp-backed and accepts it; only the
+            // desktop JDK refuses. The X-HTTP-Method-Override header this used to send instead was
+            // answered by Toggl with a flat 405, so stopping a timer never worked -- the fallback
+            // stays only for a runtime that genuinely will not take the verb.
+            runCatching { requestMethod = method }.onFailure {
                 requestMethod = "POST"
-                setRequestProperty("X-HTTP-Method-Override", "PATCH")
-            } else {
-                requestMethod = method
+                setRequestProperty("X-HTTP-Method-Override", method)
             }
             connectTimeout = TIMEOUT_MILLIS
             readTimeout = TIMEOUT_MILLIS

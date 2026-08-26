@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.shivam.nfcexplorer.data.export.SafDocumentWriter
+import dev.shivam.nfcexplorer.data.log.ActivityLogStore
 import dev.shivam.nfcexplorer.di.IoDispatcher
 import dev.shivam.nfcexplorer.domain.export.ExportFormat
 import dev.shivam.nfcexplorer.domain.export.JsonSessionExporter
@@ -21,6 +22,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Taps and what they performed, kept across restarts.
+ *
+ * Separate from the session log rather than merged into it: this one outlives the process, and
+ * pretending the two are one list would mean either losing history on every restart or persisting
+ * scan chatter nobody reads.
+ */
 /** Outcome of the most recent export attempt. */
 sealed interface ExportResult {
     data class Written(val bytes: Int, val format: ExportFormat) : ExportResult
@@ -36,11 +44,18 @@ sealed interface ExportResult {
 @HiltViewModel
 class SessionLogViewModel @Inject constructor(
     private val logger: SessionLogger,
+    private val activityLog: ActivityLogStore,
     private val documentWriter: SafDocumentWriter,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     val entries: StateFlow<List<LogEntry>> = logger.entries
+
+    /** Persisted tap history, newest first. */
+    val activityEntries: StateFlow<List<LogEntry>> get() = activityLog.entries
+
+    /** Forgets the stored history. The current session's entries are untouched. */
+    fun clearActivity() = activityLog.clear()
 
     private val backingExport = MutableStateFlow<ExportResult?>(null)
     val exportResult: StateFlow<ExportResult?> = backingExport.asStateFlow()

@@ -15,7 +15,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.shivam.nfcexplorer.data.nfc.NfcAvailability
 import dev.shivam.nfcexplorer.data.nfc.NfcReaderModeController
-import dev.shivam.nfcexplorer.logging.SessionLogcatMirror
 import dev.shivam.nfcexplorer.ui.haptics.ScanFeedback
 import dev.shivam.nfcexplorer.ui.haptics.ScanHapticFeedback
 import dev.shivam.nfcexplorer.ui.navigation.NfcExplorerNavHost
@@ -38,8 +37,6 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var readerMode: NfcReaderModeController
 
-    @Inject lateinit var logcatMirror: SessionLogcatMirror
-
     private val viewModel: ScanViewModel by viewModels()
 
     private val writeViewModel: WriteViewModel by viewModels()
@@ -48,7 +45,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        logcatMirror.attach(lifecycleScope)
         collectTags()
 
         setContent {

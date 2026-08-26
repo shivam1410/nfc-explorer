@@ -119,6 +119,7 @@ private fun AssignmentCard(
     SectionCard(
         title = assignment.label,
         subtitle = summarise(assignment.action, appNameOf),
+        icon = { ActionIcon(assignment.action) },
         initiallyExpanded = false,
     ) {
         Text(text = assignment.uid.toString(), style = HexTextStyle)
@@ -616,6 +617,43 @@ private fun readPhoneNumber(context: android.content.Context, uri: android.net.U
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull()
+
+/**
+ * The icon for a configured action, so a list of tags is scannable by shape as well as by reading.
+ *
+ * A launch action shows the *app's own* icon rather than a generic glyph: three tags that all launch
+ * something are told apart by which app, and that is exactly what the icon can say. Everything else
+ * falls back to the vector for its kind.
+ *
+ * The pieces a preset is built from -- a drag, a tap, a sequence -- share one icon: they are never
+ * configured on their own, so distinguishing them would be detail nobody chose.
+ */
+@Composable
+private fun ActionIcon(action: TagAction) {
+    if (action is TagAction.LaunchApp) {
+        AppIcon(action.packageName)
+        return
+    }
+    val iconRes = when (action) {
+        is TagAction.OpenUri -> R.drawable.ic_action_link
+        is TagAction.SendIntent -> R.drawable.ic_action_intent
+        is TagAction.MediaCommand -> R.drawable.ic_action_media
+        is TagAction.WhatsAppMessage -> R.drawable.ic_action_message
+        is TagAction.TogglToggle -> R.drawable.ic_action_timer
+        is TagAction.WhileNotificationShowing -> R.drawable.ic_action_sleep
+        is TagAction.LaunchApp,
+        is TagAction.DragGesture,
+        is TagAction.TapNode,
+        is TagAction.Steps,
+        -> R.drawable.ic_nav_actions
+    }
+    Icon(
+        painter = painterResource(iconRes),
+        contentDescription = null,
+        modifier = Modifier.size(ICON_SIZE),
+        tint = MaterialTheme.colorScheme.primary,
+    )
+}
 
 /** Screen-reader users get the label; the icon is decoration, so it carries no description. */
 internal fun ActionType.iconRes(): Int = when (this) {

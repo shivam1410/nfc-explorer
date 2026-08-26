@@ -272,6 +272,13 @@
     <string name="log_title">Session log</string>
     <string name="log_empty">Nothing logged yet.</string>
     <string name="log_filter_all">All</string>
+    <string name="log_scope_activity">Activity</string>
+    <string name="log_scope_scanning">Scanning</string>
+    <string name="log_scope_all">Everything</string>
+    <string name="log_filter_label">Filter</string>
+    <string name="log_filter_show">Show</string>
+    <string name="log_filter_level">Minimum level</string>
+    <string name="log_clear">Clear</string>
     <string name="export_json">Export JSON</string>
     <string name="export_txt">Export TXT</string>
     <string name="export_written">Exported %1$d bytes as %2$s.</string>

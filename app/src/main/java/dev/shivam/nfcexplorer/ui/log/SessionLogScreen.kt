@@ -1,5 +1,6 @@
 package dev.shivam.nfcexplorer.ui.log
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -46,46 +54,109 @@ import java.util.Locale
 @Composable
 fun SessionLogScreen(
     entries: List<LogEntry>,
+    activityEntries: List<LogEntry>,
+    onClearActivity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var minimumLevel by remember { mutableStateOf<LogLevel?>(null) }
     var expanded by remember { mutableStateOf<Long?>(null) }
+    var scope by remember { mutableStateOf(LogScope.ACTIVITY) }
 
-    val visible = remember(entries, minimumLevel) {
+    val visible = remember(entries, activityEntries, minimumLevel, scope) {
         val threshold = minimumLevel
-        entries
+        // Activity comes from the persisted store, so it survives the app closing -- which is the
+        // whole point of it. The other scopes are this process's log and cannot outlive it.
+        val source = if (scope == LogScope.ACTIVITY) activityEntries else entries
+        source
             .filter { threshold == null || it.level.ordinal >= threshold.ordinal }
-            .sortedByDescending { it.sequence }
+            .filter { scope.admits(it.category) }
+            .sortedByDescending { it.timestampMillis }
     }
+
+    // Grouped by day rather than shown as one stream: a session log spans several days once the app
+    // has been left running, and "15:41:24" alone does not say which one.
+    val byDay = remember(visible) { visible.groupBy { DAY_FORMAT.format(Date(it.timestampMillis)) } }
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilterChip(
-                selected = minimumLevel == null,
-                onClick = { minimumLevel = null },
-                label = { Text(stringResource(R.string.log_filter_all)) },
+            Text(
+                text = stringResource(R.string.log_entry_count, visible.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
-            LogLevel.entries.forEach { level ->
-                FilterChip(
-                    selected = minimumLevel == level,
-                    onClick = { minimumLevel = level },
-                    label = { Text(level.name) },
-                )
+
+            if (scope == LogScope.ACTIVITY && visible.isNotEmpty()) {
+                TextButton(onClick = onClearActivity) {
+                    Text(stringResource(R.string.log_clear))
+                }
+            }
+
+            // Both filters in one menu on the right. As two rows of chips they took a third of the
+            // screen to answer a question asked once a session, above the entries they were
+            // filtering.
+            Box {
+                var menuOpen by remember { mutableStateOf(false) }
+                TextButton(onClick = { menuOpen = true }) {
+                    Text(stringResource(scope.labelRes))
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_down),
+                        contentDescription = stringResource(R.string.log_filter_label),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    Text(
+                        text = stringResource(R.string.log_filter_show),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    LogScope.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(option.labelRes)) },
+                            trailingIcon = { if (scope == option) SelectedMark() },
+                            onClick = {
+                                scope = option
+                                menuOpen = false
+                            },
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    Text(
+                        text = stringResource(R.string.log_filter_level),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.log_filter_all)) },
+                        trailingIcon = { if (minimumLevel == null) SelectedMark() },
+                        onClick = {
+                            minimumLevel = null
+                            menuOpen = false
+                        },
+                    )
+                    LogLevel.entries.forEach { level ->
+                        DropdownMenuItem(
+                            text = { Text(level.name) },
+                            trailingIcon = { if (minimumLevel == level) SelectedMark() },
+                            onClick = {
+                                minimumLevel = level
+                                menuOpen = false
+                            },
+                        )
+                    }
+                }
             }
         }
-
-
-        Text(
-            text = stringResource(R.string.log_entry_count, visible.size),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
 
         if (visible.isEmpty()) {
             Text(
@@ -101,18 +172,34 @@ fun SessionLogScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 4.dp),
         ) {
-            items(visible, key = LogEntry::sequence) { entry ->
-                LogRow(
-                    entry = entry,
-                    isExpanded = expanded == entry.sequence,
-                    onToggle = {
-                        expanded = if (expanded == entry.sequence) null else entry.sequence
-                    },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            byDay.forEach { (day, dayEntries) ->
+                item(key = "day-$day") {
+                    Text(
+                        text = day,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                items(dayEntries, key = LogEntry::sequence) { entry ->
+                    LogRow(
+                        entry = entry,
+                        isExpanded = expanded == entry.sequence,
+                        onToggle = {
+                            expanded = if (expanded == entry.sequence) null else entry.sequence
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
             }
         }
     }
+}
+
+/** A tick beside the chosen option, so the menu shows state rather than only offering choices. */
+@Composable
+private fun SelectedMark() {
+    Text("\u2713", style = MaterialTheme.typography.bodyMedium)
 }
 
 @Composable
@@ -156,4 +243,26 @@ private fun LogRow(entry: LogEntry, isExpanded: Boolean, onToggle: () -> Unit) {
 }
 
 /** Millisecond precision: several tag operations land inside the same second. */
-private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
+/**
+ * Which slice of the log is on screen.
+ *
+ * A category filter rather than a search box: the categories are fixed and few, and the question
+ * being asked is almost always "what did my tap do", not "find this string".
+ */
+private enum class LogScope(@StringRes val labelRes: Int, val categories: Set<String>?) {
+    /** Taps and what they performed. */
+    ACTIVITY(R.string.log_scope_activity, setOf("trigger", "action")),
+
+    /** Reading the card itself: identity, memory, lock bits. */
+    SCANNING(R.string.log_scope_scanning, setOf("session", "read", "write")),
+
+    /** Null means no filtering, including categories added later. */
+    EVERYTHING(R.string.log_scope_all, null);
+
+    fun admits(category: String): Boolean = categories?.contains(category) ?: true
+}
+
+/** Seconds are enough: the sequence number already orders entries within the same second. */
+private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.US)
+
+private val DAY_FORMAT = SimpleDateFormat("EEEE d MMMM", Locale.getDefault())
