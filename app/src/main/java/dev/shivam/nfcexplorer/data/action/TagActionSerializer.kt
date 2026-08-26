@@ -92,6 +92,7 @@ object TagActionSerializer {
             packageName = action.phoneNumber,
             intentAction = action.message,
             autoSend = action.autoSend,
+            contactName = action.contactName,
         )
         is TagAction.TapNode -> ActionDto(
             type = TYPE_TAP_NODE,
@@ -171,6 +172,7 @@ object TagActionSerializer {
             TYPE_WHATSAPP -> dto.packageName?.let { number ->
                 TagAction.WhatsAppMessage(
                     phoneNumber = number,
+                    contactName = dto.contactName?.takeIf { it.isNotBlank() },
                     message = dto.intentAction.orEmpty(),
                     autoSend = dto.autoSend,
                 )
@@ -260,6 +262,7 @@ object TagActionSerializer {
         @SerialName("projectId") val projectId: Long? = null,
         @SerialName("togglTags") val togglTags: List<String> = emptyList(),
         @SerialName("autoSend") val autoSend: Boolean = false,
+        @SerialName("contactName") val contactName: String? = null,
     )
 
     /** Gesture geometry, kept in its own object so [ActionDto] does not sprout eight more columns. */
