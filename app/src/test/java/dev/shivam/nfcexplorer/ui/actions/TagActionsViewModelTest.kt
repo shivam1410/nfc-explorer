@@ -252,6 +252,64 @@ class TagActionsViewModelTest {
         assertEquals(DraftProblem.MISSING_TARGET, model.state.value.problem)
     }
 
+
+    // --- Scanning a second card ---
+
+    /** Reported from a real phone: the page kept describing the first card. */
+    @Test
+    fun `scanning another card while one is reported as taken switches to it`() = runTest {
+        val taken = TagAssignment(uid, "Desk", TagAction.LaunchApp("com.example"))
+        repository.save(taken)
+        val other = ByteBlock.ofInts(0x04, 0x0E, 0x66, 0xA2, 0xF0, 0x7B, 0x81)
+        val model = viewModel()
+        model.onStartAddFlow()
+
+        model.onTagScanned(uid)
+        advanceUntilIdle()
+        assertTrue(model.state.value.addTag is AddTagState.AlreadyAssigned)
+
+        model.onTagScanned(other)
+        advanceUntilIdle()
+
+        // The second card is unassigned, so the flow moves on to naming it.
+        assertNull(model.state.value.addTag)
+        assertEquals(other, model.state.value.draft?.uid)
+    }
+
+    @Test
+    fun `scanning a second assigned card reports that one instead`() = runTest {
+        val first = TagAssignment(uid, "Desk", TagAction.LaunchApp("com.example"))
+        val secondUid = ByteBlock.ofInts(0x04, 0x0E, 0x66, 0xA2, 0xF0, 0x7B, 0x81)
+        val second = TagAssignment(secondUid, "Shelf", TagAction.LaunchApp("com.other"))
+        repository.save(first)
+        repository.save(second)
+        val model = viewModel()
+        model.onStartAddFlow()
+
+        model.onTagScanned(uid)
+        advanceUntilIdle()
+        model.onTagScanned(secondUid)
+        advanceUntilIdle()
+
+        val state = model.state.value.addTag
+        assertTrue(state is AddTagState.AlreadyAssigned)
+        assertEquals("Shelf", state.assignment.label)
+    }
+
+    /** The guard still earns its place: a stray tap must not discard a half-typed form. */
+    @Test
+    fun `a tap while editing does not disturb the open draft`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Half typed", type = ActionType.MEDIA))
+
+        model.onTagScanned(ByteBlock.ofInts(0x04, 0x0E, 0x66, 0xA2, 0xF0, 0x7B, 0x81))
+        advanceUntilIdle()
+
+        assertEquals("Half typed", model.state.value.draft?.label)
+        assertEquals(uid, model.state.value.draft?.uid)
+    }
+
     private companion object {
         const val READ_DELAY_MILLIS = 10L
         const val CATALOG_DELAY_MILLIS = 200L

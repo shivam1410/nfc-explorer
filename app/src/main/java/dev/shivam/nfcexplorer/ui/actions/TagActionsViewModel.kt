@@ -179,13 +179,17 @@ class TagActionsViewModel @Inject constructor(
     }
 
     /**
-     * Handles the tag tapped while the add flow is waiting.
+     * Handles a tag tapped while the add flow is on screen.
      *
-     * Ignored unless the flow is actually waiting, because the reader stays live for the whole app:
-     * without the guard, a second tap while the user is mid-edit would throw away what they had typed.
+     * Accepted whenever the flow is still asking about a card -- waiting for one, or reporting that
+     * the last one is taken. Tapping a second card there is a change of mind, and the earlier guard
+     * dropped it, leaving the page describing a card no longer against the phone.
+     *
+     * Still ignored once an editor is open. The reader stays live for the whole app, and a stray tap
+     * mid-edit would otherwise throw away what had been typed -- which is what the guard was for.
      */
     fun onTagScanned(uid: ByteBlock) {
-        if (backing.value.addTag !is AddTagState.WaitingForTag) return
+        if (backing.value.addTag == null) return
         viewModelScope.launch {
             val existing = repository.find(uid)
             if (existing != null) {
