@@ -4,14 +4,9 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.logging.LogEntry
-import dev.shivam.nfcexplorer.logging.LogLevel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,7 +43,26 @@ class ActivityLogStore @Inject constructor(
         if (newEntries.isEmpty()) return
         val merged = LogRetention.append(existing = backing.value, incoming = newEntries)
         backing.value = merged
-        runCatching { file.writeText(encode(merged)) }
+        runCatching { file.writeText(ActivityLogSerializer.encode(merged)) }
+    }
+
+    /**
+     * Folds a history recovered from the cloud into what is held, returning how many were new.
+     *
+     * Separate from [append] because the two differ in where the entries belong in time. Appended
+     * entries are always the newest; recovered ones are usually older than everything here, and
+     * have to be interleaved rather than stacked on top.
+     */
+    @Synchronized
+    fun restore(recovered: List<LogEntry>): Int {
+        if (recovered.isEmpty()) return 0
+        val before = backing.value
+        val merged = LogRetention.restore(local = before, recovered = recovered)
+        if (merged.size == before.size && merged == before) return 0
+
+        backing.value = merged
+        runCatching { file.writeText(ActivityLogSerializer.encode(merged)) }
+        return merged.size - before.size
     }
 
     @Synchronized
@@ -67,46 +81,10 @@ class ActivityLogStore @Inject constructor(
         if (!file.exists()) return emptyList()
         // Normalised on the way in, so a file written before the numbering rule existed is repaired
         // rather than carried forward with its duplicates.
-        LogRetention.normalise(
-            json.decodeFromString(ListSerializer(EntryDto.serializer()), file.readText())
-                .map { it.toDomain() },
-        )
+        LogRetention.normalise(ActivityLogSerializer.decode(file.readText()))
     }.getOrDefault(emptyList())
 
-    private fun encode(entries: List<LogEntry>): String =
-        json.encodeToString(ListSerializer(EntryDto.serializer()), entries.map(::toDto))
-
-    private fun toDto(entry: LogEntry) = EntryDto(
-        sequence = entry.sequence,
-        timestampMillis = entry.timestampMillis,
-        level = entry.level.name,
-        category = entry.category,
-        message = entry.message,
-        payload = entry.payload,
-    )
-
-    private fun EntryDto.toDomain() = LogEntry(
-        sequence = sequence,
-        timestampMillis = timestampMillis,
-        level = LogLevel.entries.firstOrNull { it.name == level } ?: LogLevel.INFO,
-        category = category,
-        message = message,
-        payload = payload,
-    )
-
-    @Serializable
-    private data class EntryDto(
-        @SerialName("sequence") val sequence: Long,
-        @SerialName("timestampMillis") val timestampMillis: Long,
-        @SerialName("level") val level: String,
-        @SerialName("category") val category: String,
-        @SerialName("message") val message: String,
-        @SerialName("payload") val payload: Map<String, String> = emptyMap(),
-    )
-
-    companion object {
-        private const val FILE_NAME = "activity-log.json"
-
-        private val json = Json { ignoreUnknownKeys = true }
+    private companion object {
+        const val FILE_NAME = "activity-log.json"
     }
 }

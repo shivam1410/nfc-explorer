@@ -179,6 +179,7 @@ fun SettingsScreen(
                             sync.report.pulled,
                             sync.report.pushed,
                             sync.report.logsUploaded,
+                            sync.report.logsRestored,
                         )
                     },
                     style = MaterialTheme.typography.bodySmall,

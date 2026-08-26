@@ -194,6 +194,95 @@ class LogRetentionTest {
         )
     }
 
+
+    // --- Coming back after a reinstall ---
+
+    /** The whole point: a wiped phone finds the document it uploaded and takes its taps back. */
+    @Test
+    fun `a wiped phone recovers the history it uploaded`() {
+        val uploaded = listOf(
+            entry(1, 1_700_000_100, "started a timer", category = "trigger"),
+            entry(0, 1_700_000_000, "sent intent"),
+        )
+
+        val restored = LogRetention.restore(local = emptyList(), recovered = uploaded)
+
+        assertEquals(listOf("started a timer", "sent intent"), restored.map { it.message })
+    }
+
+    /**
+     * The failure this is most likely to have: numbers are positional and assigned per device, so
+     * the same tap holds a different one at each end. Matching on them would restore the entire
+     * history again on every single sync.
+     */
+    @Test
+    fun `restoring the same history twice adds nothing the second time`() {
+        val uploaded = listOf(
+            entry(7, 1_700_000_100, "started a timer", category = "trigger"),
+            entry(6, 1_700_000_000, "sent intent"),
+        )
+        val once = LogRetention.restore(local = emptyList(), recovered = uploaded)
+
+        // Renumbered on the way in, so the second pass sees numbers that match nothing it holds.
+        val twice = LogRetention.restore(local = once, recovered = uploaded)
+
+        assertEquals(once, twice, "a repeated restore must be a no-op")
+    }
+
+    @Test
+    fun `an entry differing only in payload is not treated as already held`() {
+        val held = entry(0, 1_700_000_000, "dump finished", category = "read")
+            .copy(payload = mapOf("pagesRead" to "0"))
+        val other = held.copy(payload = mapOf("pagesRead" to "44"))
+
+        val restored = LogRetention.restore(local = listOf(held), recovered = listOf(other))
+
+        assertEquals(2, restored.size, "different payloads are different entries")
+    }
+
+    /**
+     * Recovered entries are usually older than everything held. Appending would number a tap from
+     * last week above one from this morning, and the list is ordered by number, not by clock.
+     */
+    @Test
+    fun `recovered entries are interleaved by time rather than stacked on top`() {
+        val held = listOf(entry(0, 1_700_009_000, "this morning", category = "trigger"))
+        val old = listOf(
+            entry(0, 1_700_005_000, "last week", category = "trigger"),
+            entry(1, 1_700_001_000, "the week before", category = "trigger"),
+        )
+
+        val restored = LogRetention.restore(local = held, recovered = old)
+
+        assertEquals(
+            listOf("this morning", "last week", "the week before"),
+            restored.map { it.message },
+        )
+        val sequences = restored.map { it.sequence }
+        assertEquals(sequences.sortedDescending(), sequences, "numbers must follow the order shown")
+    }
+
+    @Test
+    fun `a restore cannot push the history past its bounds`() {
+        val held = (0..4).map { entry(0, 2_000L + it, "held $it", category = "trigger") }
+        val recovered = (0..9).map { entry(0, 1_000L + it, "old $it", category = "trigger") }
+
+        val restored = LogRetention.restore(held, recovered, tapLimit = 6)
+
+        assertEquals(6, restored.size)
+        assertTrue(
+            restored.take(5).map { it.message } == held.sortedByDescending { it.timestampMillis }.map { it.message },
+            "the newest entries must be the ones that survive, got ${restored.map { it.message }}",
+        )
+    }
+
+    @Test
+    fun `restoring nothing changes nothing`() {
+        val held = listOf(entry(0, 100, "kept", category = "trigger"))
+
+        assertEquals(held, LogRetention.restore(held, emptyList()))
+    }
+
     // --- Documents ---
 
     @Test

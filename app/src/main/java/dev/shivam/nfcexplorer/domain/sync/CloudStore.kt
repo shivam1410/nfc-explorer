@@ -39,8 +39,10 @@ data class SyncReport(
     val pulled: Int,
     val pushed: Int,
     val logsUploaded: Int,
+    val logsRestored: Int = 0,
 ) {
-    val quiet: Boolean get() = pulled == 0 && pushed == 0 && logsUploaded == 0
+    val quiet: Boolean
+        get() = pulled == 0 && pushed == 0 && logsUploaded == 0 && logsRestored == 0
 }
 
 /**

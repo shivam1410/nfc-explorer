@@ -1,6 +1,7 @@
 package dev.shivam.nfcexplorer.data.sync
 
 import dev.shivam.nfcexplorer.data.action.TagActionSerializer
+import dev.shivam.nfcexplorer.data.log.ActivityLogSerializer
 import dev.shivam.nfcexplorer.data.log.ActivityLogStore
 import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
@@ -93,6 +94,7 @@ class CloudSyncService @Inject constructor(
             ).getOrThrow()
         }
 
+        val logsRestored = restoreLogs()
         val logsUploaded = uploadLogs()
         pruneRetiredLogs()
 
@@ -104,7 +106,69 @@ class CloudSyncService @Inject constructor(
             pulled = merged.fromCloud.size,
             pushed = merged.fromLocal.size,
             logsUploaded = logsUploaded,
+            logsRestored = logsRestored,
         )
+    }
+
+    /**
+     * Takes back any kept history in the folder that this device does not already hold.
+     *
+     * The point of the whole arrangement: uninstalling takes the phone's log with it but leaves the
+     * document, and a fresh install is issued a new device id, so its own former history reads as
+     * another device's and is recovered here.
+     *
+     * Every activity document is read, not only this device's. Two phones on one account therefore
+     * converge on one history, which is the same behaviour assignments already have and the only
+     * rule that also restores a wiped phone -- a phone that has forgotten its own id cannot pick
+     * its own document out of the folder.
+     *
+     * A document that cannot be read is logged and skipped rather than failing the sync. One
+     * unreadable file is a poor reason to abandon the others, or the assignments already merged.
+     */
+    private suspend fun restoreLogs(): Int {
+        val documents = cloud.list(LogRetention.ACTIVITY_PREFIX)
+            .getOrElse { failure ->
+                logger.warn(CATEGORY, "could not list kept logs", mapOf("error" to describe(failure)))
+                return 0
+            }
+
+        val recovered = documents.flatMap { name ->
+            val body = cloud.read(name)
+                .getOrElse { failure ->
+                    logger.warn(
+                        CATEGORY,
+                        "could not read kept log",
+                        mapOf("document" to name, "error" to describe(failure)),
+                    )
+                    return@flatMap emptyList()
+                } ?: return@flatMap emptyList()
+
+            runCatching { ActivityLogSerializer.decode(body) }
+                .getOrElse { failure ->
+                    logger.warn(
+                        CATEGORY,
+                        "could not decode kept log",
+                        mapOf("document" to name, "error" to describe(failure)),
+                    )
+                    emptyList()
+                }
+        }
+
+        val added = activityLog.restore(recovered)
+
+        // Logged on every run, including the usual one where nothing is new. A step that reports
+        // only when it finds something is indistinguishable from a step that never ran, which is
+        // precisely the hole that made the last three syncs impossible to verify.
+        logger.info(
+            CATEGORY,
+            "read kept logs",
+            mapOf(
+                "documents" to documents.size.toString(),
+                "found" to recovered.size.toString(),
+                "new" to added.toString(),
+            ),
+        )
+        return added
     }
 
     /**
@@ -123,7 +187,7 @@ class CloudSyncService @Inject constructor(
         if (synced.isEmpty()) return 0
 
         val document = LogRetention.activityDocument(deviceId.value)
-        cloud.write(document, encode(synced)).getOrThrow()
+        cloud.write(document, ActivityLogSerializer.encode(synced)).getOrThrow()
 
         // Logged because the upload was the one step of a sync that left no trace of itself: the
         // merge said what it reconciled and the prune said what it removed, but what actually went
@@ -171,11 +235,6 @@ class CloudSyncService @Inject constructor(
     }
 
     private fun describe(failure: Throwable): String = failure.message ?: failure::class.java.simpleName
-
-    private fun encode(entries: List<LogEntry>): String = json.encodeToString(
-        ListSerializer(LogEntryDto.serializer()),
-        entries.map(::toDto),
-    )
 
     private fun toDto(entry: LogEntry) = LogEntryDto(
         sequence = entry.sequence,

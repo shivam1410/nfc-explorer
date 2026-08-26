@@ -105,6 +105,57 @@ object LogRetention {
         return ordered.mapIndexed { index, entry -> entry.copy(sequence = oldest - index) }
     }
 
+    /**
+     * Folds a history recovered from the cloud into what this device already holds.
+     *
+     * This is how a phone gets its taps back after being wiped: the store it uploaded is still in
+     * the folder, and after a reinstall the app no longer recognises the document as its own, so it
+     * arrives here as somebody else's history and is taken on.
+     *
+     * Entries are matched on what they say, not on their number. Numbers are positional and
+     * assigned per device, so the same tap uploaded by one phone and merged by another holds a
+     * different one at each end -- matching on them would restore every entry twice on every sync.
+     * The cost is that two entries identical in time, category, message and payload collapse into
+     * one; at millisecond resolution that means a genuine duplicate is indistinguishable from a
+     * restored one, and treating it as restored is the harmless direction to be wrong in.
+     *
+     * Bounded and renumbered afterwards like any other write, so a restore cannot push the history
+     * past its limits.
+     */
+    fun restore(
+        local: List<LogEntry>,
+        recovered: List<LogEntry>,
+        tapLimit: Int = TAP_LIMIT,
+        scanLimit: Int = SCAN_LIMIT,
+    ): List<LogEntry> {
+        if (recovered.isEmpty()) return local
+
+        val known = local.mapTo(mutableSetOf(), ::identity)
+        val fresh = recovered.filterNot { identity(it) in known }
+        if (fresh.isEmpty()) return local
+
+        // Interleaved by time rather than appended, because recovered entries are usually older
+        // than everything here: appending would number a restored tap from last week above one from
+        // this morning, and the list is ordered by number.
+        val ordered = (local + fresh).sortedByDescending { it.timestampMillis }
+        return normalise(
+            ordered.mapIndexed { index, entry ->
+                entry.copy(sequence = (ordered.size - 1 - index).toLong())
+            },
+            tapLimit,
+            scanLimit,
+        )
+    }
+
+    /** What makes two entries the same tap. Everything the entry says, and nothing about numbering. */
+    private fun identity(entry: LogEntry) =
+        listOf(
+            entry.timestampMillis.toString(),
+            entry.category,
+            entry.message,
+            entry.payload.entries.sortedBy { it.key }.joinToString { "${it.key}=${it.value}" },
+        )
+
     /** The document holding a device's kept history. One per device, rewritten in place. */
     fun activityDocument(deviceId: String): String = "$ACTIVITY_PREFIX$deviceId.json"
 
@@ -127,7 +178,8 @@ object LogRetention {
     /** Session-per-file logs from the first scheme. Named only so they can be cleaned up. */
     private const val LEGACY_PREFIX = "log-"
 
-    private const val ACTIVITY_PREFIX = "activity-"
+    /** Public so a sync can ask the store for every kept history in the folder, not only its own. */
+    const val ACTIVITY_PREFIX = "activity-"
 
     /** No longer written. Named so the ones already uploaded can be removed. */
     private const val DIAGNOSTIC_PREFIX = "diagnostic-"
