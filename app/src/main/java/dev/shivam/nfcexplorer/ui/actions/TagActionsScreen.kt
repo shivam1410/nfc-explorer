@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -224,19 +225,25 @@ internal fun DraftEditor(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = ACTIONS_PER_ROW,
-            modifier = Modifier.padding(top = 8.dp),
-        ) {
-            ACTION_ORDER.forEach { type ->
-                ActionTypeTile(
-                    type = type,
-                    selected = draft.type == type,
-                    onClick = { onTypeChange(type) },
-                    modifier = Modifier.weight(1f),
-                )
+        // Measured width rather than weight(1f). A weight divides the row it lands in, so the last
+        // row -- holding one tile -- gave that tile the full width, and a square aspect ratio then
+        // made it as tall as the screen is wide. A fixed third keeps every tile the same size
+        // however many share a row.
+        BoxWithConstraints(modifier = Modifier.padding(top = 8.dp)) {
+            val tileWidth = (maxWidth - ACTION_TILE_GAP * (ACTIONS_PER_ROW - 1)) / ACTIONS_PER_ROW
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ACTION_TILE_GAP),
+                verticalArrangement = Arrangement.spacedBy(ACTION_TILE_GAP),
+                maxItemsInEachRow = ACTIONS_PER_ROW,
+            ) {
+                ACTION_ORDER.forEach { type ->
+                    ActionTypeTile(
+                        type = type,
+                        selected = draft.type == type,
+                        onClick = { onTypeChange(type) },
+                        modifier = Modifier.width(tileWidth),
+                    )
+                }
             }
         }
 
@@ -691,6 +698,7 @@ private val ACTION_ORDER = listOf(
 )
 
 private const val ACTIONS_PER_ROW = 3
+private val ACTION_TILE_GAP = 8.dp
 private val ACTION_TILE_CORNER = 14.dp
 private val ACTION_TILE_ICON = 26.dp
 
