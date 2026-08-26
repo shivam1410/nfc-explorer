@@ -54,6 +54,14 @@ sealed interface IntentSpec {
         val projectId: Long?,
     ) : IntentSpec
 
+    /** Press a control located by id or accessibility label. */
+    data class TapNode(
+        val viewId: String?,
+        val contentDescription: String?,
+        val requireForegroundPackage: String?,
+        val awaitForegroundMillis: Long,
+    ) : IntentSpec
+
     /** Perform each spec in order, pausing [gapMillis] between them. Never nested. */
     data class Sequence(val specs: List<IntentSpec>, val gapMillis: Long) : IntentSpec
 }
@@ -98,6 +106,13 @@ object IntentSpecMapper {
             },
         )
 
+        is TagAction.TapNode -> IntentSpec.TapNode(
+            viewId = action.viewId,
+            contentDescription = action.contentDescription,
+            requireForegroundPackage = action.requireForegroundPackage,
+            awaitForegroundMillis = action.awaitForegroundMillis,
+        )
+
         is TagAction.DragGesture -> IntentSpec.Drag(
             startXRatio = action.startXRatio,
             startYRatio = action.startYRatio,
@@ -110,10 +125,30 @@ object IntentSpecMapper {
             awaitForegroundMillis = action.awaitForegroundMillis,
         )
 
-        is TagAction.WhatsAppMessage -> IntentSpec.ActivityIntent(
-            action = ACTION_VIEW,
-            uri = WhatsApp.linkFor(action.phoneNumber, action.message),
-        )
+        is TagAction.WhatsAppMessage -> {
+            val open = IntentSpec.ActivityIntent(
+                action = ACTION_VIEW,
+                uri = WhatsApp.linkFor(action.phoneNumber, action.message),
+            )
+            if (!action.autoSend) {
+                open
+            } else {
+                // Open the chat, let it settle, then press send. The gap is not decoration: the
+                // button does not exist until WhatsApp has drawn the conversation.
+                IntentSpec.Sequence(
+                    specs = listOf(
+                        open,
+                        IntentSpec.TapNode(
+                            viewId = WhatsApp.SEND_BUTTON_ID,
+                            contentDescription = WhatsApp.SEND_BUTTON_DESCRIPTION,
+                            requireForegroundPackage = WhatsApp.PACKAGE,
+                            awaitForegroundMillis = TagAction.DEFAULT_AWAIT_FOREGROUND_MILLIS,
+                        ),
+                    ),
+                    gapMillis = TagAction.DEFAULT_GAP_MILLIS,
+                )
+            }
+        }
 
         is TagAction.TogglToggle -> IntentSpec.TogglTimer(
             workspaceId = action.workspaceId,

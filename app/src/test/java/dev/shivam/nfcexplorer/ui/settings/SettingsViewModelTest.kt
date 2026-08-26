@@ -1,6 +1,8 @@
 package dev.shivam.nfcexplorer.ui.settings
 
 import dev.shivam.nfcexplorer.data.sync.Authorization
+import dev.shivam.nfcexplorer.data.update.UpdateInstaller
+import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.SystemGrantState
@@ -66,6 +68,23 @@ class SettingsViewModelTest {
     private val performer = RecordingPerformer()
     private val secrets = FakeSecrets()
 
+    /** An installer that never touches the network or the package manager. */
+    private class FakeInstaller(
+        var allowed: Boolean = true,
+        var downloadResult: Result<java.io.File> = Result.success(java.io.File("update.apk")),
+    ) : UpdateInstaller {
+        var installed: java.io.File? = null
+        override fun canInstall() = allowed
+        override fun unknownSourcesIntent() = android.content.Intent("android.settings.MANAGE_UNKNOWN_APP_SOURCES")
+        override suspend fun download(url: String, version: String) = downloadResult
+        override fun install(apk: java.io.File): Result<Unit> {
+            installed = apk
+            return Result.success(Unit)
+        }
+    }
+
+    private val installer = FakeInstaller()
+
     private fun viewModel(
         releases: ReleaseSource = ReleaseSource { Result.success(null) },
         tokens: AccessTokens = AccessTokens { Authorization.Token("t") },
@@ -79,6 +98,7 @@ class SettingsViewModelTest {
         tokens = tokens,
         cloudSync = sync,
         installedVersion = InstalledVersion { version },
+        installer = installer,
     )
 
     // --- Permissions ---
@@ -185,6 +205,59 @@ class SettingsViewModelTest {
         model.onSaveTogglToken()
 
         assertFalse(secrets.values.containsKey(SecretStore.TOGGL_TOKEN))
+    }
+
+
+    // --- Installing an update ---
+
+    private val release = AppRelease("v0.3.0", "0.3.0", "https://example.test", "https://example.test/a.apk", true)
+
+    @Test
+    fun `a downloaded update is handed to the installer`() = runTest {
+        val model = viewModel()
+
+        model.onDownloadAndInstall(release)
+        advanceUntilIdle()
+
+        assertEquals(InstallStatus.Handed, model.state.value.install)
+        assertEquals("update.apk", installer.installed?.name)
+    }
+
+    /** Not a failure: the download worked and one settings toggle stands in the way. */
+    @Test
+    fun `a missing install permission is reported as needing permission`() = runTest {
+        installer.allowed = false
+        val model = viewModel()
+
+        model.onDownloadAndInstall(release)
+        advanceUntilIdle()
+
+        assertEquals(InstallStatus.NeedsPermission, model.state.value.install)
+        assertEquals(null, installer.installed, "nothing should be handed over without permission")
+    }
+
+    @Test
+    fun `a failed download is reported and installs nothing`() = runTest {
+        installer.downloadResult = Result.failure(IllegalStateException("offline"))
+        val model = viewModel()
+
+        model.onDownloadAndInstall(release)
+        advanceUntilIdle()
+
+        val status = model.state.value.install
+        assertTrue(status is InstallStatus.Failed && status.reason.contains("offline"), "got $status")
+        assertEquals(null, installer.installed)
+    }
+
+    /** A source-only release has nothing to install; saying so beats a button that cannot work. */
+    @Test
+    fun `a release with no apk is refused before downloading`() = runTest {
+        val model = viewModel()
+
+        model.onDownloadAndInstall(release.copy(apkUrl = null))
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.install is InstallStatus.Failed)
     }
 
     // --- Sync ---

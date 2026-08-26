@@ -20,6 +20,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
+import dev.shivam.nfcexplorer.domain.update.AppRelease
+import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
 import dev.shivam.nfcexplorer.ui.component.SectionCard
 
@@ -36,6 +38,8 @@ fun SettingsScreen(
     onOpenAccessibilitySettings: () -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenRelease: (String) -> Unit,
+    onDownloadAndInstall: (AppRelease) -> Unit,
+    onAllowInstalls: () -> Unit,
     onSyncNow: () -> Unit,
     onTogglDraftChange: (String) -> Unit,
     onSaveTogglToken: () -> Unit,
@@ -177,8 +181,45 @@ fun SettingsScreen(
                         ),
                         style = MaterialTheme.typography.bodySmall,
                     )
+
+                    // Only offered when the release actually carries an APK; a source-only release
+                    // would otherwise present a button that could not work.
+                    if (update.release.apkUrl != null) {
+                        Button(
+                            onClick = { onDownloadAndInstall(update.release) },
+                            enabled = state.install !is InstallStatus.Downloading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.settings_update_install)) }
+                    }
                     TextButton(onClick = { onOpenRelease(update.release.pageUrl) }) {
                         Text(stringResource(R.string.settings_update_open))
+                    }
+
+                    when (val install = state.install) {
+                        InstallStatus.Idle -> Unit
+                        InstallStatus.Downloading -> Text(
+                            text = stringResource(R.string.settings_install_downloading),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        // Not an error: the download worked and one toggle stands in the way.
+                        InstallStatus.NeedsPermission -> Column {
+                            Text(
+                                text = stringResource(R.string.settings_install_needs_permission),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            TextButton(onClick = onAllowInstalls) {
+                                Text(stringResource(R.string.settings_install_allow))
+                            }
+                        }
+                        InstallStatus.Handed -> Text(
+                            text = stringResource(R.string.settings_install_handed),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        is InstallStatus.Failed -> Text(
+                            text = stringResource(R.string.settings_install_failed, install.reason),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }

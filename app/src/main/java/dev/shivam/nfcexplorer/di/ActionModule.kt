@@ -13,7 +13,9 @@ import dev.shivam.nfcexplorer.data.sync.CloudSyncService
 import dev.shivam.nfcexplorer.data.sync.DriveAppDataStore
 import dev.shivam.nfcexplorer.data.sync.GoogleAccessTokens
 import dev.shivam.nfcexplorer.data.toggl.TogglHttpSession
+import dev.shivam.nfcexplorer.data.update.ApkInstaller
 import dev.shivam.nfcexplorer.data.update.GitHubReleaseSource
+import dev.shivam.nfcexplorer.data.update.UpdateInstaller
 import dev.shivam.nfcexplorer.data.update.PackageInstalledVersion
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.AppCatalog
@@ -57,6 +59,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindReleaseSource(impl: GitHubReleaseSource): ReleaseSource
+
+    @Binds
+    abstract fun bindUpdateInstaller(impl: ApkInstaller): UpdateInstaller
 
     @Binds
     abstract fun bindSecretStore(impl: KeystoreSecretStore): SecretStore

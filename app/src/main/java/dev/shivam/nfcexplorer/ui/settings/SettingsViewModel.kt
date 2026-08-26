@@ -11,6 +11,9 @@ import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.update.AppVersion
+import dev.shivam.nfcexplorer.data.update.UpdateInstaller
+import dev.shivam.nfcexplorer.domain.update.AppRelease
+import dev.shivam.nfcexplorer.domain.update.InstallStatus
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
 import dev.shivam.nfcexplorer.domain.update.ReleaseSource
 import dev.shivam.nfcexplorer.data.sync.Authorization
@@ -53,6 +56,7 @@ data class SettingsUiState(
     val togglTokenSet: Boolean = false,
     val togglDraft: String = "",
     val sync: SyncUiState = SyncUiState.Idle,
+    val install: InstallStatus = InstallStatus.Idle,
 )
 
 /**
@@ -70,6 +74,7 @@ class SettingsViewModel @Inject constructor(
     private val secrets: SecretStore,
     private val tokens: AccessTokens,
     private val cloudSync: CloudSync,
+    private val installer: UpdateInstaller,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -167,6 +172,57 @@ class SettingsViewModel @Inject constructor(
                 onFailure = { UpdateStatus.Failed("${it::class.simpleName}: ${it.message}") },
             )
             backing.update { it.copy(update = status) }
+        }
+    }
+
+    /**
+     * Downloads the release APK and hands it to the system installer.
+     *
+     * The install itself is never silent: Android shows its own confirmation, and refuses entirely
+     * unless this app has been allowed to install unknown apps. That permission is checked *after*
+     * the download rather than before, so a user who grants it at the prompt does not have to
+     * download twice.
+     */
+    fun onDownloadAndInstall(release: AppRelease) {
+        val url = release.apkUrl
+        if (url == null) {
+            backing.update {
+                it.copy(install = InstallStatus.Failed("That release has no APK attached"))
+            }
+            return
+        }
+        backing.update { it.copy(install = InstallStatus.Downloading) }
+        viewModelScope.launch {
+            installer.download(url, release.tag).fold(
+                onSuccess = { file ->
+                    if (!installer.canInstall()) {
+                        backing.update { it.copy(install = InstallStatus.NeedsPermission) }
+                        return@fold
+                    }
+                    val status = installer.install(file).fold(
+                        onSuccess = { InstallStatus.Handed },
+                        onFailure = { InstallStatus.Failed("${it::class.simpleName}: ${it.message}") },
+                    )
+                    backing.update { it.copy(install = status) }
+                },
+                onFailure = { failure ->
+                    backing.update {
+                        it.copy(
+                            install = InstallStatus.Failed(
+                                "${failure::class.simpleName}: ${failure.message}",
+                            ),
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    /** Sends the user to the screen where installing unknown apps is allowed. */
+    fun onAllowInstalls() {
+        viewModelScope.launch {
+            runCatching { installer.unknownSourcesIntent() }
+                .onSuccess { intent -> performer.perform(TagAction.SendIntent(intent.action.orEmpty(), intent.data?.toString())) }
         }
     }
 

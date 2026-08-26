@@ -55,6 +55,7 @@ class TagActionRunner @Inject constructor(
             is IntentSpec.ActivityIntent -> startActivity(spec)
             is IntentSpec.MediaKeyEvent -> dispatchMediaKey(spec.keyCode)
             is IntentSpec.Drag -> gestures.perform(spec).getOrThrow()
+            is IntentSpec.TapNode -> gestures.tap(spec).getOrThrow()
             is IntentSpec.TogglTimer ->
                 toggl.toggle(spec.workspaceId, spec.description, spec.projectId).getOrThrow()
             is IntentSpec.Sequence -> runSequence(spec)

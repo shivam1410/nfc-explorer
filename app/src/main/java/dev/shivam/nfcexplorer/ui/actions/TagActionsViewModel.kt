@@ -59,6 +59,7 @@ data class ActionDraft(
     val togglWorkspaceId: String = "",
     val phoneNumber: String = "",
     val messageText: String = "",
+    val autoSend: Boolean = false,
     val isExisting: Boolean = false,
 )
 
@@ -199,7 +200,9 @@ class TagActionsViewModel @Inject constructor(
             packageName = app.packageName,
             label = draft.label.ifBlank { app.label },
         )
-        backing.update { it.copy(draft = picked, problem = problemOf(picked)) }
+        // The search box shows what was chosen rather than the half-typed query that found it: an
+        // empty-looking field above "Launch app" reads as nothing being selected.
+        backing.update { it.copy(draft = picked, problem = problemOf(picked), appQuery = app.label) }
     }
 
     /**
@@ -362,6 +365,7 @@ class TagActionsViewModel @Inject constructor(
                 ActionType.WHATSAPP -> TagAction.WhatsAppMessage(
                     phoneNumber = draft.phoneNumber.trim(),
                     message = draft.messageText.trim(),
+                    autoSend = draft.autoSend,
                 )
                 ActionType.TOGGL -> TagAction.TogglToggle(
                     workspaceId = draft.togglWorkspaceId.trim().toLong(),
@@ -430,6 +434,7 @@ class TagActionsViewModel @Inject constructor(
             type = ActionType.WHATSAPP,
             phoneNumber = current.phoneNumber,
             messageText = current.message,
+            autoSend = current.autoSend,
             isExisting = true,
         )
         is TagAction.TogglToggle -> ActionDraft(
@@ -440,6 +445,7 @@ class TagActionsViewModel @Inject constructor(
             isExisting = true,
         )
         is TagAction.DragGesture,
+        is TagAction.TapNode,
         is TagAction.Steps,
         is TagAction.WhileNotificationShowing,
         -> ActionDraft(

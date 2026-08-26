@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the downloaded-update directory is shared, and only that.
+
+  A FileProvider is a grant of read access to whatever it exposes, so it is scoped to the one folder
+  the installer needs rather than to cache or files wholesale.
+-->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

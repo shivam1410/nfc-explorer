@@ -32,6 +32,25 @@ sealed interface UpdateStatus {
     data class Failed(val reason: String) : UpdateStatus
 }
 
+/** Where downloading and installing an update has got to. */
+sealed interface InstallStatus {
+    data object Idle : InstallStatus
+    data object Downloading : InstallStatus
+
+    /**
+     * Downloaded, but the user has not allowed this app to install packages.
+     *
+     * A distinct state rather than a failure: nothing went wrong, and the fix is one settings toggle
+     * away, so the UI can offer it instead of reporting an error the user cannot interpret.
+     */
+    data object NeedsPermission : InstallStatus
+
+    /** Handed to the system installer, which now owns the interaction. */
+    data object Handed : InstallStatus
+
+    data class Failed(val reason: String) : InstallStatus
+}
+
 /** Where releases are read from. Implemented in `data/`. */
 fun interface ReleaseSource {
     suspend fun latest(): Result<AppRelease?>

@@ -133,6 +133,15 @@ sealed interface TagAction {
     data class WhatsAppMessage(
         val phoneNumber: String,
         val message: String = "",
+        /**
+         * Press send as well as filling the message in.
+         *
+         * Off by default, deliberately. WhatsApp has no send API — this works by finding the send
+         * button through the accessibility service and pressing it, which means an accidental tag
+         * tap sends a real message to a real person with no undo. Opting in should be a decision,
+         * not a default.
+         */
+        val autoSend: Boolean = false,
     ) : Leaf {
         init {
             require(phoneNumber.any(Char::isDigit)) { "phoneNumber must contain digits" }
@@ -164,6 +173,31 @@ sealed interface TagAction {
         init {
             require(workspaceId > 0) { "workspaceId must be positive" }
             require(projectId == null || projectId > 0) { "projectId, when present, must be positive" }
+        }
+    }
+
+    /**
+     * Presses an on-screen control, found by id or by its accessibility label.
+     *
+     * The sibling of [DragGesture] for things that are ordinary buttons rather than gestures. Prefer
+     * [viewId] where one exists: ids are chosen by the app's developers and never translated, while
+     * a content description is whatever the user's language happens to call it.
+     *
+     * Like a drag, this is blind and lands on whatever is frontmost, so [requireForegroundPackage]
+     * carries the same weight here — more, in fact, since pressing an unknown button is less
+     * recoverable than dragging on one.
+     */
+    data class TapNode(
+        val viewId: String? = null,
+        val contentDescription: String? = null,
+        val requireForegroundPackage: String? = null,
+        val awaitForegroundMillis: Long = DEFAULT_AWAIT_FOREGROUND_MILLIS,
+    ) : Leaf {
+        init {
+            require(!viewId.isNullOrBlank() || !contentDescription.isNullOrBlank()) {
+                "a tap needs something to find the control by"
+            }
+            require(awaitForegroundMillis >= 0) { "awaitForegroundMillis must not be negative" }
         }
     }
 
@@ -220,7 +254,7 @@ sealed interface TagAction {
         }
     }
 
-    private companion object {
+    companion object {
         /** `scheme:` per RFC 3986 — a letter followed by letters, digits, `+`, `-` or `.`. */
         val SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:")
 

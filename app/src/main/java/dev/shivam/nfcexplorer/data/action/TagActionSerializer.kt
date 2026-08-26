@@ -90,6 +90,14 @@ object TagActionSerializer {
             type = TYPE_WHATSAPP,
             packageName = action.phoneNumber,
             intentAction = action.message,
+            autoSend = action.autoSend,
+        )
+        is TagAction.TapNode -> ActionDto(
+            type = TYPE_TAP_NODE,
+            packageName = action.viewId,
+            intentAction = action.contentDescription,
+            uri = null,
+            channelId = action.requireForegroundPackage,
         )
         is TagAction.TogglToggle -> ActionDto(
             type = TYPE_TOGGL,
@@ -159,8 +167,17 @@ object TagActionSerializer {
                 ?.let { name -> MediaKey.entries.firstOrNull { it.name == name } }
                 ?.let(TagAction::MediaCommand)
             TYPE_WHATSAPP -> dto.packageName?.let { number ->
-                TagAction.WhatsAppMessage(phoneNumber = number, message = dto.intentAction.orEmpty())
+                TagAction.WhatsAppMessage(
+                    phoneNumber = number,
+                    message = dto.intentAction.orEmpty(),
+                    autoSend = dto.autoSend,
+                )
             }
+            TYPE_TAP_NODE -> TagAction.TapNode(
+                viewId = dto.packageName,
+                contentDescription = dto.intentAction,
+                requireForegroundPackage = dto.channelId,
+            )
             TYPE_TOGGL -> dto.workspaceId?.let { workspace ->
                 TagAction.TogglToggle(
                     workspaceId = workspace,
@@ -198,6 +215,7 @@ object TagActionSerializer {
     private const val TYPE_STEPS = "steps"
     private const val TYPE_TOGGL = "togglToggle"
     private const val TYPE_WHATSAPP = "whatsAppMessage"
+    private const val TYPE_TAP_NODE = "tapNode"
     private const val TYPE_WHILE_NOTIFICATION = "whileNotificationShowing"
 
     @Serializable
@@ -237,6 +255,7 @@ object TagActionSerializer {
         @SerialName("drag") val drag: DragDto? = null,
         @SerialName("workspaceId") val workspaceId: Long? = null,
         @SerialName("projectId") val projectId: Long? = null,
+        @SerialName("autoSend") val autoSend: Boolean = false,
     )
 
     /** Gesture geometry, kept in its own object so [ActionDto] does not sprout eight more columns. */
