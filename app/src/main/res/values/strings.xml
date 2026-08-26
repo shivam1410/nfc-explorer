@@ -160,6 +160,12 @@
     <string name="settings_about_title">About</string>
     <string name="settings_toggl_title">Toggl</string>
     <string name="settings_sync_title">Google Drive sync</string>
+    <string name="settings_deleted_title">Deleted tags</string>
+    <string name="settings_deleted_subtitle">Kept so the deletion reaches your other devices. Restoring one needs no card.</string>
+    <string name="settings_deleted_restore">Restore</string>
+    <string name="settings_deleted_count">%1$d kept, restorable without the card</string>
+    <string name="settings_deleted_open">View deleted tags</string>
+    <string name="settings_deleted_empty">Nothing has been deleted.</string>
     <string name="settings_export_title">Export session log</string>
     <string name="settings_export_subtitle">Everything this app recorded since it started, written wherever you choose.</string>
     <string name="settings_sync_subtitle">Actions and session logs, in a hidden folder inside your own Drive. This app cannot see any of your other files.</string>

@@ -57,6 +57,7 @@ fun SettingsScreen(
     onEditTogglToken: () -> Unit,
     onCancelTogglEdit: () -> Unit,
     onCheckToggl: () -> Unit,
+    onOpenDeleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -81,6 +82,16 @@ fun SettingsScreen(
                 labelRes = R.string.actions_grant_accessibility,
                 onOpen = onOpenAccessibilitySettings,
             )
+        }
+
+        SectionCard(
+            title = stringResource(R.string.settings_deleted_title),
+            subtitle = stringResource(R.string.settings_deleted_count, state.deleted.size),
+            collapsible = false,
+        ) {
+            TextButton(onClick = onOpenDeleted) {
+                Text(stringResource(R.string.settings_deleted_open))
+            }
         }
 
         SectionCard(

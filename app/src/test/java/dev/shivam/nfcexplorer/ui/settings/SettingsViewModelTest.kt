@@ -7,6 +7,11 @@ import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.SystemGrantState
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
+import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
@@ -88,6 +93,21 @@ class SettingsViewModelTest {
 
     private val installer = FakeInstaller()
 
+    /** Holds tombstones so restoring can be observed. */
+    private class FakeAssignments : TagActionRepository {
+        val deleted = MutableStateFlow<List<TagAssignment>>(emptyList())
+        val restored = mutableListOf<ByteBlock>()
+        override fun observeAll(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
+        override suspend fun snapshotForSync(): List<TagAssignment> = deleted.value
+        override fun observeDeleted(): Flow<List<TagAssignment>> = deleted
+        override suspend fun restore(uid: ByteBlock) { restored += uid }
+        override suspend fun find(uid: ByteBlock): TagAssignment? = null
+        override suspend fun save(assignment: TagAssignment) = Unit
+        override suspend fun delete(uid: ByteBlock) = Unit
+    }
+
+    private val assignments = FakeAssignments()
+
     /** Answers as Toggl would, without a network. */
     private class FakeToggl(
         var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
@@ -115,6 +135,7 @@ class SettingsViewModelTest {
         installedVersion = InstalledVersion { version },
         installer = installer,
         toggl = toggl,
+        assignments = assignments,
     )
 
     // --- Permissions ---
@@ -374,6 +395,38 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(TogglCheck.Idle, model.state.value.togglCheck)
+    }
+
+
+    // --- Deleted tags ---
+
+    @Test
+    fun `deleted tags are listed so they can be brought back`() = runTest {
+        val gone = TagAssignment(
+            uid = ByteBlock.ofInts(0x04, 0x1C),
+            label = "gemini",
+            action = TagAction.LaunchApp("com.example"),
+            updatedAtMillis = 10,
+            deleted = true,
+        )
+        assignments.deleted.value = listOf(gone)
+
+        val model = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf("gemini"), model.state.value.deleted.map { it.label })
+    }
+
+    /** Restoring needs no card, which is the whole reason the tombstone keeps the action. */
+    @Test
+    fun `restoring asks the repository to bring the tag back`() = runTest {
+        val uid = ByteBlock.ofInts(0x04, 0x1C)
+        val model = viewModel()
+
+        model.onRestore(uid)
+        advanceUntilIdle()
+
+        assertEquals(listOf(uid), assignments.restored)
     }
 
     // --- Sync ---

@@ -48,6 +48,8 @@ class TagActionsViewModelTest {
          * ViewModel that captured state before suspending could not lose to it.
          */
         override suspend fun snapshotForSync(): List<TagAssignment> = stored.value
+        override fun observeDeleted(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
+        override suspend fun restore(uid: ByteBlock) = Unit
 
         override fun observeAll(): Flow<List<TagAssignment>> = flow {
             delay(READ_DELAY_MILLIS)
@@ -70,6 +72,8 @@ class TagActionsViewModelTest {
     private class FailingRepository : TagActionRepository {
         override fun observeAll(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
         override suspend fun snapshotForSync(): List<TagAssignment> = emptyList()
+        override fun observeDeleted(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
+        override suspend fun restore(uid: ByteBlock) = Unit
         override suspend fun find(uid: ByteBlock): TagAssignment? = null
         override suspend fun save(assignment: TagAssignment): Unit = throw IOException("disk full")
         override suspend fun delete(uid: ByteBlock): Unit = throw IOException("disk full")

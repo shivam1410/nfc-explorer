@@ -7,6 +7,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.SystemGrantState
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
+import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
@@ -85,6 +88,8 @@ data class SettingsUiState(
     val sync: SyncUiState = SyncUiState.Idle,
     val togglCheck: TogglCheck = TogglCheck.Idle,
     val install: InstallStatus = InstallStatus.Idle,
+    /** Tags deleted but still recorded, and therefore restorable without the card. */
+    val deleted: List<TagAssignment> = emptyList(),
 )
 
 /**
@@ -104,6 +109,7 @@ class SettingsViewModel @Inject constructor(
     private val cloudSync: CloudSync,
     private val installer: UpdateInstaller,
     private val toggl: TogglSession,
+    private val assignments: TagActionRepository,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -111,6 +117,11 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<SettingsUiState> = backing.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            assignments.observeDeleted().collect { gone ->
+                backing.update { it.copy(deleted = gone) }
+            }
+        }
         refreshGrants()
         refreshTogglToken()
     }
@@ -133,6 +144,11 @@ class SettingsViewModel @Inject constructor(
      * all the configuration this needs. It also turns a typo into an error you see now rather than
      * a tag that silently does nothing at bedtime.
      */
+    /** Undoes a deletion. Possible without the card, because the tombstone kept everything. */
+    fun onRestore(uid: ByteBlock) {
+        viewModelScope.launch { assignments.restore(uid) }
+    }
+
     fun onCheckToggl() {
         if (!secrets.has(SecretStore.TOGGL_TOKEN)) return
         backing.update { it.copy(togglCheck = TogglCheck.Checking) }

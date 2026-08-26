@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -282,5 +283,46 @@ class TagActionStoreTest {
         store.delete(uidA)
 
         assertTrue(store.snapshotForSync().isEmpty())
+    }
+
+    @Test
+    fun `restoring clears the tombstone and stamps the moment`() = runTest {
+        var clock = 500L
+        val store = TagActionStore(FakeDocumentStore(), logger) { clock }
+        store.save(TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example")))
+        store.delete(uidA)
+
+        clock = 900
+        store.restore(uidA)
+
+        assertEquals(listOf("Desk"), store.observeAll().first().map { it.label })
+        val row = store.snapshotForSync().single()
+        assertFalse(row.deleted)
+        // Stamped now, not restored to the old time: the restore has to beat the deletion
+        // everywhere it has already been synced to.
+        assertEquals(900, row.updatedAtMillis)
+    }
+
+    /** Restoring something that is not deleted must not bump its timestamp and win a merge. */
+    @Test
+    fun `restoring a tag that was never deleted changes nothing`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+        store.save(
+            TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example"), updatedAtMillis = 123),
+        )
+
+        store.restore(uidA)
+
+        assertEquals(123, store.snapshotForSync().single().updatedAtMillis)
+    }
+
+    @Test
+    fun `only tombstones are offered as deleted`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+        store.save(TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example")))
+        store.save(TagAssignment(uidB, "Shelf", TagAction.LaunchApp("com.other")))
+        store.delete(uidA)
+
+        assertEquals(listOf("Desk"), store.observeDeleted().first().map { it.label })
     }
 }

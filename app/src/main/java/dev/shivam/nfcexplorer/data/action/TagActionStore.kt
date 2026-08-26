@@ -32,6 +32,32 @@ class TagActionStore(
 
     override suspend fun snapshotForSync(): List<TagAssignment> = current()
 
+    override fun observeDeleted(): Flow<List<TagAssignment>> =
+        documents.observe().map { document ->
+            TagActionSerializer.decode(document).filter { it.deleted }
+        }
+
+    /**
+     * Clears the tombstone and stamps the restore.
+     *
+     * Stamped rather than restoring the original timestamp: the user acted now, and the restore has
+     * to beat the deletion on every other device it reaches.
+     */
+    override suspend fun restore(uid: ByteBlock) {
+        val key = TagAssignment.uidKeyOf(uid)
+        val existing = current()
+        val target = existing.firstOrNull { it.uidKey == key && it.deleted } ?: return
+
+        val restored = existing.map { assignment ->
+            if (assignment.uidKey == key) {
+                assignment.copy(deleted = false, updatedAtMillis = now())
+            } else {
+                assignment
+            }
+        }
+        documents.write(TagActionSerializer.encode(restored))
+    }
+
     override suspend fun find(uid: ByteBlock): TagAssignment? {
         val key = TagAssignment.uidKeyOf(uid)
         // A tombstone must not answer a tap: the tag was deleted, so it does nothing.
