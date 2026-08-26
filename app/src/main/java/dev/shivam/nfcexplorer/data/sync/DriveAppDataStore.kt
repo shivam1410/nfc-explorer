@@ -60,6 +60,16 @@ class DriveAppDataStore @Inject constructor(
         }
     }
 
+    override suspend fun delete(name: String): Result<Unit> = withContext(io) {
+        runCatching {
+            val token = tokens.current() ?: error("Not signed in to Google Drive")
+            // A missing file is the state delete is trying to reach, so finding none is a success
+            // rather than an error. Pruning runs on every sync and must be idempotent.
+            val id = findId(token, name) ?: return@runCatching
+            send(url = "$FILES/$id", method = "DELETE", token = token, contentType = null, body = null)
+        }
+    }
+
     /**
      * The file id for [name], or null.
      *
@@ -142,7 +152,8 @@ class DriveAppDataStore @Inject constructor(
                 // access was revoked, and the caller retries once after refreshing.
                 error("Drive returned HTTP $code${if (detail.isBlank()) "" else ": ${detail.take(300)}"}")
             }
-            return connection.inputStream.bufferedReader().use { it.readText() }
+            // 204, which DELETE answers with, carries no stream at all.
+            return connection.inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
         } finally {
             connection.disconnect()
         }

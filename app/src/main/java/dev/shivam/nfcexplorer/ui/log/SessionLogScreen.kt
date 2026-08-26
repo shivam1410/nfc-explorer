@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
 import dev.shivam.nfcexplorer.domain.export.ExportFormat
+import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.logging.LogEntry
 import dev.shivam.nfcexplorer.logging.LogLevel
 import dev.shivam.nfcexplorer.ui.component.StatusChip
@@ -64,9 +65,10 @@ fun SessionLogScreen(
 
     val visible = remember(entries, activityEntries, minimumLevel, scope) {
         val threshold = minimumLevel
-        // Activity comes from the persisted store, so it survives the app closing -- which is the
-        // whole point of it. The other scopes are this process's log and cannot outlive it.
-        val source = if (scope == LogScope.ACTIVITY) activityEntries else entries
+        // Anything the user is shown is persisted, so taps and scans both survive the app closing.
+        // The session log is added only for what is not kept -- sync and export chatter, which
+        // explains a failure while it is happening and goes with the process.
+        val source = activityEntries + entries.filterNot { LogRetention.retains(it.category) }
         source
             .filter { threshold == null || it.level.ordinal >= threshold.ordinal }
             .filter { scope.admits(it.category) }
@@ -91,6 +93,8 @@ fun SessionLogScreen(
                 modifier = Modifier.weight(1f),
             )
 
+            // Offered only here, though it clears both kept tiers: under Scanning the same button
+            // would throw away the taps too, which is not what "clear" reads as from that screen.
             if (scope == LogScope.ACTIVITY && visible.isNotEmpty()) {
                 TextButton(onClick = onClearActivity) {
                     Text(stringResource(R.string.log_clear))
@@ -256,10 +260,10 @@ private fun LogRow(entry: LogEntry, isExpanded: Boolean, onToggle: () -> Unit) {
  */
 private enum class LogScope(@StringRes val labelRes: Int, val categories: Set<String>?) {
     /** Taps and what they performed. */
-    ACTIVITY(R.string.log_scope_activity, setOf("trigger", "action")),
+    ACTIVITY(R.string.log_scope_activity, LogRetention.TAPS),
 
     /** Reading the card itself: identity, memory, lock bits. */
-    SCANNING(R.string.log_scope_scanning, setOf("session", "read", "write")),
+    SCANNING(R.string.log_scope_scanning, LogRetention.SCANS),
 
     /** Null means no filtering, including categories added later. */
     EVERYTHING(R.string.log_scope_all, null);

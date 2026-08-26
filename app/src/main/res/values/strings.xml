@@ -168,7 +168,7 @@
     <string name="settings_deleted_empty">Nothing has been deleted.</string>
     <string name="settings_export_title">Export session log</string>
     <string name="settings_export_subtitle">Everything this app recorded since it started, written wherever you choose.</string>
-    <string name="settings_sync_subtitle">Actions and session logs, in a hidden folder inside your own Drive. This app cannot see any of your other files.</string>
+    <string name="settings_sync_subtitle">Actions and your tap history, in a hidden folder inside your own Drive. This app cannot see any of your other files.</string>
     <string name="settings_sync_direction">Syncing goes both ways in one pass: whichever change is newer wins, per tag, whichever device made it.</string>
     <string name="settings_sync_last">Last synced %1$s</string>
     <string name="settings_sync_never">Not synced on this device yet.</string>
@@ -177,7 +177,7 @@
     <string name="settings_sync_consent">Waiting for you to allow access…</string>
     <string name="settings_sync_failed">Sync failed: %1$s</string>
     <string name="settings_sync_quiet">Already in sync.</string>
-    <string name="settings_sync_done">Pulled %1$d, pushed %2$d, uploaded %3$d log.</string>
+    <string name="settings_sync_done">Pulled %1$d, pushed %2$d, logs uploaded %3$d.</string>
     <string name="settings_toggl_set">✓ Token saved on this device — ends in %1$s</string>
     <string name="settings_toggl_show">Show token</string>
     <string name="settings_toggl_hide">Hide token</string>

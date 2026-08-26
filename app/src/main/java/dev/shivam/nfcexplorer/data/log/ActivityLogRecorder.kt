@@ -1,5 +1,6 @@
 package dev.shivam.nfcexplorer.data.log
 
+import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.drop
@@ -33,7 +34,7 @@ class ActivityLogRecorder @Inject constructor(
             logger.entries.drop(1).collect { all ->
                 if (all.size <= persisted) return@collect
                 val fresh = all.subList(persisted, all.size)
-                    .filter { it.category in ActivityLogStore.PERSISTED_CATEGORIES }
+                    .filter { LogRetention.retains(it.category) }
                 persisted = all.size
                 store.append(fresh.reversed())
             }
