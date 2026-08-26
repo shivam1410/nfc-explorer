@@ -48,7 +48,9 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(vertical = 12.dp),
     ) {
         item {
-            SectionCard(title = stringResource(R.string.section_lock_bytes)) {
+            SectionCard(title = stringResource(R.string.section_lock_bytes),
+                collapsible = false,
+            ) {
                 val bytes = locks.staticLockBytes
                 if (bytes == null) {
                     Text(
@@ -83,7 +85,9 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
         }
 
         item {
-            SectionCard(title = stringResource(R.string.section_page_access)) {
+            SectionCard(title = stringResource(R.string.section_page_access),
+                collapsible = false,
+            ) {
                 report.memory.pages.forEach { page ->
                     val access = locks.accessFor(page.index)
                     Row(
@@ -116,7 +120,9 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
 
         if (locks.blockLockBits.isNotEmpty()) {
             item {
-                SectionCard(title = stringResource(R.string.section_block_locking)) {
+                SectionCard(title = stringResource(R.string.section_block_locking),
+                    collapsible = false,
+                ) {
                     locks.blockLockBits.forEach { bit ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -148,7 +154,9 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
         }
 
         item {
-            SectionCard(title = stringResource(R.string.section_dynamic_lock)) {
+            SectionCard(title = stringResource(R.string.section_dynamic_lock),
+                collapsible = false,
+            ) {
                 // Stated as an explicit absence rather than left as an empty section, so the
                 // chip's limits are visible instead of looking like missing data.
                 when (val support = locks.dynamicLockSupport) {

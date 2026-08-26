@@ -58,7 +58,14 @@ fun SectionCard(
     icon: (@Composable () -> Unit)? = null,
     initiallyExpanded: Boolean = true,
     collapsible: Boolean = true,
-    content: @Composable () -> Unit,
+    /**
+     * Makes the whole card a control, for a card whose only purpose is to open something.
+     *
+     * Mutually exclusive with [collapsible] in practice: a header cannot both expand the card and
+     * navigate away from it, and offering both would make which one happens a coin toss.
+     */
+    onClick: (() -> Unit)? = null,
+    content: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     val isOpen = expanded || !collapsible
@@ -84,12 +91,14 @@ fun SectionCard(
                     // A fixed card has no toggle, so the header is not a control and must not
                     // advertise itself as one to a screen reader.
                     .then(
-                        if (collapsible) {
-                            Modifier
+                        when {
+                            onClick != null -> Modifier
+                                .clickable(onClick = onClick)
+                                .semantics(mergeDescendants = true) {}
+                            collapsible -> Modifier
                                 .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
                                 .semantics(mergeDescendants = true) {}
-                        } else {
-                            Modifier
+                            else -> Modifier
                         },
                     )
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -109,7 +118,8 @@ fun SectionCard(
                         )
                     }
                 }
-                if (collapsible) {
+                // A chevron on a card that navigates would promise expansion it does not do.
+                if (collapsible && onClick == null) {
                     Icon(
                         painter = painterResource(R.drawable.ic_chevron_down),
                     // Null: the header row already carries the action and its label, so a
@@ -123,6 +133,7 @@ fun SectionCard(
                 }
             }
 
+            if (content == null) return@Column
             AnimatedVisibility(
                 visible = isOpen,
                 enter = fadeIn() + expandVertically(),

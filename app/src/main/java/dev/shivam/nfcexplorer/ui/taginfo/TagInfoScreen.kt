@@ -47,7 +47,9 @@ fun TagInfoScreen(report: TagReport, modifier: Modifier = Modifier) {
 @Composable
 private fun IdentitySection(report: TagReport) {
     val identity = report.identity
-    SectionCard(title = stringResource(R.string.section_identity)) {
+    SectionCard(title = stringResource(R.string.section_identity),
+        collapsible = false,
+    ) {
         KeyValueRow(stringResource(R.string.label_uid), identity.uid.toString(), isHex = true)
         KeyValueRow(
             stringResource(R.string.label_uid_length),
@@ -119,7 +121,9 @@ private fun BccRow(label: String, check: BccCheck?) {
 @Composable
 private fun ChipSection(report: TagReport) {
     val chip = report.chip
-    SectionCard(title = stringResource(R.string.section_chip)) {
+    SectionCard(title = stringResource(R.string.section_chip),
+        collapsible = false,
+    ) {
         KeyValueRow(stringResource(R.string.label_vendor), chip.vendor.ifEmpty { "—" })
         KeyValueRow(
             stringResource(R.string.label_chip),
@@ -183,7 +187,9 @@ private fun ChipSection(report: TagReport) {
  */
 @Composable
 private fun CapabilitiesSection(report: TagReport) {
-    SectionCard(title = stringResource(R.string.section_capabilities)) {
+    SectionCard(title = stringResource(R.string.section_capabilities),
+        collapsible = false,
+    ) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -211,7 +217,9 @@ private fun CapabilitiesSection(report: TagReport) {
 
 @Composable
 private fun TechnologiesSection(report: TagReport) {
-    SectionCard(title = stringResource(R.string.section_technologies)) {
+    SectionCard(title = stringResource(R.string.section_technologies),
+        collapsible = false,
+    ) {
         report.technologies.available.forEach { tech ->
             Column(modifier = Modifier.padding(bottom = 6.dp)) {
                 Text(
