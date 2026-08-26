@@ -11,6 +11,7 @@ import dev.shivam.nfcexplorer.domain.action.SleepCycle
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.action.matching
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,6 +74,13 @@ data class TagActionsUiState(
     val apps: List<InstalledApp> = emptyList(),
     val appQuery: String = "",
     val addTag: AddTagState? = null,
+    /**
+     * Tag names offered by the workspace.
+     *
+     * Empty until fetched, and empty is not an error: a new account has no tags, and the free-text
+     * field still works, so nothing here blocks saving.
+     */
+    val togglTagOptions: List<String> = emptyList(),
 ) {
     val isEditing: Boolean get() = draft != null
     val canSave: Boolean get() = draft != null && problem == null
@@ -109,6 +117,7 @@ class TagActionsViewModel @Inject constructor(
     private val repository: TagActionRepository,
     private val performer: ActionPerformer,
     private val catalog: AppCatalog,
+    private val toggl: TogglSession,
 ) : ViewModel() {
 
     /**
@@ -182,6 +191,7 @@ class TagActionsViewModel @Inject constructor(
     }
 
     fun onEdit(assignment: TagAssignment) {
+        if (assignment.action is TagAction.TogglToggle) loadTogglTags()
         val draft = assignment.toDraft()
         backing.update { it.copy(draft = draft, problem = problemOf(draft), message = null) }
     }
@@ -240,8 +250,25 @@ class TagActionsViewModel @Inject constructor(
      * scheme, so an empty field's only possible next state is the "include a scheme" error — which the
      * user then has to read and fix for no reason. An existing link is never touched.
      */
+    /**
+     * Fetches the workspace's tags once, when they first become relevant.
+     *
+     * Not at construction: it is a network call, and most tags are not Toggl tags. A failure is
+     * swallowed on purpose -- the picker is a convenience over a field that still works by hand, so
+     * an offline phone should lose the shortcut, not the ability to save.
+     */
+    private fun loadTogglTags() {
+        if (backing.value.togglTagOptions.isNotEmpty()) return
+        viewModelScope.launch {
+            toggl.tags().onSuccess { names ->
+                backing.update { it.copy(togglTagOptions = names) }
+            }
+        }
+    }
+
     fun onTypeChange(type: ActionType) {
         val draft = backing.value.draft ?: return
+        if (type == ActionType.TOGGL) loadTogglTags()
         val seeded = when {
             type == ActionType.OPEN_URI && draft.uri.isBlank() -> draft.copy(
                 type = type,
@@ -262,6 +289,19 @@ class TagActionsViewModel @Inject constructor(
         val draft = backing.value.draft ?: return
         val withoutScheme = SCHEME_PREFIX.replace(draft.uri.trim(), "")
         onDraftChange(draft.copy(uri = scheme + withoutScheme))
+    }
+
+    /**
+     * Adds or removes one tag name, keeping the field the single source of truth.
+     *
+     * The chips edit the same text the user can type into, rather than holding a second copy that
+     * would need reconciling.
+     */
+    fun onToggleTogglTag(name: String) {
+        val draft = backing.value.draft ?: return
+        val current = draft.togglTags.split(',').map(String::trim).filter(String::isNotEmpty)
+        val next = if (name in current) current - name else current + name
+        onDraftChange(draft.copy(togglTags = next.joinToString(", ")))
     }
 
     fun onSave() {

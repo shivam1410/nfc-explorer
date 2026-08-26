@@ -95,6 +95,7 @@ class SettingsViewModelTest {
         override suspend fun toggle(description: String, tags: List<String>, projectId: Long?) =
             Result.success<TogglOutcome>(TogglOutcome.Started(description))
         override suspend fun account(): Result<TogglAccount> = account
+        override suspend fun tags(): Result<List<String>> = Result.success(emptyList())
     }
 
     private val toggl = FakeToggl()

@@ -7,6 +7,9 @@ import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
+import dev.shivam.nfcexplorer.domain.toggl.TogglAccount
+import dev.shivam.nfcexplorer.domain.toggl.TogglOutcome
+import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +94,56 @@ class TagActionsViewModelTest {
         }
     }
 
+
+    // --- Toggl tag picker ---
+
+    @Test
+    fun `choosing Toggl loads the workspace tags once`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+
+        model.onTypeChange(ActionType.TOGGL)
+        advanceUntilIdle()
+        model.onTypeChange(ActionType.MEDIA)
+        model.onTypeChange(ActionType.TOGGL)
+        advanceUntilIdle()
+
+        assertEquals(listOf("deep work", "email"), model.state.value.togglTagOptions)
+        assertEquals(1, toggl.tagCalls, "the list should be fetched once, not per selection")
+    }
+
+    /** The picker is a convenience over a field that still works, so offline must not block saving. */
+    @Test
+    fun `a failed tag fetch leaves the editor usable`() = runTest {
+        toggl.tags = Result.failure(IllegalStateException("offline"))
+        val model = viewModel()
+        model.onCreateFor(uid)
+        // Labelled, so the only thing that could still object is the failed fetch.
+        model.onDraftChange(draft(model, label = "Focus", type = ActionType.TOGGL))
+
+        model.onTypeChange(ActionType.TOGGL)
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.togglTagOptions.isEmpty())
+        assertNull(model.state.value.problem, "an unreachable tag list is not a draft problem")
+    }
+
+    @Test
+    fun `tapping a tag adds it and tapping again removes it`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Focus", type = ActionType.TOGGL))
+
+        model.onToggleTogglTag("deep work")
+        assertEquals("deep work", model.state.value.draft?.togglTags)
+
+        model.onToggleTogglTag("email")
+        assertEquals("deep work, email", model.state.value.draft?.togglTags)
+
+        model.onToggleTogglTag("deep work")
+        assertEquals("email", model.state.value.draft?.togglTags)
+    }
+
     private companion object {
         const val READ_DELAY_MILLIS = 10L
         const val CATALOG_DELAY_MILLIS = 200L
@@ -99,6 +152,22 @@ class TagActionsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repository = FakeRepository()
     private val performer = RecordingPerformer()
+    /** Answers as Toggl would, without a network. */
+    private class FakeToggl(
+        var tags: Result<List<String>> = Result.success(listOf("deep work", "email")),
+    ) : TogglSession {
+        var tagCalls = 0
+        override suspend fun toggle(description: String, tags: List<String>, projectId: Long?) =
+            Result.success<TogglOutcome>(TogglOutcome.Started(description))
+        override suspend fun account() = Result.success(TogglAccount("Ada", 1))
+        override suspend fun tags(): Result<List<String>> {
+            tagCalls++
+            return tags
+        }
+    }
+
+    private val toggl = FakeToggl()
+
     private val uid = ByteBlock.ofInts(0x04, 0x1C, 0x4E, 0x52, 0xCE, 0x7C, 0x80)
 
     @BeforeTest fun setUp() = Dispatchers.setMain(dispatcher)
@@ -112,7 +181,7 @@ class TagActionsViewModelTest {
         ),
     )
 
-    private fun viewModel() = TagActionsViewModel(repository, performer, catalog)
+    private fun viewModel() = TagActionsViewModel(repository, performer, catalog, toggl)
 
     // --- Draft lifecycle ---
 
@@ -296,7 +365,7 @@ class TagActionsViewModelTest {
     @Test
     fun `a failing test reports a message rather than throwing`() = runTest {
         val failing = RecordingPerformer(Result.failure(IllegalStateException("no such app")))
-        val model = TagActionsViewModel(repository, failing, catalog)
+        val model = TagActionsViewModel(repository, failing, catalog, toggl)
 
         model.onTest(TagAction.LaunchApp("com.absent"))
         advanceUntilIdle()
@@ -485,7 +554,7 @@ class TagActionsViewModelTest {
     fun `a save that fails is reported rather than taking the app down`() = runTest(dispatcher) {
         // DataStore writes can fail on a full or unreadable disk. Every other failure in this feature
         // reports itself; an unhandled one here would crash the app on a button press.
-        val model = TagActionsViewModel(FailingRepository(), performer, catalog)
+        val model = TagActionsViewModel(FailingRepository(), performer, catalog, toggl)
         model.onCreateFor(uid)
         model.onDraftChange(draft(model, label = "Desk", packageName = "com.example.notes"))
 
