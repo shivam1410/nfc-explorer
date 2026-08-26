@@ -129,19 +129,43 @@ class TagActionsViewModelTest {
     }
 
     @Test
-    fun `tapping a tag adds it and tapping again removes it`() = runTest {
+    fun `choosing a tag sets it and choosing the same one clears it`() = runTest {
         val model = viewModel()
         model.onCreateFor(uid)
         model.onDraftChange(draft(model, label = "Focus", type = ActionType.TOGGL))
 
-        model.onToggleTogglTag("deep work")
-        assertEquals("deep work", model.state.value.draft?.togglTags)
+        model.onSelectTogglTag("deep work")
+        assertEquals("deep work", model.state.value.draft?.togglTag)
 
-        model.onToggleTogglTag("email")
-        assertEquals("deep work, email", model.state.value.draft?.togglTags)
+        // Choosing a different one replaces rather than accumulates: this is a single select.
+        model.onSelectTogglTag("email")
+        assertEquals("email", model.state.value.draft?.togglTag)
 
-        model.onToggleTogglTag("deep work")
-        assertEquals("email", model.state.value.draft?.togglTags)
+        // Picking the chosen one again is how you get back to no tag at all.
+        model.onSelectTogglTag("email")
+        assertEquals("", model.state.value.draft?.togglTag)
+    }
+
+    @Test
+    fun `a typed tag is kept even when the workspace has never seen it`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(
+            draft(model, label = "Focus", type = ActionType.TOGGL).copy(togglTag = "brand new"),
+        )
+
+        val action = model.draftAction(model.state.value.draft!!) as TagAction.TogglToggle
+        assertEquals(listOf("brand new"), action.tags)
+    }
+
+    @Test
+    fun `no tag chosen means no tags on the entry`() = runTest {
+        val model = viewModel()
+        model.onCreateFor(uid)
+        model.onDraftChange(draft(model, label = "Focus", type = ActionType.TOGGL))
+
+        val action = model.draftAction(model.state.value.draft!!) as TagAction.TogglToggle
+        assertTrue(action.tags.isEmpty())
     }
 
     private companion object {

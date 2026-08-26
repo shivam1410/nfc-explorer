@@ -208,7 +208,7 @@
     <string name="actions_type_sleep_cycle">Sleep Cycle</string>
     <string name="actions_type_toggl">Toggl</string>
     <string name="actions_toggl_description">Description (defaults to the tag label)</string>
-    <string name="actions_toggl_tags">Tags, separated by commas</string>
+    <string name="actions_toggl_tags">Tag</string>
     <string name="actions_type_whatsapp">WhatsApp</string>
     <string name="actions_summary_whatsapp">WhatsApp &#8594; %1$s</string>
     <string name="actions_whatsapp_number">Phone number, with country code</string>

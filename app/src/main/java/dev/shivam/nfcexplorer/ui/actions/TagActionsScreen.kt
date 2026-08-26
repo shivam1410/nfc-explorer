@@ -130,9 +130,60 @@ private fun AssignmentCard(
     }
 }
 
-/** Reads the fetched options off the state, so the editor signature stays as it was. */
-private fun ActionDraft.togglTagOptionsFrom(state: TagActionsUiState): List<String> =
-    state.togglTagOptions
+
+/**
+ * One tag, chosen from the workspace or typed.
+ *
+ * Editable rather than a fixed list: a read-only dropdown would quietly remove the ability to use a
+ * tag Toggl has not seen yet, which is a capability the action otherwise has for free. Same shape as
+ * the app picker, so the two selection surfaces in this editor behave alike.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TogglTagPicker(
+    chosen: String,
+    options: List<String>,
+    onChoose: (String) -> Unit,
+    onTyped: (String) -> Unit,
+) {
+    var isOpen by remember { mutableStateOf(false) }
+    val matches = remember(options, chosen) {
+        options.filter { chosen.isBlank() || it.contains(chosen.trim(), ignoreCase = true) }
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = isOpen && matches.isNotEmpty(),
+        onExpandedChange = { isOpen = it },
+    ) {
+        OutlinedTextField(
+            value = chosen,
+            onValueChange = {
+                onTyped(it)
+                isOpen = true
+            },
+            label = { Text(stringResource(R.string.actions_toggl_tags)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isOpen) },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryEditable),
+        )
+        ExposedDropdownMenu(
+            expanded = isOpen && matches.isNotEmpty(),
+            onDismissRequest = { isOpen = false },
+        ) {
+            matches.forEach { name ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = {
+                        onChoose(name)
+                        isOpen = false
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 internal fun DraftEditor(
@@ -146,7 +197,7 @@ internal fun DraftEditor(
     onPickApp: (InstalledApp) -> Unit,
     onTypeChange: (ActionType) -> Unit,
     onSchemeChange: (String) -> Unit,
-    onToggleTogglTag: (String) -> Unit,
+    onSelectTogglTag: (String) -> Unit,
 ) {
     SectionCard(
         title = stringResource(
@@ -324,29 +375,11 @@ internal fun DraftEditor(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                // Chips for what the workspace already has; the field stays for anything new.
-                // Both edit the same value, so there is no second copy to reconcile.
-                if (draft.togglTagOptionsFrom(state).isNotEmpty()) {
-                    val chosen = draft.togglTags.split(',').map(String::trim).toSet()
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        draft.togglTagOptionsFrom(state).forEach { name ->
-                            FilterChip(
-                                selected = name in chosen,
-                                onClick = { onToggleTogglTag(name) },
-                                label = { Text(name) },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = draft.togglTags,
-                    onValueChange = { onDraftChange(draft.copy(togglTags = it)) },
-                    label = { Text(stringResource(R.string.actions_toggl_tags)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                TogglTagPicker(
+                    chosen = draft.togglTag,
+                    options = state.togglTagOptions,
+                    onChoose = onSelectTogglTag,
+                    onTyped = { onDraftChange(draft.copy(togglTag = it)) },
                 )
                 Text(
                     text = stringResource(R.string.actions_toggl_explainer),
