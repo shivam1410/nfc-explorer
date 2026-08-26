@@ -11,7 +11,10 @@ import dev.shivam.nfcexplorer.data.secret.KeystoreSecretStore
 import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.data.sync.CloudSyncService
 import dev.shivam.nfcexplorer.data.sync.DriveAppDataStore
+import dev.shivam.nfcexplorer.data.log.ActivityLogStore
+import dev.shivam.nfcexplorer.data.sync.PreferencesSyncDeviceId
 import dev.shivam.nfcexplorer.data.sync.PreferencesSyncState
+import dev.shivam.nfcexplorer.data.sync.SyncDeviceId
 import dev.shivam.nfcexplorer.data.sync.SyncState
 import dev.shivam.nfcexplorer.data.sync.GoogleAccessTokens
 import dev.shivam.nfcexplorer.data.toggl.PreferencesTogglConfig
@@ -25,6 +28,7 @@ import dev.shivam.nfcexplorer.domain.action.AppCatalog
 import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
+import dev.shivam.nfcexplorer.domain.log.ActivityLog
 import dev.shivam.nfcexplorer.domain.sync.CloudStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
 import dev.shivam.nfcexplorer.domain.toggl.TogglConfig
@@ -78,6 +82,14 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindSyncState(impl: PreferencesSyncState): SyncState
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncDeviceId(impl: PreferencesSyncDeviceId): SyncDeviceId
+
+    @Binds
+    @Singleton
+    abstract fun bindActivityLog(impl: ActivityLogStore): ActivityLog
 
     @Binds
     abstract fun bindAccessTokens(impl: GoogleAccessTokens): AccessTokens

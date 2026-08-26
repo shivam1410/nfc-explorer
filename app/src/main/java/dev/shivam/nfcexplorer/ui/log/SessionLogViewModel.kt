@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.shivam.nfcexplorer.data.export.SafDocumentWriter
-import dev.shivam.nfcexplorer.data.log.ActivityLogStore
+import dev.shivam.nfcexplorer.domain.log.ActivityLog
 import dev.shivam.nfcexplorer.di.IoDispatcher
 import dev.shivam.nfcexplorer.domain.export.ExportFormat
 import dev.shivam.nfcexplorer.domain.export.JsonSessionExporter
@@ -44,7 +44,7 @@ sealed interface ExportResult {
 @HiltViewModel
 class SessionLogViewModel @Inject constructor(
     private val logger: SessionLogger,
-    private val activityLog: ActivityLogStore,
+    private val activityLog: ActivityLog,
     private val documentWriter: SafDocumentWriter,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
