@@ -1,5 +1,6 @@
 package dev.shivam.nfcexplorer.data.log
 
+import dev.shivam.nfcexplorer.domain.log.ActivityLog
 import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class ActivityLogRecorder @Inject constructor(
     private val logger: SessionLogger,
-    private val store: ActivityLogStore,
+    private val store: ActivityLog,
 ) {
 
     /**

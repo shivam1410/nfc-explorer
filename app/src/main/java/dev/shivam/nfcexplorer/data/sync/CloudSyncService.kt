@@ -2,7 +2,7 @@ package dev.shivam.nfcexplorer.data.sync
 
 import dev.shivam.nfcexplorer.data.action.TagActionSerializer
 import dev.shivam.nfcexplorer.data.log.ActivityLogSerializer
-import dev.shivam.nfcexplorer.data.log.ActivityLogStore
+import dev.shivam.nfcexplorer.domain.log.ActivityLog
 import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.sync.CloudStore
@@ -36,7 +36,7 @@ import javax.inject.Singleton
 class CloudSyncService @Inject constructor(
     private val repository: TagActionRepository,
     private val logger: SessionLogger,
-    private val activityLog: ActivityLogStore,
+    private val activityLog: ActivityLog,
     private val cloud: CloudStore,
     private val deviceId: SyncDeviceId,
     private val syncState: SyncState,

@@ -2,6 +2,7 @@ package dev.shivam.nfcexplorer.data.log
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.shivam.nfcexplorer.domain.log.ActivityLog
 import dev.shivam.nfcexplorer.domain.log.LogRetention
 import dev.shivam.nfcexplorer.logging.LogEntry
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,18 +29,18 @@ import javax.inject.Singleton
 @Singleton
 class ActivityLogStore @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : ActivityLog {
 
     private val file = File(context.filesDir, FILE_NAME)
 
     private val backing = MutableStateFlow(read())
 
     /** Newest first, which is the order the screen wants and the order questions are asked in. */
-    val entries: StateFlow<List<LogEntry>> = backing.asStateFlow()
+    override val entries: StateFlow<List<LogEntry>> = backing.asStateFlow()
 
     /** Adds entries, renumbered and bounded by [LogRetention]. */
     @Synchronized
-    fun append(newEntries: List<LogEntry>) {
+    override fun append(newEntries: List<LogEntry>) {
         if (newEntries.isEmpty()) return
         val merged = LogRetention.append(existing = backing.value, incoming = newEntries)
         backing.value = merged
@@ -54,7 +55,7 @@ class ActivityLogStore @Inject constructor(
      * have to be interleaved rather than stacked on top.
      */
     @Synchronized
-    fun restore(recovered: List<LogEntry>): Int {
+    override fun restore(recovered: List<LogEntry>): Int {
         if (recovered.isEmpty()) return 0
         val before = backing.value
         val merged = LogRetention.restore(local = before, recovered = recovered)
@@ -66,7 +67,7 @@ class ActivityLogStore @Inject constructor(
     }
 
     @Synchronized
-    fun clear() {
+    override fun clear() {
         backing.value = emptyList()
         runCatching { file.delete() }
     }
