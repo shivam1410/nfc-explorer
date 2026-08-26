@@ -89,8 +89,11 @@ fun ScanScreen(
     }
 }
 
+/**
+ * Title and supporting line, shared with the add-a-tag page so both carry the same type scale.
+ */
 @Composable
-private fun Message(title: String, body: String) {
+internal fun Message(title: String, body: String) {
     Text(text = title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
     Text(
         text = body,

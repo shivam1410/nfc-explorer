@@ -228,8 +228,39 @@ fun NfcExplorerNavHost(
                     }
                 }
 
+                // Exporting lives here now rather than on the log itself. One launcher per format:
+                // CreateDocument fixes its MIME type at construction.
+                val logViewModel: SessionLogViewModel = hiltViewModel()
+                val exportResult by logViewModel.exportResult.collectAsStateWithLifecycle()
+                val jsonLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
+                ) { uri ->
+                    uri?.let {
+                        logViewModel.export(it, ExportFormat.JSON, lastReport, System.currentTimeMillis())
+                    }
+                }
+                val textLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument(ExportFormat.TEXT.mimeType),
+                ) { uri ->
+                    uri?.let {
+                        logViewModel.export(it, ExportFormat.TEXT, lastReport, System.currentTimeMillis())
+                    }
+                }
+
                 SettingsScreen(
                     state = settingsState,
+                    exportResult = exportResult,
+                    onExport = { format ->
+                        val name = logViewModel.suggestedFileName(
+                            report = lastReport,
+                            format = format,
+                            nowMillis = System.currentTimeMillis(),
+                        )
+                        when (format) {
+                            ExportFormat.JSON -> jsonLauncher.launch(name)
+                            ExportFormat.TEXT -> textLauncher.launch(name)
+                        }
+                    },
                     onOpenNotificationAccess = settingsViewModel::onOpenNotificationAccess,
                     onOpenAccessibilitySettings = settingsViewModel::onOpenAccessibilitySettings,
                     onCheckForUpdates = settingsViewModel::onCheckForUpdates,
@@ -240,6 +271,7 @@ fun NfcExplorerNavHost(
                     onTogglDraftChange = settingsViewModel::onTogglDraftChange,
                     onSaveTogglToken = settingsViewModel::onSaveTogglToken,
                     onClearTogglToken = settingsViewModel::onClearTogglToken,
+                    onToggleTokenVisibility = settingsViewModel::onToggleTokenVisibility,
                 )
             }
             composable(Destination.ACTIONS.route) {
@@ -291,39 +323,8 @@ fun NfcExplorerNavHost(
             composable(Destination.LOG.route) {
                 val viewModel: SessionLogViewModel = hiltViewModel()
                 val entries by viewModel.entries.collectAsStateWithLifecycle()
-                val exportResult by viewModel.exportResult.collectAsStateWithLifecycle()
 
-                // One launcher per format: CreateDocument fixes its MIME type at construction.
-                val jsonLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
-                ) { uri ->
-                    uri?.let {
-                        viewModel.export(it, ExportFormat.JSON, lastReport, System.currentTimeMillis())
-                    }
-                }
-                val textLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument(ExportFormat.TEXT.mimeType),
-                ) { uri ->
-                    uri?.let {
-                        viewModel.export(it, ExportFormat.TEXT, lastReport, System.currentTimeMillis())
-                    }
-                }
-
-                SessionLogScreen(
-                    entries = entries,
-                    exportResult = exportResult,
-                    onExport = { format ->
-                        val name = viewModel.suggestedFileName(
-                            report = lastReport,
-                            format = format,
-                            nowMillis = System.currentTimeMillis(),
-                        )
-                        when (format) {
-                            ExportFormat.JSON -> jsonLauncher.launch(name)
-                            ExportFormat.TEXT -> textLauncher.launch(name)
-                        }
-                    },
-                )
+                SessionLogScreen(entries = entries)
             }
         }
     }
