@@ -21,14 +21,21 @@ import kotlinx.coroutines.flow.map
 class TagActionStore(
     private val documents: AssignmentDocumentStore,
     private val logger: SessionLogger,
+    /** Injected so tombstone timestamps are deterministic in tests. */
+    private val now: () -> Long = System::currentTimeMillis,
 ) : TagActionRepository {
 
     override fun observeAll(): Flow<List<TagAssignment>> =
-        documents.observe().map(TagActionSerializer::decode)
+        documents.observe().map { document ->
+            TagActionSerializer.decode(document).filterNot { it.deleted }
+        }
+
+    override suspend fun snapshotForSync(): List<TagAssignment> = current()
 
     override suspend fun find(uid: ByteBlock): TagAssignment? {
         val key = TagAssignment.uidKeyOf(uid)
-        return current().firstOrNull { it.uidKey == key }
+        // A tombstone must not answer a tap: the tag was deleted, so it does nothing.
+        return current().firstOrNull { it.uidKey == key && !it.deleted }
     }
 
     override suspend fun save(assignment: TagAssignment) {
@@ -38,15 +45,27 @@ class TagActionStore(
         documents.write(TagActionSerializer.encode(merged))
     }
 
+    /**
+     * Marks the assignment deleted rather than removing the row.
+     *
+     * The row is what carries the deletion to other devices. Dropping it instead would leave the
+     * store looking exactly as it does on a device that has simply never seen the tag, and the next
+     * sync would helpfully restore it.
+     */
     override suspend fun delete(uid: ByteBlock) {
         val key = TagAssignment.uidKeyOf(uid)
         val existing = current()
-        val remaining = existing.filterNot { it.uidKey == key }
+        val target = existing.firstOrNull { it.uidKey == key } ?: return
+        if (target.deleted) return
 
-        // Nothing matched, so nothing to rewrite.
-        if (remaining.size == existing.size) return
-
-        documents.write(TagActionSerializer.encode(remaining))
+        val tombstoned = existing.map { assignment ->
+            if (assignment.uidKey == key) {
+                assignment.copy(deleted = true, updatedAtMillis = now())
+            } else {
+                assignment
+            }
+        }
+        documents.write(TagActionSerializer.encode(tombstoned))
     }
 
     /**

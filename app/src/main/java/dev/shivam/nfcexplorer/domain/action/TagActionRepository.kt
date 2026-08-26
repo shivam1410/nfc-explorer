@@ -15,7 +15,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface TagActionRepository {
 
+    /** Live assignments. Tombstones are filtered out; nothing above this layer should see one. */
     fun observeAll(): Flow<List<TagAssignment>>
+
+    /**
+     * Everything stored, tombstones included.
+     *
+     * Only sync needs this: a deletion cannot propagate if the thing that propagates never sees it.
+     */
+    suspend fun snapshotForSync(): List<TagAssignment>
 
     suspend fun find(uid: ByteBlock): TagAssignment?
 

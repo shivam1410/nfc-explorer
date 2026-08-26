@@ -114,7 +114,13 @@ private fun AssignmentCard(
     onDelete: () -> Unit,
     onTest: () -> Unit,
 ) {
-    SectionCard(title = assignment.label, subtitle = summarise(assignment.action, appNameOf)) {
+    // Collapsed by default: the label and what it does are the whole story at a glance, and a list
+    // of tags is for finding one, not for reading all of them at once.
+    SectionCard(
+        title = assignment.label,
+        subtitle = summarise(assignment.action, appNameOf),
+        initiallyExpanded = false,
+    ) {
         Text(text = assignment.uid.toString(), style = HexTextStyle)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onTest) { Text(stringResource(R.string.actions_test)) }

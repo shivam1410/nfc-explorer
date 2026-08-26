@@ -44,6 +44,8 @@ class TagActionsViewModelTest {
          * more prompt than the real thing, and being more prompt hid a race: anything else in the
          * ViewModel that captured state before suspending could not lose to it.
          */
+        override suspend fun snapshotForSync(): List<TagAssignment> = stored.value
+
         override fun observeAll(): Flow<List<TagAssignment>> = flow {
             delay(READ_DELAY_MILLIS)
             emitAll(stored.asStateFlow())
@@ -64,6 +66,7 @@ class TagActionsViewModelTest {
     /** Every write fails, the way a full disk does. */
     private class FailingRepository : TagActionRepository {
         override fun observeAll(): Flow<List<TagAssignment>> = MutableStateFlow(emptyList())
+        override suspend fun snapshotForSync(): List<TagAssignment> = emptyList()
         override suspend fun find(uid: ByteBlock): TagAssignment? = null
         override suspend fun save(assignment: TagAssignment): Unit = throw IOException("disk full")
         override suspend fun delete(uid: ByteBlock): Unit = throw IOException("disk full")
