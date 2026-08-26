@@ -60,8 +60,8 @@ data class ActionDraft(
     val phoneNumber: String = "",
     val messageText: String = "",
     val togglDescription: String = "",
-    /** Comma-separated as typed; split only when the action is built. */
-    val togglTags: String = "",
+    /** One tag name, chosen from the workspace or typed. Empty means no tag. */
+    val togglTag: String = "",
     val autoSend: Boolean = false,
     val isExisting: Boolean = false,
 )
@@ -291,17 +291,10 @@ class TagActionsViewModel @Inject constructor(
         onDraftChange(draft.copy(uri = scheme + withoutScheme))
     }
 
-    /**
-     * Adds or removes one tag name, keeping the field the single source of truth.
-     *
-     * The chips edit the same text the user can type into, rather than holding a second copy that
-     * would need reconciling.
-     */
-    fun onToggleTogglTag(name: String) {
+    /** Chooses the tag, or clears it when the same one is picked again. */
+    fun onSelectTogglTag(name: String) {
         val draft = backing.value.draft ?: return
-        val current = draft.togglTags.split(',').map(String::trim).filter(String::isNotEmpty)
-        val next = if (name in current) current - name else current + name
-        onDraftChange(draft.copy(togglTags = next.joinToString(", ")))
+        onDraftChange(draft.copy(togglTag = if (draft.togglTag == name) "" else name))
     }
 
     fun onSave() {
@@ -413,9 +406,8 @@ class TagActionsViewModel @Inject constructor(
                     // Falls back to the tag's own label, so a description is genuinely optional
                     // rather than a field you must fill to save.
                     description = draft.togglDescription.trim().ifBlank { draft.label.trim() },
-                    tags = draft.togglTags.split(',')
-                        .map(String::trim)
-                        .filter(String::isNotEmpty),
+                    // A list because Toggl's model is a list, holding at most the one tag chosen.
+                    tags = listOfNotNull(draft.togglTag.trim().ifBlank { null }),
                 )
             }
         }.getOrNull()
@@ -486,7 +478,7 @@ class TagActionsViewModel @Inject constructor(
             label = label,
             type = ActionType.TOGGL,
             togglDescription = current.description,
-            togglTags = current.tags.joinToString(", "),
+            togglTag = current.tags.firstOrNull().orEmpty(),
             isExisting = true,
         )
         is TagAction.DragGesture,
