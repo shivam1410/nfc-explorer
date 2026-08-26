@@ -103,7 +103,9 @@ fun SessionLogScreen(
             Box {
                 var menuOpen by remember { mutableStateOf(false) }
                 TextButton(onClick = { menuOpen = true }) {
-                    Text(stringResource(scope.labelRes))
+                    // Named for what the control does, not for the value it currently holds: the
+                    // chosen scope is already ticked inside the menu.
+                    Text(stringResource(R.string.log_filter_label))
                     Icon(
                         painter = painterResource(R.drawable.ic_chevron_down),
                         contentDescription = stringResource(R.string.log_filter_label),

@@ -1,6 +1,12 @@
 package dev.shivam.nfcexplorer.ui.actions
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -213,33 +220,23 @@ internal fun DraftEditor(
             value = draft.label,
             onValueChange = { onDraftChange(draft.copy(label = it)) },
             label = { Text(stringResource(R.string.actions_label)) },
-            isError = state.problem == DraftProblem.BLANK_LABEL,
+            isError = draft.touched && state.problem == DraftProblem.BLANK_LABEL,
             modifier = Modifier.fillMaxWidth(),
         )
 
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = ACTIONS_PER_ROW,
             modifier = Modifier.padding(top = 8.dp),
         ) {
-            ActionType.entries.forEach { type ->
-                // Filled when chosen, outlined otherwise: the selected action has to be obvious at a
-                // glance, and an icon alone would not say which of two similar ones is active.
-                val label: @Composable () -> Unit = {
-                    Icon(
-                        painter = painterResource(type.iconRes()),
-                        contentDescription = null,
-                        modifier = Modifier.size(ACTION_ICON_SIZE),
-                        tint = type.brandTint() ?: LocalContentColor.current,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(type.labelRes()))
-                }
-                if (draft.type == type) {
-                    FilledTonalButton(onClick = { onTypeChange(type) }) { label() }
-                } else {
-                    OutlinedButton(onClick = { onTypeChange(type) }) { label() }
-                }
+            ACTION_ORDER.forEach { type ->
+                ActionTypeTile(
+                    type = type,
+                    selected = draft.type == type,
+                    onClick = { onTypeChange(type) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 
@@ -268,8 +265,10 @@ internal fun DraftEditor(
                     value = draft.uri,
                     onValueChange = { onDraftChange(draft.copy(uri = it)) },
                     label = { Text(stringResource(R.string.actions_uri)) },
-                    isError = state.problem == DraftProblem.MISSING_TARGET ||
-                        state.problem == DraftProblem.INVALID_URI,
+                    isError = draft.touched && (
+                        state.problem == DraftProblem.MISSING_TARGET ||
+                            state.problem == DraftProblem.INVALID_URI
+                        ),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -279,14 +278,14 @@ internal fun DraftEditor(
                     value = draft.intentAction,
                     onValueChange = { onDraftChange(draft.copy(intentAction = it)) },
                     label = { Text(stringResource(R.string.actions_intent_action)) },
-                    isError = state.problem == DraftProblem.MISSING_TARGET,
+                    isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = draft.uri,
                     onValueChange = { onDraftChange(draft.copy(uri = it)) },
                     label = { Text(stringResource(R.string.actions_uri_optional)) },
-                    isError = state.problem == DraftProblem.INVALID_URI,
+                    isError = draft.touched && state.problem == DraftProblem.INVALID_URI,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -321,7 +320,7 @@ internal fun DraftEditor(
                     value = draft.phoneNumber,
                     onValueChange = { onDraftChange(draft.copy(phoneNumber = it)) },
                     label = { Text(stringResource(R.string.actions_whatsapp_number)) },
-                    isError = state.problem == DraftProblem.MISSING_TARGET,
+                    isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -400,7 +399,7 @@ internal fun DraftEditor(
             )
         }
 
-        state.problem?.let { problem ->
+        state.problem?.takeIf { draft.touched }?.let { problem ->
             Text(
                 text = stringResource(problem.labelRes()),
                 style = MaterialTheme.typography.bodySmall,
@@ -621,6 +620,79 @@ private fun readPhoneNumber(context: android.content.Context, uri: android.net.U
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull()
+
+
+/**
+ * One action choice: a square tile with the mark above its name.
+ *
+ * Square because three fit a phone's width only if they stop competing for it horizontally -- an
+ * icon-then-label row at a third of the screen truncates "Launch app". Stacking gives the label the
+ * full tile width and makes the marks, which are the fastest thing to recognise, the dominant part.
+ */
+@Composable
+private fun ActionTypeTile(
+    type: ActionType,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val border = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    Column(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(ACTION_TILE_CORNER))
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    Color.Transparent
+                },
+            )
+            .border(1.dp, border, RoundedCornerShape(ACTION_TILE_CORNER))
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            painter = painterResource(type.iconRes()),
+            contentDescription = null,
+            modifier = Modifier.size(ACTION_TILE_ICON),
+            tint = type.brandTint() ?: MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(
+            text = stringResource(type.labelRes()),
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
+    }
+}
+
+/**
+ * The order the tiles appear in, which is not the order the enum happens to declare.
+ *
+ * Grouped by what they are: the three integrations first, since those are the ones reached by name,
+ * then the three generic escape hatches, then media.
+ */
+private val ACTION_ORDER = listOf(
+    ActionType.TOGGL,
+    ActionType.WHATSAPP,
+    ActionType.SLEEP_CYCLE,
+    ActionType.LAUNCH_APP,
+    ActionType.OPEN_URI,
+    ActionType.SEND_INTENT,
+    ActionType.MEDIA,
+)
+
+private const val ACTIONS_PER_ROW = 3
+private val ACTION_TILE_CORNER = 14.dp
+private val ACTION_TILE_ICON = 26.dp
 
 /**
  * The icon for a configured action, so a list of tags is scannable by shape as well as by reading.
