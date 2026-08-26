@@ -2,4 +2,12 @@
 <resources>
     <color name="window_background">#FFFBFE</color>
     <color name="ic_launcher_background">#12303A</color>
+    <!--
+      Brand colours, used only for the icon of the service they belong to.
+
+      Kept out of the theme on purpose: these are not this app's palette and must not shift with it.
+      A Toggl mark that turns teal because the theme did is no longer the Toggl mark.
+    -->
+    <color name="brand_toggl">#C77DFF</color>
+    <color name="brand_whatsapp">#25D366</color>
 </resources>

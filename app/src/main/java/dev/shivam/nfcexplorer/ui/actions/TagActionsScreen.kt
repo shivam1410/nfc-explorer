@@ -27,6 +27,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -227,6 +230,7 @@ internal fun DraftEditor(
                         painter = painterResource(type.iconRes()),
                         contentDescription = null,
                         modifier = Modifier.size(ACTION_ICON_SIZE),
+                        tint = type.brandTint() ?: LocalContentColor.current,
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(type.labelRes()))
@@ -638,7 +642,7 @@ private fun ActionIcon(action: TagAction) {
         is TagAction.OpenUri -> R.drawable.ic_action_link
         is TagAction.SendIntent -> R.drawable.ic_action_intent
         is TagAction.MediaCommand -> R.drawable.ic_action_media
-        is TagAction.WhatsAppMessage -> R.drawable.ic_action_message
+        is TagAction.WhatsAppMessage -> R.drawable.ic_action_whatsapp
         is TagAction.TogglToggle -> R.drawable.ic_action_toggl
         is TagAction.WhileNotificationShowing -> R.drawable.ic_action_sleep
         is TagAction.LaunchApp,
@@ -651,8 +655,28 @@ private fun ActionIcon(action: TagAction) {
         painter = painterResource(iconRes),
         contentDescription = null,
         modifier = Modifier.size(ICON_SIZE),
-        tint = MaterialTheme.colorScheme.primary,
+        tint = action.brandTint() ?: MaterialTheme.colorScheme.primary,
     )
+}
+
+/**
+ * The colour a service's own mark should be drawn in, or null to follow the theme.
+ *
+ * Only for marks that belong to someone else. Tinting them with the app's primary made the Toggl
+ * ring teal, which is a different logo.
+ */
+@Composable
+private fun TagAction.brandTint(): Color? = when (this) {
+    is TagAction.TogglToggle -> colorResource(R.color.brand_toggl)
+    is TagAction.WhatsAppMessage -> colorResource(R.color.brand_whatsapp)
+    else -> null
+}
+
+@Composable
+private fun ActionType.brandTint(): Color? = when (this) {
+    ActionType.TOGGL -> colorResource(R.color.brand_toggl)
+    ActionType.WHATSAPP -> colorResource(R.color.brand_whatsapp)
+    else -> null
 }
 
 /** Screen-reader users get the label; the icon is decoration, so it carries no description. */
@@ -663,7 +687,7 @@ internal fun ActionType.iconRes(): Int = when (this) {
     ActionType.MEDIA -> R.drawable.ic_action_media
     ActionType.SLEEP_CYCLE -> R.drawable.ic_action_sleep
     ActionType.TOGGL -> R.drawable.ic_action_toggl
-    ActionType.WHATSAPP -> R.drawable.ic_action_message
+    ActionType.WHATSAPP -> R.drawable.ic_action_whatsapp
 }
 
 internal fun ActionType.labelRes(): Int = when (this) {
