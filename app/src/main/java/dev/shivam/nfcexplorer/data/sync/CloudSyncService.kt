@@ -42,6 +42,20 @@ class CloudSyncService @Inject constructor(
 
         val merged = SyncMerge.merge(local = local, cloud = remote)
 
+        // Logged because a sync that reports "nothing to do" is indistinguishable from a sync that
+        // read nothing at all, and the two need completely different fixes.
+        logger.info(
+            category = CATEGORY,
+            message = "merged assignments",
+            payload = mapOf(
+                "local" to local.size.toString(),
+                "remoteDocument" to if (remoteDocument == null) "absent" else "${remoteDocument.length} chars",
+                "remote" to remote.size.toString(),
+                "pull" to merged.fromCloud.size.toString(),
+                "push" to merged.fromLocal.size.toString(),
+            ),
+        )
+
         // Only the ones the cloud was ahead on need writing locally; saving the rest would churn
         // the store and, worse, bump timestamps that the next merge depends on.
         merged.fromCloud.forEach { repository.save(it) }
@@ -103,6 +117,7 @@ class CloudSyncService @Inject constructor(
     )
 
     private companion object {
+        const val CATEGORY = "sync"
         val json = Json { encodeDefaults = true }
     }
 }
