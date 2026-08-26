@@ -14,8 +14,8 @@ import dev.shivam.nfcexplorer.domain.update.AppVersion
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
 import dev.shivam.nfcexplorer.domain.update.ReleaseSource
 import dev.shivam.nfcexplorer.data.sync.Authorization
-import dev.shivam.nfcexplorer.data.sync.CloudSyncService
-import dev.shivam.nfcexplorer.data.sync.GoogleAccessTokens
+import dev.shivam.nfcexplorer.data.sync.AccessTokens
+import dev.shivam.nfcexplorer.domain.sync.CloudSync
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,8 +68,8 @@ class SettingsViewModel @Inject constructor(
     private val performer: ActionPerformer,
     private val releases: ReleaseSource,
     private val secrets: SecretStore,
-    private val tokens: GoogleAccessTokens,
-    private val cloudSync: CloudSyncService,
+    private val tokens: AccessTokens,
+    private val cloudSync: CloudSync,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 

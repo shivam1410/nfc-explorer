@@ -42,12 +42,12 @@ sealed interface Authorization {
 @Singleton
 class GoogleAccessTokens @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : AccessTokens {
 
     /** A token if the scope is already granted, otherwise null. Never shows UI. */
     suspend fun current(): String? = (authorize() as? Authorization.Token)?.accessToken
 
-    suspend fun authorize(): Authorization = suspendCancellableCoroutine { continuation ->
+    override suspend fun authorize(): Authorization = suspendCancellableCoroutine { continuation ->
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DRIVE_APPDATA_SCOPE)))
             .build()
@@ -83,4 +83,15 @@ class GoogleAccessTokens @Inject constructor(
          */
         const val DRIVE_APPDATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
     }
+}
+
+/**
+ * Obtains authorization for the Drive scope.
+ *
+ * Lives in `data/` rather than `domain/` because [Authorization.NeedsConsent] carries a
+ * `PendingIntent`, and `domain/` may not import Android. The seam still earns its place: it is what
+ * lets the settings view model be tested without Play Services.
+ */
+fun interface AccessTokens {
+    suspend fun authorize(): Authorization
 }

@@ -42,3 +42,12 @@ data class SyncReport(
 ) {
     val quiet: Boolean get() = pulled == 0 && pushed == 0 && logsUploaded == 0
 }
+
+/**
+ * Runs one sync.
+ *
+ * An interface so the settings view model can be tested against a fake rather than against Drive.
+ */
+fun interface CloudSync {
+    suspend fun sync(nowMillis: Long): Result<SyncReport>
+}

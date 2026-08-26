@@ -1,0 +1,251 @@
+package dev.shivam.nfcexplorer.ui.settings
+
+import dev.shivam.nfcexplorer.data.sync.Authorization
+import dev.shivam.nfcexplorer.data.sync.AccessTokens
+import dev.shivam.nfcexplorer.domain.action.ActionPerformer
+import dev.shivam.nfcexplorer.domain.action.SystemGrantState
+import dev.shivam.nfcexplorer.domain.action.SystemGrants
+import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.secret.SecretStore
+import dev.shivam.nfcexplorer.domain.sync.CloudSync
+import dev.shivam.nfcexplorer.domain.sync.SyncReport
+import dev.shivam.nfcexplorer.domain.update.AppRelease
+import dev.shivam.nfcexplorer.domain.update.InstalledVersion
+import dev.shivam.nfcexplorer.domain.update.ReleaseSource
+import dev.shivam.nfcexplorer.domain.update.UpdateStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+/**
+ * The settings surface: permissions, update checks, secrets and sync.
+ *
+ * These behaviours used to sit on the actions view model and moved here when the editor stopped
+ * restating permissions it does not own. The tests moved with them rather than being deleted.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class SettingsViewModelTest {
+
+    private val dispatcher = StandardTestDispatcher()
+
+    @BeforeTest fun setUp() = Dispatchers.setMain(dispatcher)
+
+    @AfterTest fun tearDown() = Dispatchers.resetMain()
+
+    private class FakeGrants(var state: SystemGrantState = SystemGrantState()) : SystemGrants {
+        override fun current(): SystemGrantState = state
+    }
+
+    private class RecordingPerformer : ActionPerformer {
+        val performed = mutableListOf<TagAction>()
+        override suspend fun perform(action: TagAction): Result<Unit> {
+            performed += action
+            return Result.success(Unit)
+        }
+    }
+
+    private class FakeSecrets : SecretStore {
+        val values = mutableMapOf<String, String>()
+        override fun read(key: String): String? = values[key]
+        override fun has(key: String): Boolean = values.containsKey(key)
+        override fun write(key: String, value: String) { values[key] = value }
+        override fun clear(key: String) { values.remove(key) }
+    }
+
+    private val grants = FakeGrants()
+    private val performer = RecordingPerformer()
+    private val secrets = FakeSecrets()
+
+    private fun viewModel(
+        releases: ReleaseSource = ReleaseSource { Result.success(null) },
+        tokens: AccessTokens = AccessTokens { Authorization.Token("t") },
+        sync: CloudSync = CloudSync { Result.success(SyncReport(0, 0, 0)) },
+        version: String = "0.1.0",
+    ) = SettingsViewModel(
+        grants = grants,
+        performer = performer,
+        releases = releases,
+        secrets = secrets,
+        tokens = tokens,
+        cloudSync = sync,
+        installedVersion = InstalledVersion { version },
+    )
+
+    // --- Permissions ---
+
+    @Test
+    fun `grants are read up front and refreshed on demand`() = runTest {
+        grants.state = SystemGrantState(notificationAccess = true, gestureService = false)
+        val model = viewModel()
+        advanceUntilIdle()
+        assertFalse(model.state.value.grants.readyForToggle)
+
+        grants.state = SystemGrantState(notificationAccess = true, gestureService = true)
+        model.refreshGrants()
+
+        assertTrue(model.state.value.grants.readyForToggle)
+    }
+
+    @Test
+    fun `opening each settings screen fires its intent`() = runTest {
+        val model = viewModel()
+
+        model.onOpenNotificationAccess()
+        model.onOpenAccessibilitySettings()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS",
+                "android.settings.ACCESSIBILITY_SETTINGS",
+            ),
+            performer.performed.filterIsInstance<TagAction.SendIntent>().map { it.action },
+        )
+    }
+
+    // --- Updates ---
+
+    @Test
+    fun `a newer release is offered`() = runTest {
+        val release = AppRelease("v0.2.0", "0.2.0", "https://example.test", null, true)
+        val model = viewModel(releases = { Result.success(release) })
+
+        model.onCheckForUpdates()
+        advanceUntilIdle()
+
+        val status = model.state.value.update
+        assertTrue(status is UpdateStatus.Available, "got $status")
+    }
+
+    @Test
+    fun `the same version reports up to date`() = runTest {
+        val release = AppRelease("v0.1.0", "0.1.0", "https://example.test", null, false)
+        val model = viewModel(releases = { Result.success(release) })
+
+        model.onCheckForUpdates()
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.update is UpdateStatus.UpToDate)
+    }
+
+    /** A check that never reached GitHub proves nothing, and must not read as "you are current". */
+    @Test
+    fun `a failed check is reported as failed rather than up to date`() = runTest {
+        val model = viewModel(releases = { Result.failure(IllegalStateException("offline")) })
+
+        model.onCheckForUpdates()
+        advanceUntilIdle()
+
+        val status = model.state.value.update
+        assertTrue(status is UpdateStatus.Failed, "got $status")
+        assertTrue(status.reason.contains("offline"))
+    }
+
+    // --- Secrets ---
+
+    @Test
+    fun `saving a token stores it and forgets the draft`() = runTest {
+        val model = viewModel()
+
+        model.onTogglDraftChange("secret-token")
+        model.onSaveTogglToken()
+
+        assertEquals("secret-token", secrets.values[SecretStore.TOGGL_TOKEN])
+        // The draft is cleared so the value does not linger in observable UI state.
+        assertEquals("", model.state.value.togglDraft)
+        assertTrue(model.state.value.togglTokenSet)
+    }
+
+    @Test
+    fun `clearing removes the stored token`() = runTest {
+        secrets.values[SecretStore.TOGGL_TOKEN] = "old"
+        val model = viewModel()
+
+        model.onClearTogglToken()
+
+        assertFalse(secrets.values.containsKey(SecretStore.TOGGL_TOKEN))
+        assertFalse(model.state.value.togglTokenSet)
+    }
+
+    @Test
+    fun `a blank token is not saved`() = runTest {
+        val model = viewModel()
+
+        model.onTogglDraftChange("   ")
+        model.onSaveTogglToken()
+
+        assertFalse(secrets.values.containsKey(SecretStore.TOGGL_TOKEN))
+    }
+
+    // --- Sync ---
+
+    @Test
+    fun `a sync that moves nothing reports quietly`() = runTest {
+        val model = viewModel(sync = { Result.success(SyncReport(0, 0, 0)) })
+
+        model.onSyncNow()
+        advanceUntilIdle()
+
+        val state = model.state.value.sync
+        assertTrue(state is SyncUiState.Done && state.report.quiet, "got $state")
+    }
+
+    @Test
+    fun `a sync reports what actually moved`() = runTest {
+        val model = viewModel(sync = { Result.success(SyncReport(pulled = 2, pushed = 1, logsUploaded = 1)) })
+
+        model.onSyncNow()
+        advanceUntilIdle()
+
+        val state = model.state.value.sync
+        assertTrue(state is SyncUiState.Done && !state.report.quiet)
+        assertEquals(2, state.report.pulled)
+    }
+
+    @Test
+    fun `a failing sync surfaces the reason`() = runTest {
+        val model = viewModel(sync = { Result.failure(IllegalStateException("no network")) })
+
+        model.onSyncNow()
+        advanceUntilIdle()
+
+        val state = model.state.value.sync
+        assertTrue(state is SyncUiState.Failed && state.reason.contains("no network"), "got $state")
+    }
+
+    /** Declining consent must not read as a successful sync. */
+    @Test
+    fun `declining consent is a failure not a quiet success`() = runTest {
+        val model = viewModel()
+
+        model.onConsentResult(granted = false)
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.sync is SyncUiState.Failed)
+    }
+
+    @Test
+    fun `authorization failure is reported without attempting a sync`() = runTest {
+        var synced = false
+        val model = viewModel(
+            tokens = { Authorization.Failed("DEVELOPER_ERROR") },
+            sync = { synced = true; Result.success(SyncReport(0, 0, 0)) },
+        )
+
+        model.onSyncNow()
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.sync is SyncUiState.Failed)
+        assertFalse(synced, "a sync must not run without authorization")
+    }
+}

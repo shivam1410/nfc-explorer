@@ -199,12 +199,6 @@ fun NfcExplorerNavHost(
             composable(Destination.ACTIONS.route) {
                 val actionsViewModel: TagActionsViewModel = hiltViewModel()
                 val actionsState by actionsViewModel.state.collectAsStateWithLifecycle()
-                // Both grants are made in system settings, so the only reliable moment to re-read
-                // them is coming back to this screen.
-                LifecycleResumeEffect(actionsViewModel) {
-                    actionsViewModel.refreshGrants()
-                    onPauseOrDispose { }
-                }
                 TagActionsScreen(
                     state = actionsState,
                     lastScannedUid = lastReport?.identity?.uid,
@@ -220,8 +214,6 @@ fun NfcExplorerNavHost(
                     onPickApp = actionsViewModel::onPickApp,
                     onTypeChange = actionsViewModel::onTypeChange,
                     onSchemeChange = actionsViewModel::onSchemeChange,
-                    onOpenNotificationAccess = actionsViewModel::onOpenNotificationAccess,
-                    onOpenAccessibilitySettings = actionsViewModel::onOpenAccessibilitySettings,
                 )
             }
             composable(Destination.LOG.route) {
