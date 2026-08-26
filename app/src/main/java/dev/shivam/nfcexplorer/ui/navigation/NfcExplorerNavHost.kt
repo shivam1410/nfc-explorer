@@ -272,6 +272,8 @@ fun NfcExplorerNavHost(
                     onSaveTogglToken = settingsViewModel::onSaveTogglToken,
                     onClearTogglToken = settingsViewModel::onClearTogglToken,
                     onToggleTokenVisibility = settingsViewModel::onToggleTokenVisibility,
+                    onEditTogglToken = settingsViewModel::onEditTogglToken,
+                    onCancelTogglEdit = settingsViewModel::onCancelTogglEdit,
                 )
             }
             composable(Destination.ACTIONS.route) {

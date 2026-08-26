@@ -58,6 +58,13 @@ data class SettingsUiState(
     /** Whether the token field is unmasked. Never persisted; resets with the screen. */
     val togglTokenVisible: Boolean = false,
     /**
+     * Whether the token field is open.
+     *
+     * A stored credential needs no input box; showing an empty one invites the reading that nothing
+     * is saved. The field appears when there is nothing yet, or when the user asks to replace it.
+     */
+    val togglEditing: Boolean = false,
+    /**
      * The tail of the stored token, e.g. `1a2b`.
      *
      * Enough to recognise which token is saved without putting the secret on screen — "saved" alone
@@ -106,6 +113,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun onEditTogglToken() {
+        backing.update { it.copy(togglEditing = true, togglDraft = "", togglTokenVisible = false) }
+    }
+
+    fun onCancelTogglEdit() {
+        backing.update { it.copy(togglEditing = false, togglDraft = "", togglTokenVisible = false) }
+    }
+
     fun onToggleTokenVisibility() {
         backing.update { it.copy(togglTokenVisible = !it.togglTokenVisible) }
     }
@@ -119,13 +134,14 @@ class SettingsViewModel @Inject constructor(
         val token = backing.value.togglDraft.trim()
         if (token.isBlank()) return
         secrets.write(SecretStore.TOGGL_TOKEN, token)
-        backing.update { it.copy(togglDraft = "", togglTokenVisible = false) }
+        backing.update { it.copy(togglDraft = "", togglTokenVisible = false, togglEditing = false) }
         refreshTogglToken()
     }
 
     fun onClearTogglToken() {
         secrets.clear(SecretStore.TOGGL_TOKEN)
-        backing.update { it.copy(togglDraft = "", togglTokenVisible = false) }
+        // Straight into the field: clearing is almost always the first half of replacing.
+        backing.update { it.copy(togglDraft = "", togglTokenVisible = false, togglEditing = true) }
         refreshTogglToken()
     }
 
