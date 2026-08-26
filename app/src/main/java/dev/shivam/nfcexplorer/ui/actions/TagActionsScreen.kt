@@ -63,6 +63,7 @@ import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
+import dev.shivam.nfcexplorer.ui.component.FieldShape
 import dev.shivam.nfcexplorer.ui.component.SectionCard
 import dev.shivam.nfcexplorer.ui.theme.HexTextStyle
 import androidx.core.graphics.drawable.toBitmap
@@ -134,9 +135,19 @@ private fun AssignmentCard(
         initiallyExpanded = false,
     ) {
         Text(text = assignment.uid.toString(), style = HexTextStyle)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onTest) { Text(stringResource(R.string.actions_test)) }
-            OutlinedButton(onClick = onEdit) { Text(stringResource(R.string.actions_edit)) }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            OutlinedButton(onClick = onTest, shape = FieldShape) {
+                Text(stringResource(R.string.actions_test))
+            }
+            OutlinedButton(onClick = onEdit, shape = FieldShape) {
+                Text(stringResource(R.string.actions_edit))
+            }
+            // Same reasoning as Cancel: the irreversible one sits apart from the others.
+            Spacer(Modifier.weight(1f))
             TextButton(onClick = onDelete) { Text(stringResource(R.string.actions_delete)) }
         }
     }
@@ -179,7 +190,7 @@ private fun TogglTagPicker(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryEditable),
-            shape = FIELD_SHAPE,
+            shape = FieldShape,
         )
         ExposedDropdownMenu(
             expanded = isOpen && matches.isNotEmpty(),
@@ -251,7 +262,7 @@ internal fun DraftEditor(
             label = { Text(stringResource(R.string.actions_label)) },
             isError = draft.touched && state.problem == DraftProblem.BLANK_LABEL,
             modifier = Modifier.fillMaxWidth(),
-            shape = FIELD_SHAPE,
+            shape = FieldShape,
         )
 
         when (draft.type) {
@@ -284,7 +295,7 @@ internal fun DraftEditor(
                             state.problem == DraftProblem.INVALID_URI
                         ),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
             }
 
@@ -295,7 +306,7 @@ internal fun DraftEditor(
                     label = { Text(stringResource(R.string.actions_intent_action)) },
                     isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
                 OutlinedTextField(
                     value = draft.uri,
@@ -303,7 +314,7 @@ internal fun DraftEditor(
                     label = { Text(stringResource(R.string.actions_uri_optional)) },
                     isError = draft.touched && state.problem == DraftProblem.INVALID_URI,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
             }
 
@@ -340,7 +351,7 @@ internal fun DraftEditor(
                     isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
                 OutlinedButton(
                     onClick = {
@@ -355,7 +366,7 @@ internal fun DraftEditor(
                     onValueChange = { onDraftChange(draft.copy(messageText = it)) },
                     label = { Text(stringResource(R.string.actions_whatsapp_message)) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -397,7 +408,7 @@ internal fun DraftEditor(
                     placeholder = { Text(draft.label.ifBlank { "" }) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = FIELD_SHAPE,
+                    shape = FieldShape,
                 )
                 TogglTagPicker(
                     chosen = draft.togglTag,
@@ -428,19 +439,35 @@ internal fun DraftEditor(
             )
         }
 
+        // Cancel is pushed to the far right, away from Save. They are the two ends of this form and
+        // the destructive one should not sit under the thumb that just pressed the other.
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
         ) {
-            Button(onClick = onSave, enabled = state.canSave) {
+            Button(
+                onClick = onSave,
+                enabled = state.canSave,
+                shape = FieldShape,
+            ) {
                 Text(stringResource(R.string.actions_save))
             }
             // Try it before committing: enabled on the same condition as save, since a testable
             // draft and a saveable one are the same thing.
-            OutlinedButton(onClick = onTestDraft, enabled = state.canSave) {
+            OutlinedButton(
+                onClick = onTestDraft,
+                enabled = state.canSave,
+                shape = FieldShape,
+            ) {
                 Text(stringResource(R.string.actions_test))
             }
-            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.actions_cancel)) }
+            Spacer(Modifier.weight(1f))
+            OutlinedButton(onClick = onCancel, shape = FieldShape) {
+                Text(stringResource(R.string.actions_cancel))
+            }
         }
     }
 }
@@ -498,7 +525,7 @@ private fun AppPicker(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryEditable),
-            shape = FIELD_SHAPE,
+            shape = FieldShape,
         )
 
         ExposedDropdownMenu(
@@ -716,8 +743,6 @@ private val ACTION_TILE_GAP = 8.dp
 private val ACTION_TILE_CORNER = 14.dp
 private val ACTION_TILE_ICON = 26.dp
 
-/** Softer than Material's default field corner, to sit with the rounded tiles above them. */
-private val FIELD_SHAPE = RoundedCornerShape(16.dp)
 
 /**
  * The icon for a configured action, so a list of tags is scannable by shape as well as by reading.

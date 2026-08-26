@@ -42,10 +42,24 @@ class ActivityLogStore @Inject constructor(
     /** Newest first, which is the order the screen wants and the order questions are asked in. */
     val entries: StateFlow<List<LogEntry>> = backing.asStateFlow()
 
+    /**
+     * Adds entries, renumbering them to continue from what is already stored.
+     *
+     * The session log restarts its sequence at zero in every process, so a history spanning several
+     * runs holds many entries numbered 0. That is not merely untidy: the sequence is the only
+     * identity an entry has, and a list keyed by it crashed outright once a second session existed.
+     * Renumbering on the way in keeps the identity unique for as long as the history does.
+     */
     @Synchronized
     fun append(newEntries: List<LogEntry>) {
         if (newEntries.isEmpty()) return
-        val merged = (newEntries + backing.value).take(LIMIT)
+        var next = (backing.value.maxOfOrNull { it.sequence } ?: -1L) + 1
+        // Oldest first, so the numbers run in the same direction as time.
+        val renumbered = newEntries.reversed().map { entry ->
+            entry.copy(sequence = next++)
+        }.reversed()
+
+        val merged = (renumbered + backing.value).take(LIMIT)
         backing.value = merged
         runCatching { file.writeText(encode(merged)) }
     }
