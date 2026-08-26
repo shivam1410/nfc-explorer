@@ -64,6 +64,15 @@ data class ActionDraft(
     val togglTag: String = "",
     val autoSend: Boolean = false,
     val isExisting: Boolean = false,
+    /**
+     * Whether the user has edited anything yet.
+     *
+     * Problems are computed from the moment a draft opens -- an empty label is genuinely missing --
+     * but showing them before the user has typed a character is scolding someone for not having
+     * done something they have not had a chance to do. So the problem is known immediately and
+     * *displayed* only once they have engaged, or once they try to save.
+     */
+    val touched: Boolean = false,
 )
 
 data class TagActionsUiState(
@@ -240,7 +249,8 @@ class TagActionsViewModel @Inject constructor(
     }
 
     fun onDraftChange(draft: ActionDraft) {
-        backing.update { it.copy(draft = draft, problem = problemOf(draft)) }
+        val edited = draft.copy(touched = true)
+        backing.update { it.copy(draft = edited, problem = problemOf(edited)) }
     }
 
     /**
@@ -276,7 +286,9 @@ class TagActionsViewModel @Inject constructor(
             )
             else -> draft.copy(type = type)
         }
-        onDraftChange(seeded)
+        // Deliberately not onDraftChange: choosing what kind of action this is does not count as
+        // having filled the form in, so it must not start showing errors about empty fields.
+        backing.update { it.copy(draft = seeded, problem = problemOf(seeded)) }
     }
 
     /**
@@ -299,8 +311,12 @@ class TagActionsViewModel @Inject constructor(
 
     fun onSave() {
         val draft = backing.value.draft ?: return
-        // The editor stays open on an invalid draft so the problem can be corrected in place.
-        val action = draftAction(draft) ?: return
+        // The editor stays open on an invalid draft so the problem can be corrected in place --
+        // and trying to save is the moment the problem becomes worth stating.
+        val action = draftAction(draft) ?: run {
+            backing.update { it.copy(draft = draft.copy(touched = true)) }
+            return
+        }
         val uid = draft.uid ?: return
 
         viewModelScope.launch {
