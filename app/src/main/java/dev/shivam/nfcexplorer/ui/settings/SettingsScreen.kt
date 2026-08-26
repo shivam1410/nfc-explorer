@@ -68,6 +68,7 @@ fun SettingsScreen(
         SectionCard(
             title = stringResource(R.string.settings_permissions_title),
             subtitle = stringResource(R.string.settings_permissions_subtitle),
+            collapsible = false,
         ) {
             GrantRow(
                 granted = state.grants.notificationAccess,
@@ -84,6 +85,7 @@ fun SettingsScreen(
         SectionCard(
             title = stringResource(R.string.settings_export_title),
             subtitle = stringResource(R.string.settings_export_subtitle),
+            collapsible = false,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onExport(ExportFormat.JSON) }) {
@@ -115,6 +117,7 @@ fun SettingsScreen(
         SectionCard(
             title = stringResource(R.string.settings_sync_title),
             subtitle = stringResource(R.string.settings_sync_subtitle),
+            collapsible = false,
         ) {
             Button(
                 onClick = onSyncNow,
@@ -158,6 +161,7 @@ fun SettingsScreen(
 
         SectionCard(
             title = stringResource(R.string.settings_toggl_title),
+            collapsible = false,
         ) {
             Text(
                 text = state.togglTokenTail
@@ -236,6 +240,7 @@ fun SettingsScreen(
         SectionCard(
             title = stringResource(R.string.settings_about_title),
             subtitle = stringResource(R.string.settings_version, state.version),
+            collapsible = false,
         ) {
             Button(onClick = onCheckForUpdates, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.settings_check_updates))
