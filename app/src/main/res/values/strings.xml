@@ -220,7 +220,9 @@
     <string name="actions_toggl_tags">Tag</string>
     <string name="actions_type_whatsapp">WhatsApp</string>
     <string name="actions_summary_whatsapp">WhatsApp &#8594; %1$s</string>
+    <string name="actions_summary_whatsapp_plain">WhatsApp message</string>
     <string name="actions_whatsapp_number">Phone number, with country code</string>
+    <string name="actions_whatsapp_contact">Sending to %1$s</string>
     <string name="actions_whatsapp_pick">Pick from contacts</string>
     <string name="actions_whatsapp_message">Message (optional)</string>
     <string name="actions_whatsapp_autosend">Send it automatically</string>

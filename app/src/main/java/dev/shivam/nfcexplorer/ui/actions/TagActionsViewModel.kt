@@ -58,6 +58,8 @@ data class ActionDraft(
     val mediaKey: MediaKey = MediaKey.PLAY_PAUSE,
     /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
     val phoneNumber: String = "",
+    /** Filled by the contact picker; cleared when the number is edited by hand. */
+    val contactName: String = "",
     val messageText: String = "",
     val togglDescription: String = "",
     /** One tag name, chosen from the workspace or typed. Empty means no tag. */
@@ -446,6 +448,7 @@ class TagActionsViewModel @Inject constructor(
                 // and then typing "Deep work" again into a second field is busywork.
                 ActionType.WHATSAPP -> TagAction.WhatsAppMessage(
                     phoneNumber = draft.phoneNumber.trim(),
+                    contactName = draft.contactName.trim().ifBlank { null },
                     message = draft.messageText.trim(),
                     autoSend = draft.autoSend,
                 )
@@ -516,6 +519,7 @@ class TagActionsViewModel @Inject constructor(
             label = label,
             type = ActionType.WHATSAPP,
             phoneNumber = current.phoneNumber,
+            contactName = current.contactName.orEmpty(),
             messageText = current.message,
             autoSend = current.autoSend,
             isExisting = true,

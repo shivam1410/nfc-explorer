@@ -132,6 +132,14 @@ sealed interface TagAction {
      */
     data class WhatsAppMessage(
         val phoneNumber: String,
+        /**
+         * Who the number belongs to, when it came from the contact picker.
+         *
+         * Stored rather than looked up: resolving a number to a name later would mean holding
+         * READ_CONTACTS permanently, where the picker hands this over for one contact at the moment
+         * the user chooses it. Null for a number typed by hand, and the number is shown instead.
+         */
+        val contactName: String? = null,
         val message: String = "",
         /**
          * Press send as well as filling the message in.
@@ -145,7 +153,19 @@ sealed interface TagAction {
     ) : Leaf {
         init {
             require(phoneNumber.any(Char::isDigit)) { "phoneNumber must contain digits" }
+            require(contactName?.isNotBlank() != false) {
+                "contactName, when present, must not be blank"
+            }
         }
+
+        /**
+         * What to call this recipient on screen.
+         *
+         * Never the number. A phone number on a list anyone can see over your shoulder is more than
+         * the list needs to say, and the label above it already identifies the tag. Null when the
+         * number was typed by hand, and the caller says something generic instead.
+         */
+        val displayName: String? get() = contactName
     }
 
     /**

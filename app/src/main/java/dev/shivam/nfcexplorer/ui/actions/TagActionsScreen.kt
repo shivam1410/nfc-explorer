@@ -33,6 +33,7 @@ import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.graphics.Color
@@ -338,28 +339,44 @@ internal fun DraftEditor(
                     ActivityResultContracts.StartActivityForResult(),
                 ) { result ->
                     result.data?.data?.let { uri ->
-                        readPhoneNumber(context, uri)?.let { number ->
-                            onDraftChange(draft.copy(phoneNumber = number))
+                        readContact(context, uri)?.let { (number, name) ->
+                            onDraftChange(draft.copy(phoneNumber = number, contactName = name.orEmpty()))
                         }
                     }
                 }
 
                 OutlinedTextField(
                     value = draft.phoneNumber,
-                    onValueChange = { onDraftChange(draft.copy(phoneNumber = it)) },
+                    // Typing by hand drops the remembered name: the two would otherwise disagree,
+                    // and a card naming the wrong person is worse than one showing a number.
+                    onValueChange = {
+                        onDraftChange(draft.copy(phoneNumber = it, contactName = ""))
+                    },
                     label = { Text(stringResource(R.string.actions_whatsapp_number)) },
                     isError = draft.touched && state.problem == DraftProblem.MISSING_TARGET,
+                    // Inside the field rather than a full-width button beneath it: picking a
+                    // contact is one way of filling this single input, not a step of its own.
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                picker.launch(
+                                    Intent(
+                                        Intent.ACTION_PICK,
+                                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                                    ),
+                                )
+                            },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_contact),
+                                contentDescription = stringResource(R.string.actions_whatsapp_pick),
+                            )
+                        }
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = FieldShape,
                 )
-                OutlinedButton(
-                    onClick = {
-                        picker.launch(
-                            Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI),
-                        )
-                    },
-                ) { Text(stringResource(R.string.actions_whatsapp_pick)) }
 
                 OutlinedTextField(
                     value = draft.messageText,
@@ -636,8 +653,9 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
     is TagAction.SendIntent -> stringResource(R.string.actions_summary_intent, action.action)
     is TagAction.MediaCommand ->
         stringResource(R.string.actions_summary_media, stringResource(action.key.labelRes()))
-    is TagAction.WhatsAppMessage ->
-        stringResource(R.string.actions_summary_whatsapp, action.phoneNumber)
+    is TagAction.WhatsAppMessage -> action.displayName
+        ?.let { stringResource(R.string.actions_summary_whatsapp, it) }
+        ?: stringResource(R.string.actions_summary_whatsapp_plain)
     is TagAction.TogglToggle -> stringResource(R.string.actions_summary_toggl, action.description)
     is TagAction.DragGesture -> stringResource(R.string.actions_summary_gesture)
     is TagAction.TapNode -> stringResource(R.string.actions_summary_tap)
@@ -656,18 +674,27 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
  * carries a one-row read grant, which is why this works without READ_CONTACTS. Failures return null
  * — a picker that yielded nothing usable should leave the field alone, not crash the editor.
  */
-private fun readPhoneNumber(context: android.content.Context, uri: android.net.Uri): String? =
-    runCatching {
-        context.contentResolver.query(
-            uri,
-            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
-    }.getOrNull()
+private fun readContact(
+    context: android.content.Context,
+    uri: android.net.Uri,
+): Pair<String, String?>? = runCatching {
+    context.contentResolver.query(
+        uri,
+        arrayOf(
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+        ),
+        null,
+        null,
+        null,
+    )?.use { cursor ->
+        if (!cursor.moveToFirst()) return@use null
+        val number = cursor.getString(0) ?: return@use null
+        // The name comes from the same one-row grant as the number, so remembering it costs no
+        // extra permission -- and it is the only chance to learn it without holding READ_CONTACTS.
+        number to cursor.getString(1)?.takeIf { it.isNotBlank() }
+    }
+}.getOrNull()
 
 
 /**
