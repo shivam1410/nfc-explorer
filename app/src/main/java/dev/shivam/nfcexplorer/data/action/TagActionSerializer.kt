@@ -56,6 +56,7 @@ object TagActionSerializer {
         uidHex = assignment.uidKey,
         label = assignment.label,
         action = actionDto(assignment.action),
+        updatedAtMillis = assignment.updatedAtMillis,
     )
 
     /**
@@ -114,7 +115,12 @@ object TagActionSerializer {
     private fun toDomainOrNull(dto: AssignmentDto): TagAssignment? = runCatching {
         val bytes = dto.uidHex.parseHexBytes() ?: return null
         val action = toActionOrNull(dto.action) ?: return null
-        TagAssignment(uid = ByteBlock.copyOf(bytes), label = dto.label, action = action)
+        TagAssignment(
+            uid = ByteBlock.copyOf(bytes),
+            label = dto.label,
+            action = action,
+            updatedAtMillis = dto.updatedAtMillis,
+        )
     }.getOrNull()
 
     private fun toActionOrNull(dto: ActionDto): TagAction? = runCatching {
@@ -196,6 +202,7 @@ object TagActionSerializer {
         @SerialName("uidHex") val uidHex: String,
         @SerialName("label") val label: String,
         @SerialName("action") val action: ActionDto,
+        @SerialName("updatedAtMillis") val updatedAtMillis: Long = 0,
     )
 
     /**
