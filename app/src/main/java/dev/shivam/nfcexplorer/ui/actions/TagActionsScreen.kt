@@ -639,7 +639,7 @@ private fun ActionIcon(action: TagAction) {
         is TagAction.SendIntent -> R.drawable.ic_action_intent
         is TagAction.MediaCommand -> R.drawable.ic_action_media
         is TagAction.WhatsAppMessage -> R.drawable.ic_action_message
-        is TagAction.TogglToggle -> R.drawable.ic_action_timer
+        is TagAction.TogglToggle -> R.drawable.ic_action_toggl
         is TagAction.WhileNotificationShowing -> R.drawable.ic_action_sleep
         is TagAction.LaunchApp,
         is TagAction.DragGesture,
@@ -662,7 +662,7 @@ internal fun ActionType.iconRes(): Int = when (this) {
     ActionType.SEND_INTENT -> R.drawable.ic_action_intent
     ActionType.MEDIA -> R.drawable.ic_action_media
     ActionType.SLEEP_CYCLE -> R.drawable.ic_action_sleep
-    ActionType.TOGGL -> R.drawable.ic_action_timer
+    ActionType.TOGGL -> R.drawable.ic_action_toggl
     ActionType.WHATSAPP -> R.drawable.ic_action_message
 }
 

@@ -1,0 +1,27 @@
+<!--
+  Toggl's mark: a power symbol inside a ring.
+
+  The ring is stroked and the glyph filled, rather than both outlined as in the source image: at the
+  18-20dp these render at, hairline strokes on the inner symbol turn to mush, and every other action
+  icon here is filled. Reads as the same mark, holds up at the size it is actually used.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+
+    <path
+        android:pathData="M1.4,12 A10.6,10.6 0 1 1 22.6,12 A10.6,10.6 0 1 1 1.4,12"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.5"
+        android:fillColor="@android:color/transparent" />
+
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:scaleX="0.58"
+        android:scaleY="0.58">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M13,3h-2v10h2V3zM17.83,5.17l-1.42,1.42C17.99,7.86 19,9.81 19,12c0,3.87 -3.13,7 -7,7s-7,-3.13 -7,-7c0,-2.19 1.01,-4.14 2.58,-5.42L6.17,5.17C4.23,6.82 3,9.26 3,12c0,4.97 4.03,9 9,9s9,-4.03 9,-9C21,9.26 19.77,6.82 17.83,5.17z" />
+    </group>
+</vector>
