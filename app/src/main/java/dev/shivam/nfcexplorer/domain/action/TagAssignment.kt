@@ -20,6 +20,18 @@ data class TagAssignment(
      * outcome: anything edited since is newer than something never edited at all.
      */
     val updatedAtMillis: Long = 0,
+    /**
+     * Whether this is a tombstone: a record that the tag's assignment was deleted.
+     *
+     * Deletions have to be stored rather than simply dropped, because a row that is merely absent is
+     * indistinguishable from one another device has not seen yet. Without this, a sync restores
+     * whatever you just deleted -- which is exactly what happened in practice.
+     *
+     * A tombstone keeps the label and action it had, so a merge can order it by [updatedAtMillis]
+     * against a real edit like any other record. Everything above the repository filters them out,
+     * so nothing but sync ever sees one.
+     */
+    val deleted: Boolean = false,
 ) {
     init {
         require(!uid.isEmpty) { "a tag always reports a UID" }

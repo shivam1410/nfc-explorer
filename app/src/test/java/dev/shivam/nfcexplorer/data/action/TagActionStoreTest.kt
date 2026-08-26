@@ -233,5 +233,54 @@ class TagActionStoreTest {
 
         assertTrue(warnings().isEmpty(), "got ${warnings().map { it.message }}")
     }
-}
 
+    // --- Deletion leaves a tombstone ---
+
+    /**
+     * Deleting must leave evidence. A row that is merely gone looks exactly like one this device has
+     * never seen, and sync restores it -- which it did, on a real phone, within an hour.
+     */
+    @Test
+    fun `deleting keeps a tombstone that sync can see`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+        store.save(TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example")))
+
+        store.delete(uidA)
+
+        val raw = store.snapshotForSync().single()
+        assertTrue(raw.deleted, "the row must survive as a tombstone")
+        assertEquals(500, raw.updatedAtMillis, "stamped so a merge can order it")
+    }
+
+    @Test
+    fun `a deleted assignment is invisible above the repository`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+        store.save(TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example")))
+
+        store.delete(uidA)
+
+        assertTrue(store.observeAll().first().isEmpty(), "the list must not show it")
+        assertNull(store.find(uidA), "a tap on a deleted tag must do nothing")
+    }
+
+    @Test
+    fun `recreating a deleted tag replaces its tombstone`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+        store.save(TagAssignment(uidA, "Desk", TagAction.LaunchApp("com.example")))
+        store.delete(uidA)
+
+        store.save(TagAssignment(uidA, "Desk again", TagAction.LaunchApp("com.other")))
+
+        assertEquals(listOf("Desk again"), store.observeAll().first().map { it.label })
+        assertEquals(1, store.snapshotForSync().size, "one row per tag, not a pile of tombstones")
+    }
+
+    @Test
+    fun `deleting an unknown tag writes nothing`() = runTest {
+        val store = TagActionStore(FakeDocumentStore(), logger) { 500 }
+
+        store.delete(uidA)
+
+        assertTrue(store.snapshotForSync().isEmpty())
+    }
+}

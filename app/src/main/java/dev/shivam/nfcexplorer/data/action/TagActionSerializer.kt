@@ -57,6 +57,7 @@ object TagActionSerializer {
         label = assignment.label,
         action = actionDto(assignment.action),
         updatedAtMillis = assignment.updatedAtMillis,
+        deleted = assignment.deleted,
     )
 
     /**
@@ -133,6 +134,7 @@ object TagActionSerializer {
             label = dto.label,
             action = action,
             updatedAtMillis = dto.updatedAtMillis,
+            deleted = dto.deleted,
         )
     }.getOrNull()
 
@@ -230,6 +232,7 @@ object TagActionSerializer {
         @SerialName("label") val label: String,
         @SerialName("action") val action: ActionDto,
         @SerialName("updatedAtMillis") val updatedAtMillis: Long = 0,
+        @SerialName("deleted") val deleted: Boolean = false,
     )
 
     /**

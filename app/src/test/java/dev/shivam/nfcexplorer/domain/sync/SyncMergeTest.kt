@@ -112,17 +112,55 @@ class SyncMergeTest {
         assertFalse(result.changed)
     }
 
-    /**
-     * Documented limitation, pinned so it is a decision rather than a surprise: without tombstones a
-     * deletion cannot be told apart from a tag that device has not seen yet.
-     */
+    // --- Deletions ---
+
+    private fun tombstone(last: Int, label: String, at: Long) =
+        assignment(last, label, at).copy(deleted = true)
+
+    /** The case that made tombstones necessary: sync used to restore whatever had been deleted. */
     @Test
-    fun `a deletion on one device does not propagate and is restored`() {
+    fun `a deletion beats the older copy still in the cloud`() {
         val result = SyncMerge.merge(
-            local = emptyList(),
-            cloud = listOf(assignment(1, "DeletedHere", 100)),
+            local = listOf(tombstone(1, "Gone", 200)),
+            cloud = listOf(assignment(1, "Gone", 100)),
         )
 
-        assertEquals(listOf("DeletedHere"), result.merged.map { it.label })
+        val survivor = result.merged.single()
+        assertTrue(survivor.deleted, "the deletion is newer, so it must win")
+    }
+
+    @Test
+    fun `a deletion arriving from the cloud removes the local copy`() {
+        val result = SyncMerge.merge(
+            local = listOf(assignment(1, "Gone", 100)),
+            cloud = listOf(tombstone(1, "Gone", 200)),
+        )
+
+        assertTrue(result.merged.single().deleted)
+        assertEquals(1, result.fromCloud.size, "the tombstone has to be written locally")
+    }
+
+    /** Deleting is not permanent across devices: recreating a tag afterwards must stick. */
+    @Test
+    fun `an edit made after a deletion wins`() {
+        val result = SyncMerge.merge(
+            local = listOf(assignment(1, "Recreated", 300)),
+            cloud = listOf(tombstone(1, "Gone", 200)),
+        )
+
+        val survivor = result.merged.single()
+        assertFalse(survivor.deleted)
+        assertEquals("Recreated", survivor.label)
+    }
+
+    @Test
+    fun `a tombstone only this device has is pushed rather than forgotten`() {
+        val result = SyncMerge.merge(
+            local = listOf(tombstone(1, "Gone", 200)),
+            cloud = emptyList(),
+        )
+
+        assertEquals(1, result.fromLocal.size)
+        assertTrue(result.merged.single().deleted)
     }
 }

@@ -8,7 +8,6 @@ import dev.shivam.nfcexplorer.domain.sync.SyncMerge
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
 import dev.shivam.nfcexplorer.logging.LogEntry
 import dev.shivam.nfcexplorer.logging.SessionLogger
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,7 +35,8 @@ class CloudSyncService @Inject constructor(
 ) : CloudSync {
 
     override suspend fun sync(nowMillis: Long): Result<SyncReport> = runCatching {
-        val local = repository.observeAll().first()
+        // Raw, so tombstones are included: a deletion that sync cannot see cannot propagate.
+        val local = repository.snapshotForSync()
 
         val remoteDocument = cloud.read(CloudStore.ACTIONS_DOCUMENT).getOrThrow()
         val remote = TagActionSerializer.decode(remoteDocument)

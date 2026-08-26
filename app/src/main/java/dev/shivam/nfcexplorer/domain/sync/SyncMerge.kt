@@ -13,10 +13,14 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
  * tag on the phone and a different tag on a tablet loses one of the two edits outright, even though
  * they never touched the same thing.
  *
- * **Deletions do not propagate.** Union-by-newest cannot distinguish "deleted here" from "not yet
- * created here", so a tag deleted on one device is restored by the next sync from another. Fixing
- * that needs tombstones, which is a schema change; until then this errs toward keeping data, because
- * a resurrected assignment is an annoyance and a silently deleted one is a loss.
+ * **Deletions participate like any other edit.** A deleted assignment is kept as a tombstone rather
+ * than dropped, so it carries a timestamp and competes on the same newest-wins rule. That is the
+ * whole reason tombstones exist: an absent row is indistinguishable from one the other device has
+ * never seen, so union-by-newest would restore whatever had just been deleted -- which it did, in
+ * practice, within an hour of sync being switched on.
+ *
+ * Nothing here special-cases them. A tombstone beats an older edit and loses to a newer one, which
+ * is what "the most recent thing the user did wins" means when one of the things is a deletion.
  */
 object SyncMerge {
 
