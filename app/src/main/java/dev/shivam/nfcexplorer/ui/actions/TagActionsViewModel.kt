@@ -248,7 +248,15 @@ class TagActionsViewModel @Inject constructor(
         val uid = draft.uid ?: return
 
         viewModelScope.launch {
-            val assignment = TagAssignment(uid = uid, label = draft.label.trim(), action = action)
+            // Stamped here rather than in the store, because this is the moment a human changed
+            // something. Without it every assignment carries zero and the cloud merge can never
+            // tell which side is newer.
+            val assignment = TagAssignment(
+                uid = uid,
+                label = draft.label.trim(),
+                action = action,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
             report({ repository.save(assignment) }) {
                 backing.update { it.copy(draft = null, problem = null, message = null) }
             }

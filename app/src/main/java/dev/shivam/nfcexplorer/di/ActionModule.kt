@@ -8,6 +8,7 @@ import dev.shivam.nfcexplorer.data.action.TagActionStore
 import dev.shivam.nfcexplorer.data.system.ActiveNotificationProbe
 import dev.shivam.nfcexplorer.data.system.AndroidSystemGrants
 import dev.shivam.nfcexplorer.data.secret.KeystoreSecretStore
+import dev.shivam.nfcexplorer.data.sync.DriveAppDataStore
 import dev.shivam.nfcexplorer.data.toggl.TogglHttpSession
 import dev.shivam.nfcexplorer.data.update.GitHubReleaseSource
 import dev.shivam.nfcexplorer.data.update.PackageInstalledVersion
@@ -16,6 +17,7 @@ import dev.shivam.nfcexplorer.domain.action.AppCatalog
 import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
+import dev.shivam.nfcexplorer.domain.sync.CloudStore
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
 import dev.shivam.nfcexplorer.domain.update.ReleaseSource
@@ -54,6 +56,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindSecretStore(impl: KeystoreSecretStore): SecretStore
+
+    @Binds
+    abstract fun bindCloudStore(impl: DriveAppDataStore): CloudStore
 
     @Binds
     abstract fun bindTogglSession(impl: TogglHttpSession): TogglSession
