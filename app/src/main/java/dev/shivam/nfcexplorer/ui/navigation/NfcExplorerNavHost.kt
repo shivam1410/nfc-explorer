@@ -173,6 +173,9 @@ fun NfcExplorerNavHost(
                     onOpenAccessibilitySettings = settingsViewModel::onOpenAccessibilitySettings,
                     onCheckForUpdates = settingsViewModel::onCheckForUpdates,
                     onOpenRelease = settingsViewModel::onOpenRelease,
+                    onTogglDraftChange = settingsViewModel::onTogglDraftChange,
+                    onSaveTogglToken = settingsViewModel::onSaveTogglToken,
+                    onClearTogglToken = settingsViewModel::onClearTogglToken,
                 )
             }
             composable(Destination.ACTIONS.route) {

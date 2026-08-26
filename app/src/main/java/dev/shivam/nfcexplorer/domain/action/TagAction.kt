@@ -119,6 +119,34 @@ sealed interface TagAction {
     }
 
     /**
+     * Starts a Toggl time entry, or stops the one already running.
+     *
+     * A named integration rather than a generic HTTP action, and worth justifying since [SendIntent]
+     * exists precisely to avoid a plugin per service: an intent cannot carry Basic auth, read a JSON
+     * response, and branch on it. Expressing that generically would mean inventing an HTTP DSL that
+     * only one action would ever use.
+     *
+     * Unlike the Sleep Cycle toggle, this needs no notification and no gesture. Toggl answers
+     * authoritatively what is running, so a timer stopped from the web app is simply not running the
+     * next time a tag is tapped — no local state to drift.
+     *
+     * The credential is deliberately absent from this type. It lives in the encrypted secret store,
+     * never in an action, never in the assignment document, and never on the tag: an Ultralight page
+     * has no read authentication, so a token written there is readable by any phone that touches the
+     * card.
+     */
+    data class TogglToggle(
+        val workspaceId: Long,
+        val description: String,
+        val projectId: Long? = null,
+    ) : Leaf {
+        init {
+            require(workspaceId > 0) { "workspaceId must be positive" }
+            require(projectId == null || projectId > 0) { "projectId, when present, must be positive" }
+        }
+    }
+
+    /**
      * Performs several actions in order, pausing [gapMillis] between them.
      *
      * Exists because a gesture usually cannot be the whole story: something has to put the right

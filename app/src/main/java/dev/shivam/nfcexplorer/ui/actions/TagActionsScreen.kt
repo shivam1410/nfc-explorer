@@ -263,6 +263,20 @@ private fun DraftEditor(
                 }
             }
 
+            ActionType.TOGGL -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = draft.togglWorkspaceId,
+                    onValueChange = { onDraftChange(draft.copy(togglWorkspaceId = it.filter(Char::isDigit))) },
+                    label = { Text(stringResource(R.string.actions_toggl_workspace)) },
+                    isError = state.problem == DraftProblem.MISSING_TARGET,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(R.string.actions_toggl_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
             // Nothing to configure, but the two grants are shown and reachable from here. Without
             // them the tag silently does nothing, and a tap that does nothing for an unstated reason
             // is the failure mode this app works hardest to avoid.
@@ -439,6 +453,7 @@ private fun summarise(action: TagAction, appNameOf: (String) -> String): String 
     is TagAction.SendIntent -> stringResource(R.string.actions_summary_intent, action.action)
     is TagAction.MediaCommand ->
         stringResource(R.string.actions_summary_media, stringResource(action.key.labelRes()))
+    is TagAction.TogglToggle -> stringResource(R.string.actions_summary_toggl, action.description)
     is TagAction.DragGesture -> stringResource(R.string.actions_summary_gesture)
     is TagAction.Steps -> stringResource(R.string.actions_summary_steps, action.steps.size)
     // Named by the app it watches rather than by the mechanism: "Sleep Cycle - start or end" says
@@ -487,6 +502,7 @@ private fun ActionType.labelRes(): Int = when (this) {
     ActionType.SEND_INTENT -> R.string.actions_type_intent
     ActionType.MEDIA -> R.string.actions_type_media
     ActionType.SLEEP_CYCLE -> R.string.actions_type_sleep_cycle
+    ActionType.TOGGL -> R.string.actions_type_toggl
 }
 
 private fun MediaKey.labelRes(): Int = when (this) {

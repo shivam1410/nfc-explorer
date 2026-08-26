@@ -158,6 +158,13 @@
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Granted by you in system settings, and revocable there at any time.</string>
     <string name="settings_about_title">About</string>
+    <string name="settings_toggl_title">Toggl</string>
+    <string name="settings_toggl_set">API token saved on this device.</string>
+    <string name="settings_toggl_unset">No API token saved.</string>
+    <string name="settings_toggl_token">API token</string>
+    <string name="settings_toggl_save">Save</string>
+    <string name="settings_toggl_clear">Clear</string>
+    <string name="settings_toggl_explainer">Encrypted with a key held in this device&#8217;s secure hardware. It is never written to a tag, never exported, and cannot be restored onto another phone — you will enter it once per device.</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_check_updates">Check for updates</string>
     <string name="settings_update_checking">Asking GitHub…</string>
@@ -177,6 +184,10 @@
     <string name="actions_type_intent">Send intent</string>
     <string name="actions_type_media">Media</string>
     <string name="actions_type_sleep_cycle">Sleep Cycle</string>
+    <string name="actions_type_toggl">Toggl</string>
+    <string name="actions_toggl_workspace">Toggl workspace ID</string>
+    <string name="actions_toggl_explainer">One tap starts a timer; tapping again stops whatever is running. The entry is named after this tag&#8217;s label. Add your API token in Settings — it is stored encrypted on this device and never written to the tag.</string>
+    <string name="actions_summary_toggl">Toggl — %1$s</string>
     <string name="actions_grant_notifications">Notification access — to see if a session is running</string>
     <string name="actions_grant_accessibility">Accessibility — to work the slide-to-stop control</string>
     <string name="actions_grant_on">Granted</string>

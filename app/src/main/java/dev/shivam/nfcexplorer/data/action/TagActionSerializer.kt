@@ -85,6 +85,13 @@ object TagActionSerializer {
                 requireForegroundPackage = action.requireForegroundPackage,
             ),
         )
+        is TagAction.TogglToggle -> ActionDto(
+            type = TYPE_TOGGL,
+            workspaceId = action.workspaceId,
+            // Reused rather than a new column: the description is the human label of the entry.
+            intentAction = action.description,
+            projectId = action.projectId,
+        )
         is TagAction.Steps -> ActionDto(
             type = TYPE_STEPS,
             steps = action.steps.map(::actionDto),
@@ -140,6 +147,13 @@ object TagActionSerializer {
             TYPE_MEDIA -> dto.mediaKey
                 ?.let { name -> MediaKey.entries.firstOrNull { it.name == name } }
                 ?.let(TagAction::MediaCommand)
+            TYPE_TOGGL -> dto.workspaceId?.let { workspace ->
+                TagAction.TogglToggle(
+                    workspaceId = workspace,
+                    description = dto.intentAction.orEmpty(),
+                    projectId = dto.projectId,
+                )
+            }
             TYPE_DRAG -> dto.drag?.let { drag ->
                 TagAction.DragGesture(
                     startXRatio = drag.startXRatio,
@@ -168,6 +182,7 @@ object TagActionSerializer {
     private const val TYPE_MEDIA = "media"
     private const val TYPE_DRAG = "dragGesture"
     private const val TYPE_STEPS = "steps"
+    private const val TYPE_TOGGL = "togglToggle"
     private const val TYPE_WHILE_NOTIFICATION = "whileNotificationShowing"
 
     @Serializable
@@ -204,6 +219,8 @@ object TagActionSerializer {
         @SerialName("steps") val steps: List<ActionDto>? = null,
         @SerialName("gapMillis") val gapMillis: Long? = null,
         @SerialName("drag") val drag: DragDto? = null,
+        @SerialName("workspaceId") val workspaceId: Long? = null,
+        @SerialName("projectId") val projectId: Long? = null,
     )
 
     /** Gesture geometry, kept in its own object so [ActionDto] does not sprout eight more columns. */

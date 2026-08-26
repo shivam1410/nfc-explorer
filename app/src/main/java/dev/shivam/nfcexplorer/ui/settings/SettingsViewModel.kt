@@ -8,6 +8,7 @@ import dev.shivam.nfcexplorer.domain.action.SystemGrantState
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.update.AppVersion
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
 import dev.shivam.nfcexplorer.domain.update.ReleaseSource
@@ -23,6 +24,15 @@ data class SettingsUiState(
     val grants: SystemGrantState = SystemGrantState(),
     val version: String = "",
     val update: UpdateStatus = UpdateStatus.Idle,
+    /**
+     * Whether a Toggl token is stored — never the token itself.
+     *
+     * The value is deliberately not lifted into UI state. Anything in state is one careless log or
+     * screenshot away from being visible, and nothing on screen needs it: "set" is the only fact the
+     * user is asking about.
+     */
+    val togglTokenSet: Boolean = false,
+    val togglDraft: String = "",
 )
 
 /**
@@ -37,6 +47,7 @@ class SettingsViewModel @Inject constructor(
     private val grants: SystemGrants,
     private val performer: ActionPerformer,
     private val releases: ReleaseSource,
+    private val secrets: SecretStore,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -45,6 +56,24 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refreshGrants()
+        backing.update { it.copy(togglTokenSet = secrets.has(SecretStore.TOGGL_TOKEN)) }
+    }
+
+    fun onTogglDraftChange(value: String) {
+        backing.update { it.copy(togglDraft = value) }
+    }
+
+    /** Saves the token and immediately forgets the draft, so it does not linger in UI state. */
+    fun onSaveTogglToken() {
+        val token = backing.value.togglDraft.trim()
+        if (token.isBlank()) return
+        secrets.write(SecretStore.TOGGL_TOKEN, token)
+        backing.update { it.copy(togglDraft = "", togglTokenSet = true) }
+    }
+
+    fun onClearTogglToken() {
+        secrets.clear(SecretStore.TOGGL_TOKEN)
+        backing.update { it.copy(togglDraft = "", togglTokenSet = false) }
     }
 
     /** Re-read on every resume: both grants are made outside the app and revocable at any time. */

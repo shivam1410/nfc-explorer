@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
@@ -34,6 +36,9 @@ fun SettingsScreen(
     onOpenAccessibilitySettings: () -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenRelease: (String) -> Unit,
+    onTogglDraftChange: (String) -> Unit,
+    onSaveTogglToken: () -> Unit,
+    onClearTogglToken: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -56,6 +61,38 @@ fun SettingsScreen(
                 granted = state.grants.gestureService,
                 labelRes = R.string.actions_grant_accessibility,
                 onOpen = onOpenAccessibilitySettings,
+            )
+        }
+
+        SectionCard(
+            title = stringResource(R.string.settings_toggl_title),
+            subtitle = stringResource(
+                if (state.togglTokenSet) R.string.settings_toggl_set
+                else R.string.settings_toggl_unset,
+            ),
+        ) {
+            OutlinedTextField(
+                value = state.togglDraft,
+                onValueChange = onTogglDraftChange,
+                label = { Text(stringResource(R.string.settings_toggl_token)) },
+                // Masked, and never echoed back after saving: the stored value is not readable here.
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onSaveTogglToken,
+                    enabled = state.togglDraft.isNotBlank(),
+                ) { Text(stringResource(R.string.settings_toggl_save)) }
+                TextButton(
+                    onClick = onClearTogglToken,
+                    enabled = state.togglTokenSet,
+                ) { Text(stringResource(R.string.settings_toggl_clear)) }
+            }
+            Text(
+                text = stringResource(R.string.settings_toggl_explainer),
+                style = MaterialTheme.typography.bodySmall,
             )
         }
 
