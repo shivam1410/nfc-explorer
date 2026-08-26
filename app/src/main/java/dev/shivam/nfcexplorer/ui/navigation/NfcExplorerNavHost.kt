@@ -57,8 +57,8 @@ private enum class Destination(
     // app is opened for day to day, while the inspection screens matter only with a card in hand.
     ACTIONS("actions", R.string.nav_actions, R.drawable.ic_nav_actions),
     LOG("log", R.string.nav_log, R.drawable.ic_nav_log),
-    SETTINGS("settings", R.string.nav_settings, R.drawable.ic_nav_settings),
     DISCOVERY("discovery", R.string.nav_discovery, R.drawable.ic_nav_tag),
+    SETTINGS("settings", R.string.nav_settings, R.drawable.ic_nav_settings),
 }
 
 /**
