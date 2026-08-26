@@ -34,12 +34,16 @@ import androidx.compose.ui.unit.dp
 import dev.shivam.nfcexplorer.R
 
 /**
- * An expandable titled card.
+ * A titled card, optionally expandable.
  *
  * The header row is the whole clickable area and is at least 48 dp tall, so it stays a comfortable
  * touch target despite the dense content these cards usually hold. Descendants are merged for
  * accessibility so a screen reader announces "title, collapsed" as one control rather than reading
  * the title and the chevron separately.
+ *
+ * [collapsible] exists for sections that are always worth reading. Collapsing earns its place on the
+ * tag screens, where a memory dump is long and mostly skimmed; it does not on a settings section of
+ * three controls, where a chevron only adds a way to hide the thing the user came to find.
  */
 @Composable
 fun SectionCard(
@@ -47,11 +51,13 @@ fun SectionCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     initiallyExpanded: Boolean = true,
+    collapsible: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    val isOpen = expanded || !collapsible
     val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
+        targetValue = if (isOpen) 180f else 0f,
         label = "sectionChevron",
     )
     val toggleLabel = stringResource(
@@ -69,8 +75,17 @@ fun SectionCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
-                    .semantics(mergeDescendants = true) {}
+                    // A fixed card has no toggle, so the header is not a control and must not
+                    // advertise itself as one to a screen reader.
+                    .then(
+                        if (collapsible) {
+                            Modifier
+                                .clickable(onClickLabel = toggleLabel) { expanded = !expanded }
+                                .semantics(mergeDescendants = true) {}
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -84,20 +99,22 @@ fun SectionCard(
                         )
                     }
                 }
-                Icon(
-                    painter = painterResource(R.drawable.ic_chevron_down),
+                if (collapsible) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_down),
                     // Null: the header row already carries the action and its label, so a
                     // description here would make the screen reader announce it twice.
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .rotate(chevronRotation),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(chevronRotation),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             AnimatedVisibility(
-                visible = expanded,
+                visible = isOpen,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
