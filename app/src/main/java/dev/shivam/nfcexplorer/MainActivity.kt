@@ -16,6 +16,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.shivam.nfcexplorer.data.nfc.NfcAvailability
 import dev.shivam.nfcexplorer.data.nfc.NfcReaderModeController
 import dev.shivam.nfcexplorer.logging.SessionLogcatMirror
+import dev.shivam.nfcexplorer.ui.haptics.ScanFeedback
 import dev.shivam.nfcexplorer.ui.haptics.ScanHapticFeedback
 import dev.shivam.nfcexplorer.ui.navigation.NfcExplorerNavHost
 import dev.shivam.nfcexplorer.ui.scan.ScanCapability
@@ -61,6 +62,11 @@ class MainActivity : ComponentActivity() {
                 NfcExplorerNavHost(
                     state = state,
                     lastReport = report,
+                    // Only a completed dump counts as "the user tapped a card to assign it".
+                    scanToken = haptic
+                        ?.takeIf { it.feedback == ScanFeedback.CAPTURED }
+                        ?.token
+                        ?: 0L,
                     writeViewModel = writeViewModel,
                     onOpenNfcSettings = ::openNfcSettings,
                 )

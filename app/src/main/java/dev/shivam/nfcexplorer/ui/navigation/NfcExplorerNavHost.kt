@@ -37,6 +37,10 @@ import dev.shivam.nfcexplorer.ui.log.SessionLogViewModel
 import dev.shivam.nfcexplorer.ui.memory.MemoryExplorerScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanScreen
 import dev.shivam.nfcexplorer.ui.scan.ScanUiState
+import androidx.activity.ComponentActivity
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.ui.platform.LocalContext
+import dev.shivam.nfcexplorer.ui.actions.TagEditorScreen
 import dev.shivam.nfcexplorer.ui.actions.TagActionsScreen
 import dev.shivam.nfcexplorer.ui.discovery.DiscoveryScreen
 import dev.shivam.nfcexplorer.ui.discovery.DiscoverySection
@@ -47,6 +51,9 @@ import dev.shivam.nfcexplorer.ui.actions.TagActionsViewModel
 import dev.shivam.nfcexplorer.ui.taginfo.TagInfoScreen
 import dev.shivam.nfcexplorer.ui.write.WriteScreen
 import dev.shivam.nfcexplorer.ui.write.WriteViewModel
+
+/** The add/edit page. Not a bottom-nav peer: it is pushed over one, and popped when done. */
+private const val EDITOR_ROUTE = "editor"
 
 private enum class Destination(
     val route: String,
@@ -76,6 +83,14 @@ private enum class Destination(
 fun NfcExplorerNavHost(
     state: ScanUiState,
     lastReport: TagReport?,
+    /**
+     * Changes once per completed scan.
+     *
+     * [lastReport] cannot serve as the trigger: it is a conflated `StateFlow` of a data class, so
+     * re-tapping the same card produces an equal value and emits nothing. The scan surface already
+     * solved this for haptics with a monotonic token; the add flow reuses it.
+     */
+    scanToken: Long,
     writeViewModel: WriteViewModel,
     onOpenNfcSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -84,8 +99,30 @@ fun NfcExplorerNavHost(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
+    // Activity-scoped rather than per-route: the list and the editor are two routes over one piece
+    // of state, and a route-scoped view model would drop the draft on the way between them.
+    val actionsOwner = LocalContext.current as ComponentActivity
+    val actionsViewModel: TagActionsViewModel = hiltViewModel(actionsOwner)
+    val actionsState by actionsViewModel.state.collectAsStateWithLifecycle()
+
+    fun openEditor() = navController.navigate(EDITOR_ROUTE) { launchSingleTop = true }
+
     Scaffold(
         modifier = modifier,
+        floatingActionButton = {
+            // Actions only: the other tabs are for reading a card, not binding one.
+            if (currentDestination?.hierarchy?.any { it.route == Destination.ACTIONS.route } == true) {
+                FloatingActionButton(onClick = {
+                    actionsViewModel.onStartAddFlow()
+                    openEditor()
+                }) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_add),
+                        contentDescription = stringResource(R.string.actions_add_title),
+                    )
+                }
+            }
+        },
         bottomBar = {
             NavigationBar {
                 Destination.entries.forEach { destination ->
@@ -197,23 +234,45 @@ fun NfcExplorerNavHost(
                 )
             }
             composable(Destination.ACTIONS.route) {
-                val actionsViewModel: TagActionsViewModel = hiltViewModel()
-                val actionsState by actionsViewModel.state.collectAsStateWithLifecycle()
                 TagActionsScreen(
                     state = actionsState,
                     lastScannedUid = lastReport?.identity?.uid,
-                    onCreateFor = actionsViewModel::onCreateFor,
-                    onEdit = actionsViewModel::onEdit,
-                    onDraftChange = actionsViewModel::onDraftChange,
-                    onSave = actionsViewModel::onSave,
-                    onCancel = actionsViewModel::onCancel,
+                    onCreateFor = { uid ->
+                        actionsViewModel.onCreateFor(uid)
+                        if (uid != null) openEditor()
+                    },
+                    onEdit = { assignment ->
+                        actionsViewModel.onEdit(assignment)
+                        openEditor()
+                    },
                     onDelete = actionsViewModel::onDelete,
                     onTest = actionsViewModel::onTest,
+                )
+            }
+            composable(EDITOR_ROUTE) {
+                // Keyed on the token so a repeat tap of the same card still counts, and so a tag
+                // already sitting in lastReport does not silently skip the "hold a tag" step.
+                LaunchedEffect(scanToken) {
+                    lastReport?.identity?.uid?.let(actionsViewModel::onTagScanned)
+                }
+
+                TagEditorScreen(
+                    state = actionsState,
+                    onDraftChange = actionsViewModel::onDraftChange,
+                    onSave = {
+                        actionsViewModel.onSave()
+                        navController.popBackStack()
+                    },
+                    onCancel = {
+                        actionsViewModel.onLeaveAddFlow()
+                        navController.popBackStack()
+                    },
                     onTestDraft = actionsViewModel::onTestDraft,
                     onAppQueryChange = actionsViewModel::onAppQueryChange,
                     onPickApp = actionsViewModel::onPickApp,
                     onTypeChange = actionsViewModel::onTypeChange,
                     onSchemeChange = actionsViewModel::onSchemeChange,
+                    onEditScanned = actionsViewModel::onEditScannedTag,
                 )
             }
             composable(Destination.LOG.route) {
