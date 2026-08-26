@@ -31,8 +31,8 @@ android {
         applicationId = "dev.shivam.nfcexplorer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.6.2"
+        versionCode = 18
+        versionName = "0.8.0"
     }
 
     buildTypes {

@@ -116,12 +116,13 @@ class DriveAppDataStore @Inject constructor(
         body: String?,
     ): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            // HttpURLConnection rejects PATCH; the override header is how Google accepts it.
-            if (method == "PATCH") {
+            // A real PATCH. Android's HttpURLConnection is OkHttp-backed and accepts it; only the
+            // desktop JDK refuses. The X-HTTP-Method-Override header this used to send instead was
+            // answered by Toggl with a flat 405, so stopping a timer never worked -- the fallback
+            // stays only for a runtime that genuinely will not take the verb.
+            runCatching { requestMethod = method }.onFailure {
                 requestMethod = "POST"
-                setRequestProperty("X-HTTP-Method-Override", "PATCH")
-            } else {
-                requestMethod = method
+                setRequestProperty("X-HTTP-Method-Override", method)
             }
             connectTimeout = TIMEOUT_MILLIS
             readTimeout = TIMEOUT_MILLIS

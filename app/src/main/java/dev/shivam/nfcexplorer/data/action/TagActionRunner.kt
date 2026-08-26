@@ -13,7 +13,9 @@ import dev.shivam.nfcexplorer.domain.action.IntentSpec
 import dev.shivam.nfcexplorer.domain.action.IntentSpecMapper
 import dev.shivam.nfcexplorer.domain.action.NotificationProbe
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.toggl.TogglOutcome
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
+import dev.shivam.nfcexplorer.logging.SessionLogger
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,28 +38,96 @@ class TagActionRunner @Inject constructor(
     private val notifications: NotificationProbe,
     private val gestures: ScreenGestureDispatcher,
     private val toggl: TogglSession,
+    private val logger: SessionLogger,
 ) : ActionPerformer {
 
     override suspend fun perform(action: TagAction): Result<Unit> =
         when (val resolution = ActionResolver.resolve(action, notifications)) {
             // The state a toggle depends on could not be read. Doing nothing and saying why beats
             // guessing, because the wrong guess ends a night's recording or starts a second session.
-            is ActionResolver.Resolution.Refused ->
+            is ActionResolver.Resolution.Refused -> {
+                logger.warn(
+                    category = CATEGORY,
+                    message = "refused: could not read the state this action depends on",
+                    payload = mapOf("reason" to resolution.reason),
+                )
                 Result.failure(IllegalStateException(resolution.reason))
+            }
 
-            is ActionResolver.Resolution.Perform ->
+            is ActionResolver.Resolution.Perform -> {
+                // Which branch a toggle took is the first thing worth knowing when it does the
+                // opposite of what was expected.
+                if (action is TagAction.WhileNotificationShowing) {
+                    logger.info(
+                        category = CATEGORY,
+                        message = "toggle resolved",
+                        payload = mapOf(
+                            "watching" to action.packageName,
+                            "branch" to if (resolution.leaf == action.showing) "running" else "idle",
+                        ),
+                    )
+                }
                 run(IntentSpecMapper.map(resolution.leaf))
+            }
         }
 
     private suspend fun run(spec: IntentSpec): Result<Unit> = runCatching {
         when (spec) {
-            is IntentSpec.LaunchPackage -> launch(spec.packageName)
-            is IntentSpec.ActivityIntent -> startActivity(spec)
-            is IntentSpec.MediaKeyEvent -> dispatchMediaKey(spec.keyCode)
-            is IntentSpec.Drag -> gestures.perform(spec).getOrThrow()
-            is IntentSpec.TapNode -> gestures.tap(spec).getOrThrow()
-            is IntentSpec.TogglTimer ->
-                toggl.toggle(spec.description, spec.tags, spec.projectId).getOrThrow()
+            is IntentSpec.LaunchPackage -> {
+                launch(spec.packageName)
+                note("launched app", mapOf("package" to spec.packageName))
+            }
+
+            is IntentSpec.ActivityIntent -> {
+                startActivity(spec)
+                note(
+                    "sent intent",
+                    mapOf("action" to spec.action, "uri" to (spec.uri ?: "none")),
+                )
+            }
+
+            is IntentSpec.MediaKeyEvent -> {
+                dispatchMediaKey(spec.keyCode)
+                note("media key", mapOf("keyCode" to spec.keyCode.toString()))
+            }
+
+            is IntentSpec.Drag -> {
+                gestures.perform(spec).getOrThrow()
+                note(
+                    "dragged",
+                    mapOf(
+                        "from" to "${spec.startXRatio}, ${spec.startYRatio}",
+                        "to" to "${spec.endXRatio}, ${spec.endYRatio}",
+                        "requires" to (spec.requireForegroundPackage ?: "any app"),
+                    ),
+                )
+            }
+
+            is IntentSpec.TapNode -> {
+                gestures.tap(spec).getOrThrow()
+                note(
+                    "tapped control",
+                    mapOf("target" to (spec.viewId ?: spec.contentDescription ?: "")),
+                )
+            }
+
+            is IntentSpec.TogglTimer -> {
+                val outcome = toggl.toggle(spec.description, spec.tags, spec.projectId).getOrThrow()
+                when (outcome) {
+                    is TogglOutcome.Started -> note(
+                        "Toggl timer started",
+                        mapOf(
+                            "description" to outcome.description,
+                            "tags" to spec.tags.joinToString(", ").ifEmpty { "none" },
+                        ),
+                    )
+                    is TogglOutcome.Stopped -> note(
+                        "Toggl timer stopped",
+                        mapOf("entry" to outcome.entryId.toString()),
+                    )
+                }
+            }
+
             is IntentSpec.Sequence -> runSequence(spec)
         }
         Unit
@@ -73,8 +143,14 @@ class TagActionRunner @Inject constructor(
     private suspend fun runSequence(spec: IntentSpec.Sequence) {
         spec.specs.forEachIndexed { index, step ->
             if (index > 0) delay(spec.gapMillis)
+            note("step ${index + 1} of ${spec.specs.size}", emptyMap())
             run(step).getOrThrow()
         }
+    }
+
+    /** One line per thing actually done, so the log reads as a record rather than an intention. */
+    private fun note(what: String, detail: Map<String, String>) {
+        logger.info(category = CATEGORY, message = what, payload = detail)
     }
 
     private fun launch(packageName: String) {
@@ -102,6 +178,10 @@ class TagActionRunner @Inject constructor(
         }
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+    }
+
+    private companion object {
+        const val CATEGORY = "action"
     }
 
     /** Started from a no-UI activity that finishes immediately, so a new task is required. */

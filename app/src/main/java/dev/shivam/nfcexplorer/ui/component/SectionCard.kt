@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,11 @@ fun SectionCard(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    /**
+     * Drawn before the title. A slot rather than a drawable id, because some cards front a real app
+     * icon loaded from the package manager rather than one of this app's vectors.
+     */
+    icon: (@Composable () -> Unit)? = null,
     initiallyExpanded: Boolean = true,
     collapsible: Boolean = true,
     content: @Composable () -> Unit,
@@ -89,6 +95,10 @@ fun SectionCard(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (icon != null) {
+                    icon()
+                    Spacer(Modifier.size(12.dp))
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = title, style = MaterialTheme.typography.titleMedium)
                     if (subtitle != null) {
