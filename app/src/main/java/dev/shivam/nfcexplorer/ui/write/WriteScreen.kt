@@ -59,7 +59,9 @@ fun WriteScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SectionCard(title = stringResource(R.string.write_source)) {
+        SectionCard(title = stringResource(R.string.write_source),
+            collapsible = false,
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WriteMode.entries.forEach { mode ->
                     FilterChip(
@@ -112,6 +114,7 @@ fun WriteScreen(
                 state.endPage,
                 state.capacityBytes,
             ),
+            collapsible = false,
         ) {
             PageRangePicker(state = state, onRangeChange = onRangeChange)
         }
@@ -120,6 +123,7 @@ fun WriteScreen(
             SectionCard(
                 title = stringResource(R.string.write_preview),
                 initiallyExpanded = true,
+                collapsible = false,
             ) {
                 encoded.forEachIndexed { offset, page ->
                     Text(
@@ -259,6 +263,7 @@ private fun ResultCard(result: WriteBatchResult) {
             result.writtenCount,
             result.pagesRequested,
         ),
+        collapsible = false,
     ) {
         StatusChip(
             text = stringResource(

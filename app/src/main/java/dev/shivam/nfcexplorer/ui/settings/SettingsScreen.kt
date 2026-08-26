@@ -85,14 +85,15 @@ fun SettingsScreen(
             )
         }
 
-        SectionCard(
-            title = stringResource(R.string.settings_deleted_title),
-            subtitle = stringResource(R.string.settings_deleted_count, state.deleted.size),
-            collapsible = false,
-        ) {
-            TextButton(onClick = onOpenDeleted) {
-                Text(stringResource(R.string.settings_deleted_open))
-            }
+        // Only when there is something to restore, and the card is the control: a section that
+        // exists to be opened does not need a button inside it saying so.
+        if (state.deleted.isNotEmpty()) {
+            SectionCard(
+                title = stringResource(R.string.settings_deleted_title),
+                subtitle = stringResource(R.string.settings_deleted_count, state.deleted.size),
+                collapsible = false,
+                onClick = onOpenDeleted,
+            )
         }
 
         SectionCard(
