@@ -310,12 +310,27 @@ internal fun DraftEditor(
                 )
             }
 
-            // Nothing to configure: the workspace lives in settings and the entry is named
-            // after this tag.
-            ActionType.TOGGL -> Text(
-                text = stringResource(R.string.actions_toggl_explainer),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            ActionType.TOGGL -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = draft.togglDescription,
+                    onValueChange = { onDraftChange(draft.copy(togglDescription = it)) },
+                    label = { Text(stringResource(R.string.actions_toggl_description)) },
+                    placeholder = { Text(draft.label.ifBlank { "" }) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = draft.togglTags,
+                    onValueChange = { onDraftChange(draft.copy(togglTags = it)) },
+                    label = { Text(stringResource(R.string.actions_toggl_tags)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(R.string.actions_toggl_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
 
             // No form: the preset has nothing to configure. The permissions it needs live in
             // Settings rather than being restated on every editor that happens to select it.

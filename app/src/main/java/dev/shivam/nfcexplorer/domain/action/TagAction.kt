@@ -170,10 +170,19 @@ sealed interface TagAction {
      */
     data class TogglToggle(
         val description: String,
+        /**
+         * Toggl tags applied to the entry, by name.
+         *
+         * A list rather than one string because Toggl's own model is a list, and because a timer
+         * started by a card is exactly the sort a user later wants to filter by more than one thing.
+         * Blank names are rejected: Toggl would create a tag literally called " ".
+         */
+        val tags: List<String> = emptyList(),
         val projectId: Long? = null,
     ) : Leaf {
         init {
             require(projectId == null || projectId > 0) { "projectId, when present, must be positive" }
+            require(tags.none { it.isBlank() }) { "tag names must not be blank" }
         }
     }
 

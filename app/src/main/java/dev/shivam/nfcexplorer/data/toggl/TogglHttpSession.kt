@@ -36,6 +36,7 @@ class TogglHttpSession @Inject constructor(
 
     override suspend fun toggle(
         description: String,
+        tags: List<String>,
         projectId: Long?,
     ): Result<TogglOutcome> = withContext(io) {
         runCatching {
@@ -52,7 +53,7 @@ class TogglHttpSession @Inject constructor(
                 stop(auth, current.workspaceId ?: workspaceId, current.id)
                 TogglOutcome.Stopped(current.id)
             } else {
-                start(auth, workspaceId, description, projectId)
+                start(auth, workspaceId, description, tags, projectId)
                 TogglOutcome.Started(description)
             }
         }
@@ -84,9 +85,15 @@ class TogglHttpSession @Inject constructor(
         return json.decodeFromString(EntryDto.serializer(), body)
     }
 
-    private fun start(auth: String, workspaceId: Long, description: String, projectId: Long?) {
+    private fun start(
+        auth: String,
+        workspaceId: Long,
+        description: String,
+        tags: List<String>,
+        projectId: Long?,
+    ) {
         val nowSeconds = System.currentTimeMillis() / 1_000
-        val payload = TogglProtocol.startBody(workspaceId, description, projectId, nowSeconds)
+        val payload = TogglProtocol.startBody(workspaceId, description, tags, projectId, nowSeconds)
         request("POST", TogglProtocol.startPath(workspaceId), auth, payload)
     }
 

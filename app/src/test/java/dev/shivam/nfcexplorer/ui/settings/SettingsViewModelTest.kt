@@ -92,7 +92,7 @@ class SettingsViewModelTest {
     private class FakeToggl(
         var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
     ) : TogglSession {
-        override suspend fun toggle(description: String, projectId: Long?) =
+        override suspend fun toggle(description: String, tags: List<String>, projectId: Long?) =
             Result.success<TogglOutcome>(TogglOutcome.Started(description))
         override suspend fun account(): Result<TogglAccount> = account
     }

@@ -60,6 +60,7 @@ object TogglProtocol {
     fun startBody(
         workspaceId: Long,
         description: String,
+        tags: List<String>,
         projectId: Long?,
         startEpochSeconds: Long,
     ): String = buildString {
@@ -67,6 +68,16 @@ object TogglProtocol {
         append("\"created_with\":\"").append(USER_AGENT).append("\",")
         append("\"workspace_id\":").append(workspaceId).append(",")
         append("\"description\":\"").append(escape(description)).append("\",")
+        if (tags.isNotEmpty()) {
+            // Names, not ids: Toggl creates a tag it has not seen before, so a card can introduce
+            // one without the user having to make it in the web app first.
+            append("\"tags\":[")
+            tags.forEachIndexed { index, tag ->
+                if (index > 0) append(",")
+                append("\"").append(escape(tag)).append("\"")
+            }
+            append("],")
+        }
         projectId?.let { append("\"project_id\":").append(it).append(",") }
         append("\"start\":\"").append(isoUtc(startEpochSeconds)).append("\",")
         append("\"duration\":").append(-startEpochSeconds)
@@ -109,7 +120,11 @@ interface TogglSession {
      * The workspace comes from settings rather than from the caller, so every tag targets the same
      * account and changing it is a single edit.
      */
-    suspend fun toggle(description: String, projectId: Long?): Result<TogglOutcome>
+    suspend fun toggle(
+        description: String,
+        tags: List<String>,
+        projectId: Long?,
+    ): Result<TogglOutcome>
 
     /**
      * Reads the account the saved token belongs to, caching its default workspace.

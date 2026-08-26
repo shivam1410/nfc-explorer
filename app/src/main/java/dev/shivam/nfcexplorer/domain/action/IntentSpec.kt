@@ -50,6 +50,7 @@ sealed interface IntentSpec {
     /** Start or stop a Toggl timer. The token is resolved by the adapter, never carried here. */
     data class TogglTimer(
         val description: String,
+        val tags: List<String>,
         val projectId: Long?,
     ) : IntentSpec
 
@@ -151,6 +152,7 @@ object IntentSpecMapper {
 
         is TagAction.TogglToggle -> IntentSpec.TogglTimer(
             description = action.description,
+            tags = action.tags,
             projectId = action.projectId,
         )
 
