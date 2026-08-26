@@ -105,9 +105,13 @@ private fun Message(title: String, body: String) {
  *
  * The one piece of decorative motion in the app, and it earns its place: it is the only signal
  * that the app is actively listening, since NFC gives no other feedback until a tag arrives.
+ *
+ * Shared with the add-a-tag page rather than reimplemented there. Both screens are asking for the
+ * same physical act, and two hand-rolled pulses would drift into two different answers to "is it
+ * listening?" -- which is precisely what happened before this was hoisted.
  */
 @Composable
-private fun ScanPulse() {
+internal fun ScanPulse() {
     val transition = rememberInfiniteTransition(label = "scanPulse")
     val progress by transition.animateFloat(
         initialValue = 0f,

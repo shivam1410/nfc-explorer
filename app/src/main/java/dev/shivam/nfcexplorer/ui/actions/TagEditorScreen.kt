@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.Box
+import dev.shivam.nfcexplorer.ui.scan.ScanPulse
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,6 +60,16 @@ fun TagEditorScreen(
     onScanAnother: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val draft = state.draft
+
+    // The waiting state is not a form, so it does not live in the form's scrolling column: it takes
+    // the whole page and centres in it, which is what makes it read as a prompt rather than as the
+    // first item of a list.
+    if (state.addTag is AddTagState.WaitingForTag) {
+        WaitingForTag(modifier)
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -63,10 +77,7 @@ fun TagEditorScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val draft = state.draft
         when {
-            state.addTag is AddTagState.WaitingForTag -> WaitingForTag()
-
             state.addTag is AddTagState.AlreadyAssigned -> AlreadyAssigned(
                 assignment = state.addTag.assignment,
                 onEdit = onEditScanned,
@@ -106,76 +117,40 @@ fun TagEditorScreen(
 }
 
 /**
- * The waiting state: rings pulsing outward from a centre, and one line saying why.
+ * The waiting state: the same pulse the scan screen uses, centred, with one line saying why.
  *
- * Animated rather than a static card on purpose. This screen is asking the user to do something
- * physical with their hands, and a motionless panel of text reads as a finished page rather than as
- * a prompt. Movement is what says "the app is listening, now tap".
- *
- * Three rings staggered across one cycle, each expanding and fading. Kept cheap: a single Canvas and
- * three float animations, no recomposition per frame beyond the draw.
+ * Deliberately identical to Discovery's "ready to scan" -- same rings, same contactless glyph. The
+ * two screens ask for the same physical act, so looking different taught the user nothing and made
+ * the add page read as a lesser thing.
  */
 @Composable
-private fun WaitingForTag() {
-    val transition = rememberInfiniteTransition(label = "waiting")
-    val phases = List(RING_COUNT) { index ->
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(RING_CYCLE_MILLIS, easing = LinearEasing),
-                // Staggered so the rings chase each other rather than pulsing as one blob.
-                initialStartOffset = StartOffset(index * RING_CYCLE_MILLIS / RING_COUNT),
-            ),
-            label = "ring$index",
-        )
-    }
-
-    val ringColour = MaterialTheme.colorScheme.primary
-
+private fun WaitingForTag(modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 48.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        Canvas(modifier = Modifier.size(RING_FIELD)) {
-            val centre = Offset(size.width / 2f, size.height / 2f)
-            val maxRadius = size.minDimension / 2f
-
-            phases.forEach { phase ->
-                val progress = phase.value
-                drawCircle(
-                    color = ringColour,
-                    radius = maxRadius * progress,
-                    center = centre,
-                    // Fades as it grows, so the outermost ring dissolves rather than clipping.
-                    alpha = (1f - progress).coerceIn(0f, 1f) * RING_MAX_ALPHA,
-                    style = Stroke(width = RING_STROKE.toPx()),
-                )
-            }
-            drawCircle(color = ringColour, radius = CORE_RADIUS.toPx(), center = centre)
+        // Box so the glyph sits inside the rings rather than below them.
+        Box(contentAlignment = Alignment.Center) {
+            ScanPulse()
         }
-
+        Spacer(Modifier.size(28.dp))
         Text(
             text = stringResource(R.string.actions_add_subtitle),
             style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.size(8.dp))
         Text(
             text = stringResource(R.string.actions_add_waiting),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
-
-private const val RING_COUNT = 3
-private const val RING_CYCLE_MILLIS = 1_800
-private const val RING_MAX_ALPHA = 0.55f
-private val RING_FIELD = 176.dp
-private val RING_STROKE = 2.dp
-private val CORE_RADIUS = 6.dp
 
 /**
  * The tag already does something.
