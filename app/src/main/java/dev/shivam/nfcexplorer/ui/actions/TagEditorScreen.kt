@@ -13,7 +13,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.layout.Box
 import dev.shivam.nfcexplorer.ui.scan.ScanPulse
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -132,10 +131,9 @@ private fun WaitingForTag(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // Box so the glyph sits inside the rings rather than below them.
-        Box(contentAlignment = Alignment.Center) {
-            ScanPulse()
-        }
+        // Called bare, exactly as the scan screen calls it. Wrapping it in a centring Box made the
+        // glyph overlap the rings, which is the difference that made the two screens look unrelated.
+        ScanPulse()
         Spacer(Modifier.size(28.dp))
         Text(
             text = stringResource(R.string.actions_add_subtitle),
