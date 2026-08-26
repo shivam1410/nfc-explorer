@@ -122,10 +122,21 @@ class CloudSyncService @Inject constructor(
         val synced = activityLog.entries.value.filter { LogRetention.syncs(it.category) }
         if (synced.isEmpty()) return 0
 
-        cloud.write(
-            LogRetention.activityDocument(deviceId.value),
-            encode(synced),
-        ).getOrThrow()
+        val document = LogRetention.activityDocument(deviceId.value)
+        cloud.write(document, encode(synced)).getOrThrow()
+
+        // Logged because the upload was the one step of a sync that left no trace of itself: the
+        // merge said what it reconciled and the prune said what it removed, but what actually went
+        // into the user's Drive could only be inferred from the run not having thrown.
+        logger.info(
+            category = CATEGORY,
+            message = "uploaded taps",
+            payload = mapOf(
+                "document" to document,
+                "entries" to synced.size.toString(),
+                "held" to activityLog.entries.value.size.toString(),
+            ),
+        )
         return 1
     }
 
