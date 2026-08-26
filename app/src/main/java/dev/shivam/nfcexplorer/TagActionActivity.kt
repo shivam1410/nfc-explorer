@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dev.shivam.nfcexplorer.data.nfc.AndroidNfcATransport
 import dev.shivam.nfcexplorer.data.nfc.AndroidUltralightTransport
+import dev.shivam.nfcexplorer.di.ApplicationScope
 import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.TagActionDispatch
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
@@ -19,6 +20,7 @@ import dev.shivam.nfcexplorer.domain.action.TagPresence
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.transport.TagTransport
 import dev.shivam.nfcexplorer.logging.SessionLogger
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,6 +52,16 @@ class TagActionActivity : ComponentActivity() {
     @Inject lateinit var performer: ActionPerformer
 
     @Inject lateinit var logger: SessionLogger
+
+    /**
+     * Actions run here, not in `lifecycleScope`.
+     *
+     * This activity finishes as soon as it has decided what to do, and anything still suspended in
+     * its own scope dies with it. Ending a sleep session takes a couple of seconds -- raise the
+     * screen, wait, drag -- so running it here is the difference between the tag working and the log
+     * reading `JobCancellationException`.
+     */
+    @Inject @ApplicationScope lateinit var actionScope: CoroutineScope
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,16 +111,20 @@ class TagActionActivity : ComponentActivity() {
                     message = "running assigned action",
                     payload = mapOf("uid" to uid.toString(), "label" to assignment.label),
                 )
-                performer.perform(assignment.action).onFailure { failure ->
-                    logger.error(
-                        category = CATEGORY,
-                        message = "action failed",
-                        payload = mapOf(
-                            "label" to assignment.label,
-                            "exception" to (failure::class.simpleName ?: "Throwable"),
-                            "message" to (failure.message ?: ""),
-                        ),
-                    )
+                // Deliberately not awaited: this activity is about to finish, and awaiting here
+                // would put the wait back inside the scope that dies with it.
+                actionScope.launch {
+                    performer.perform(assignment.action).onFailure { failure ->
+                        logger.error(
+                            category = CATEGORY,
+                            message = "action failed",
+                            payload = mapOf(
+                                "label" to assignment.label,
+                                "exception" to (failure::class.simpleName ?: "Throwable"),
+                                "message" to (failure.message ?: ""),
+                            ),
+                        )
+                    }
                 }
             }
 

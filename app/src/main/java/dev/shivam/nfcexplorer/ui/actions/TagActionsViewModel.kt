@@ -8,6 +8,9 @@ import dev.shivam.nfcexplorer.domain.action.AppCatalog
 import dev.shivam.nfcexplorer.domain.action.InstalledApp
 import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.SleepCycle
+import dev.shivam.nfcexplorer.domain.action.SystemGrantState
+import dev.shivam.nfcexplorer.domain.action.SystemGrants
+import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
@@ -52,6 +55,7 @@ data class TagActionsUiState(
     val message: String? = null,
     val apps: List<InstalledApp> = emptyList(),
     val appQuery: String = "",
+    val grants: SystemGrantState = SystemGrantState(),
 ) {
     val isEditing: Boolean get() = draft != null
     val canSave: Boolean get() = draft != null && problem == null
@@ -88,6 +92,7 @@ class TagActionsViewModel @Inject constructor(
     private val repository: TagActionRepository,
     private val performer: ActionPerformer,
     private val catalog: AppCatalog,
+    private val systemGrants: SystemGrants,
 ) : ViewModel() {
 
     /**
@@ -111,6 +116,36 @@ class TagActionsViewModel @Inject constructor(
         // screen first. Loading it later meant every card read as a raw package name until the user
         // happened to open an editor.
         loadApps()
+        refreshGrants()
+    }
+
+    /**
+     * Re-reads the two grants the Sleep Cycle toggle needs.
+     *
+     * Called on every resume rather than cached, because the user leaves this screen to grant them
+     * and can revoke them just as easily from system settings without the app ever being told.
+     */
+    fun refreshGrants() {
+        backing.update { it.copy(grants = systemGrants.current()) }
+    }
+
+    fun onOpenNotificationAccess() = openSettings(SystemSettings.openNotificationAccess())
+
+    fun onOpenAccessibilitySettings() = openSettings(SystemSettings.openAccessibility())
+
+    /**
+     * Opens a settings screen through the same performer a tag uses.
+     *
+     * Quiet on success: "Action performed." is the right thing to say about a tag being tested and
+     * the wrong thing to say about a screen the user is now looking at. A failure still surfaces,
+     * because a device with no such settings activity is worth knowing about.
+     */
+    private fun openSettings(action: TagAction) {
+        viewModelScope.launch {
+            performer.perform(action).onFailure { failure ->
+                backing.update { it.copy(message = "${failure::class.simpleName}: ${failure.message}") }
+            }
+        }
     }
 
     fun onCreateFor(uid: ByteBlock?) {

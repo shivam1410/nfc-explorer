@@ -6,6 +6,8 @@ import dev.shivam.nfcexplorer.domain.action.InstalledApp
 import dev.shivam.nfcexplorer.domain.action.MediaKey
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.domain.action.SystemGrantState
+import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import java.io.IOException
@@ -69,6 +71,11 @@ class TagActionsViewModelTest {
         override suspend fun delete(uid: ByteBlock): Unit = throw IOException("disk full")
     }
 
+    /** Grants the user can turn on and off, the way system settings can at any moment. */
+    private class FakeGrants(var state: SystemGrantState = SystemGrantState()) : SystemGrants {
+        override fun current(): SystemGrantState = state
+    }
+
     private class RecordingPerformer(private val result: Result<Unit> = Result.success(Unit)) :
         ActionPerformer {
         val performed = mutableListOf<TagAction>()
@@ -88,6 +95,86 @@ class TagActionsViewModelTest {
         }
     }
 
+    // --- Permission grants ---
+
+    @Test
+    fun `grants are read up front so the editor can state them`() = runTest {
+        grants.state = SystemGrantState(notificationAccess = true, gestureService = false)
+
+        val model = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(true, model.state.value.grants.notificationAccess)
+        assertFalse(model.state.value.grants.gestureService)
+        assertFalse(model.state.value.grants.readyForToggle)
+    }
+
+    /**
+     * Both grants are made outside the app and can be revoked at any time, so a cached answer goes
+     * stale the moment the user walks into system settings.
+     */
+    @Test
+    fun `refreshing picks up a grant made while the app was away`() = runTest {
+        val model = viewModel()
+        advanceUntilIdle()
+        assertFalse(model.state.value.grants.readyForToggle)
+
+        grants.state = SystemGrantState(notificationAccess = true, gestureService = true)
+        model.refreshGrants()
+
+        assertTrue(model.state.value.grants.readyForToggle)
+    }
+
+    @Test
+    fun `opening notification access fires the settings intent`() = runTest {
+        val model = viewModel()
+
+        model.onOpenNotificationAccess()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf<TagAction>(
+                TagAction.SendIntent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"),
+            ),
+            performer.performed.toList(),
+        )
+    }
+
+    @Test
+    fun `opening accessibility fires the settings intent`() = runTest {
+        val model = viewModel()
+
+        model.onOpenAccessibilitySettings()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf<TagAction>(TagAction.SendIntent("android.settings.ACCESSIBILITY_SETTINGS")),
+            performer.performed.toList(),
+        )
+    }
+
+    /** Opening a screen the user is now looking at does not deserve a "done" message. */
+    @Test
+    fun `opening settings reports nothing on success`() = runTest {
+        val model = viewModel()
+
+        model.onOpenNotificationAccess()
+        advanceUntilIdle()
+
+        assertNull(model.state.value.message)
+    }
+
+    @Test
+    fun `a device with no such settings screen reports the failure`() = runTest {
+        val failing = RecordingPerformer(Result.failure(IllegalStateException("no activity")))
+        val model = TagActionsViewModel(repository, failing, catalog, grants)
+
+        model.onOpenAccessibilitySettings()
+        advanceUntilIdle()
+
+        assertTrue(model.state.value.message?.contains("no activity") == true)
+    }
+
     private companion object {
         const val READ_DELAY_MILLIS = 10L
         const val CATALOG_DELAY_MILLIS = 200L
@@ -96,6 +183,7 @@ class TagActionsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repository = FakeRepository()
     private val performer = RecordingPerformer()
+    private val grants = FakeGrants()
     private val uid = ByteBlock.ofInts(0x04, 0x1C, 0x4E, 0x52, 0xCE, 0x7C, 0x80)
 
     @BeforeTest fun setUp() = Dispatchers.setMain(dispatcher)
@@ -109,7 +197,7 @@ class TagActionsViewModelTest {
         ),
     )
 
-    private fun viewModel() = TagActionsViewModel(repository, performer, catalog)
+    private fun viewModel() = TagActionsViewModel(repository, performer, catalog, grants)
 
     // --- Draft lifecycle ---
 
@@ -293,7 +381,7 @@ class TagActionsViewModelTest {
     @Test
     fun `a failing test reports a message rather than throwing`() = runTest {
         val failing = RecordingPerformer(Result.failure(IllegalStateException("no such app")))
-        val model = TagActionsViewModel(repository, failing, catalog)
+        val model = TagActionsViewModel(repository, failing, catalog, grants)
 
         model.onTest(TagAction.LaunchApp("com.absent"))
         advanceUntilIdle()
@@ -482,7 +570,7 @@ class TagActionsViewModelTest {
     fun `a save that fails is reported rather than taking the app down`() = runTest(dispatcher) {
         // DataStore writes can fail on a full or unreadable disk. Every other failure in this feature
         // reports itself; an unhandled one here would crash the app on a button press.
-        val model = TagActionsViewModel(FailingRepository(), performer, catalog)
+        val model = TagActionsViewModel(FailingRepository(), performer, catalog, grants)
         model.onCreateFor(uid)
         model.onDraftChange(draft(model, label = "Desk", packageName = "com.example.notes"))
 
