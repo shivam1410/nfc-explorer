@@ -127,7 +127,7 @@ fun WriteScreen(
             ) {
                 encoded.forEachIndexed { offset, page ->
                     Text(
-                        text = "%02X  %s".format(state.startPage + offset, page.toHex()),
+                        text = "%02d  %s".format(state.startPage + offset, page.toHex()),
                         style = HexTextStyle,
                     )
                 }
@@ -189,7 +189,7 @@ private fun Stepper(label: String, value: Int, onChange: (Int) -> Unit) {
         Text(text = label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = { onChange((value - 1).coerceAtLeast(0)) }) { Text("–") }
         Text(
-            text = "%02X".format(value),
+            text = "%02d".format(value),
             style = HexTextStyle,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
@@ -296,7 +296,7 @@ private fun ResultCard(result: WriteBatchResult) {
 /** Technical one-liner per page. Deliberately terse — this is a diagnostic list, not prose. */
 private fun WriteOutcome.describe(): String = when (this) {
     is WriteOutcome.Written ->
-        "%02X  wrote %s  read back %s  %s".format(
+        "%02d  wrote %s  read back %s  %s".format(
             page,
             attempted,
             readBack ?: "unavailable",
@@ -307,8 +307,8 @@ private fun WriteOutcome.describe(): String = when (this) {
             },
         )
 
-    is WriteOutcome.Refused -> "%02X  refused: %s".format(page, decision)
-    is WriteOutcome.Failed -> "%02X  failed: %s %s".format(page, exceptionName, message ?: "")
+    is WriteOutcome.Refused -> "%02d  refused: %s".format(page, decision)
+    is WriteOutcome.Failed -> "%02d  failed: %s %s".format(page, exceptionName, message ?: "")
 }
 
 private const val LOCK_PAGE = 2

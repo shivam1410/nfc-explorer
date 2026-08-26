@@ -134,7 +134,7 @@
     <string name="write_error_too_long">Too long for the selected range (%1$d bytes available). Widen the range or shorten the payload.</string>
     <string name="write_error_bad_hex">Not valid hex. Use pairs of 0–9 and A–F, optionally separated by spaces or colons.</string>
     <string name="write_target">Target pages</string>
-    <string name="write_target_summary">Pages %1$02X–%2$02X · %3$d bytes</string>
+    <string name="write_target_summary">Pages %1$02d–%2$02d · %3$d bytes</string>
     <string name="write_start_page">First page</string>
     <string name="write_end_page">Last page</string>
     <string name="write_range_warning">Pages 00–03 are the UID, the lock bytes and the OTP page. Writes there are refused, or irreversible under expert mode.</string>

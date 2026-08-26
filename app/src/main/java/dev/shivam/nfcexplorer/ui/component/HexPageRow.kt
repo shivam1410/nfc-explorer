@@ -47,7 +47,10 @@ fun HexPageRow(
 ) {
     val scheme = MaterialTheme.colorScheme
     val hexColor: Color = if (hex == null) scheme.error else scheme.onSurface
-    val pageLabel = "%02X".format(pageIndex)
+    // Decimal, zero-padded to two digits so the column stays aligned. The value is the page's
+    // real address, just in base ten -- page 10 is the page the datasheet calls 0A, not the
+    // eleventh page.
+    val pageLabel = "%02d".format(pageIndex)
 
     Column(
         modifier = modifier

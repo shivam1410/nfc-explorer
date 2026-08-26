@@ -95,7 +95,7 @@ fun LockAnalysisScreen(report: TagReport, modifier: Modifier = Modifier) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "%02X".format(page.index),
+                            text = "%02d".format(page.index),
                             style = HexTextStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(32.dp),
