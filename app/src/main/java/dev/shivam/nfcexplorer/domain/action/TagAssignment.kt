@@ -12,6 +12,14 @@ data class TagAssignment(
     val uid: ByteBlock,
     val label: String,
     val action: TagAction,
+    /**
+     * When this assignment was last changed, for merging two devices' stores.
+     *
+     * Defaults to zero so documents written before sync existed still decode — they simply lose
+     * every merge against an assignment that carries a real timestamp, which is the correct
+     * outcome: anything edited since is newer than something never edited at all.
+     */
+    val updatedAtMillis: Long = 0,
 ) {
     init {
         require(!uid.isEmpty) { "a tag always reports a UID" }
