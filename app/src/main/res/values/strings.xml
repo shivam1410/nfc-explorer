@@ -174,7 +174,6 @@
     <string name="settings_toggl_hide">Hide token</string>
     <string name="settings_toggl_unset">No token saved yet.</string>
     <string name="settings_toggl_token">API token</string>
-    <string name="settings_toggl_replace">Replace token</string>
     <string name="settings_toggl_save">Save</string>
     <string name="settings_toggl_edit">Edit</string>
     <string name="settings_toggl_cancel">Cancel</string>
