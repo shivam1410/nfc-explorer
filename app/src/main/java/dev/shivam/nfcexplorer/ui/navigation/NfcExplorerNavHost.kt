@@ -11,7 +11,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import dev.shivam.nfcexplorer.ui.discovery.DiscoveryScreen
 import dev.shivam.nfcexplorer.ui.discovery.DiscoverySection
 import dev.shivam.nfcexplorer.ui.settings.SettingsScreen
 import dev.shivam.nfcexplorer.ui.settings.SettingsViewModel
+import dev.shivam.nfcexplorer.ui.settings.SyncUiState
 import dev.shivam.nfcexplorer.ui.actions.TagActionsViewModel
 import dev.shivam.nfcexplorer.ui.taginfo.TagInfoScreen
 import dev.shivam.nfcexplorer.ui.write.WriteScreen
@@ -167,12 +170,27 @@ fun NfcExplorerNavHost(
                     settingsViewModel.refreshGrants()
                     onPauseOrDispose { }
                 }
+                // Google's consent screen is a PendingIntent, so it goes through the intent-sender
+                // contract rather than a plain activity launch.
+                val consentLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartIntentSenderForResult(),
+                ) { result ->
+                    settingsViewModel.onConsentResult(result.resultCode == android.app.Activity.RESULT_OK)
+                }
+                val pendingConsent = (settingsState.sync as? SyncUiState.NeedsConsent)?.pendingIntent
+                LaunchedEffect(pendingConsent) {
+                    pendingConsent?.let {
+                        consentLauncher.launch(IntentSenderRequest.Builder(it).build())
+                    }
+                }
+
                 SettingsScreen(
                     state = settingsState,
                     onOpenNotificationAccess = settingsViewModel::onOpenNotificationAccess,
                     onOpenAccessibilitySettings = settingsViewModel::onOpenAccessibilitySettings,
                     onCheckForUpdates = settingsViewModel::onCheckForUpdates,
                     onOpenRelease = settingsViewModel::onOpenRelease,
+                    onSyncNow = settingsViewModel::onSyncNow,
                     onTogglDraftChange = settingsViewModel::onTogglDraftChange,
                     onSaveTogglToken = settingsViewModel::onSaveTogglToken,
                     onClearTogglToken = settingsViewModel::onClearTogglToken,

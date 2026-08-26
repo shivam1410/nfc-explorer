@@ -36,6 +36,7 @@ fun SettingsScreen(
     onOpenAccessibilitySettings: () -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenRelease: (String) -> Unit,
+    onSyncNow: () -> Unit,
     onTogglDraftChange: (String) -> Unit,
     onSaveTogglToken: () -> Unit,
     onClearTogglToken: () -> Unit,
@@ -62,6 +63,50 @@ fun SettingsScreen(
                 labelRes = R.string.actions_grant_accessibility,
                 onOpen = onOpenAccessibilitySettings,
             )
+        }
+
+        SectionCard(
+            title = stringResource(R.string.settings_sync_title),
+            subtitle = stringResource(R.string.settings_sync_subtitle),
+        ) {
+            Button(
+                onClick = onSyncNow,
+                enabled = state.sync !is SyncUiState.Running,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.settings_sync_now)) }
+
+            when (val sync = state.sync) {
+                SyncUiState.Idle -> Unit
+                SyncUiState.Running -> Text(
+                    text = stringResource(R.string.settings_sync_running),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                // The consent screen is launched by the activity; nothing to show but why we paused.
+                is SyncUiState.NeedsConsent -> Text(
+                    text = stringResource(R.string.settings_sync_consent),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                is SyncUiState.Failed -> Text(
+                    text = stringResource(R.string.settings_sync_failed, sync.reason),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                is SyncUiState.Done -> Text(
+                    // Says what moved rather than just "done": a sync that silently did nothing and
+                    // a sync that pulled four tags should not read identically.
+                    text = if (sync.report.quiet) {
+                        stringResource(R.string.settings_sync_quiet)
+                    } else {
+                        stringResource(
+                            R.string.settings_sync_done,
+                            sync.report.pulled,
+                            sync.report.pushed,
+                            sync.report.logsUploaded,
+                        )
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
 
         SectionCard(

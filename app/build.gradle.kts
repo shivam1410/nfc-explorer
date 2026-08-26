@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.play.services.auth)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 
