@@ -128,6 +128,51 @@ class LogRetentionTest {
         assertEquals(emptyList(), history)
     }
 
+
+    /**
+     * Taken from a real phone: a history carried forward from before the numbering rule existed
+     * held two entries numbered 0. Numbering the arrivals never touched them, and only a compound
+     * list key stood between that file and the crash the rule was written to stop.
+     */
+    @Test
+    fun `a stored history with duplicate numbers is repaired`() {
+        val stored = listOf(
+            entry(1, 1_700_000_100, "later", category = "trigger"),
+            entry(0, 1_700_000_050, "same number, newer", category = "trigger"),
+            entry(0, 1_700_000_000, "same number, older", category = "trigger"),
+        )
+
+        val repaired = LogRetention.normalise(stored)
+
+        val sequences = repaired.map { it.sequence }
+        assertEquals(sequences.size, sequences.toSet().size, "duplicates must not survive: $sequences")
+        assertEquals(
+            listOf("later", "same number, newer", "same number, older"),
+            repaired.map { it.message },
+            "the newer of two entries sharing a number must still come first",
+        )
+    }
+
+    @Test
+    fun `numbers stay unique once scan detail and taps are interleaved`() {
+        var history = LogRetention.append(
+            emptyList(),
+            listOf(entry(1, 200, "tap", category = "trigger"), entry(0, 100, "scan", category = "read")),
+        )
+        history = LogRetention.append(
+            history,
+            listOf(entry(1, 400, "scan again", category = "read"), entry(0, 300, "tap again", category = "trigger")),
+        )
+
+        val sequences = history.map { it.sequence }
+        assertEquals(sequences.size, sequences.toSet().size, "sequences must stay unique: $sequences")
+        assertEquals(
+            listOf("scan again", "tap again", "tap", "scan"),
+            history.map { it.message },
+            "both tiers must come back as one stream, newest first",
+        )
+    }
+
     // --- Documents ---
 
     @Test

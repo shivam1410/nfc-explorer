@@ -43,10 +43,6 @@ object LogRetention {
      * Adds [incoming] to [existing], renumbering and bounding each tier.
      *
      * Both lists are newest-first, as is the result.
-     *
-     * Renumbered because the session log restarts its sequence at zero in every process, so a
-     * history spanning runs holds many entries numbered 0. The sequence is the only identity an
-     * entry has, and a list keyed by it crashed outright once a second session existed.
      */
     fun append(
         existing: List<LogEntry>,
@@ -56,17 +52,45 @@ object LogRetention {
     ): List<LogEntry> {
         if (incoming.isEmpty()) return existing
 
+        // Lifted above everything already held, so the merge below can order the two against each
+        // other. The session log restarts its sequence at zero in every process, so without this a
+        // new entry and an old one both claim to be number 3.
         var next = (existing.maxOfOrNull { it.sequence } ?: -1L) + 1
         // Numbered oldest to newest, so the numbers run in the same direction as time.
         val renumbered = incoming.reversed().map { it.copy(sequence = next++) }.reversed()
 
-        val all = renumbered + existing
-        val kept = all.filter { it.category in TAPS }.take(tapLimit) +
-            all.filter { it.category in SCANS }.take(scanLimit)
+        return normalise(renumbered + existing, tapLimit, scanLimit)
+    }
 
-        // Interleaved back into one stream. Sequence, not timestamp: entries inside one millisecond
-        // still have to come out in the order they happened.
-        return kept.sortedByDescending { it.sequence }
+    /**
+     * Bounds each tier and gives every entry a number no other entry holds.
+     *
+     * Applied on the way out of storage as well as into it, because numbering the arrivals only
+     * ever fixed arrivals: a history written before that rule existed keeps its duplicates forever,
+     * and the sequence is the only identity an entry has. A list keyed on it crashed outright once
+     * two entries claimed the same number, and today only a compound key stands between this file
+     * and that crash. Renumbering the whole list repairs the file the first time it is touched.
+     *
+     * Numbers are therefore positional and not stable across appends. Nothing persists them: they
+     * order the list and identify a row on screen, both of which are recomputed anyway.
+     */
+    fun normalise(
+        entries: List<LogEntry>,
+        tapLimit: Int = TAP_LIMIT,
+        scanLimit: Int = SCAN_LIMIT,
+    ): List<LogEntry> {
+        val kept = entries.filter { it.category in TAPS }.take(tapLimit) +
+            entries.filter { it.category in SCANS }.take(scanLimit)
+
+        // Interleaved back into one stream. Sequence first, because entries inside one millisecond
+        // still have to come out in the order they happened; time breaks the ties a duplicated
+        // number would otherwise leave to chance.
+        val ordered = kept.sortedWith(
+            compareByDescending<LogEntry> { it.sequence }.thenByDescending { it.timestampMillis },
+        )
+
+        val oldest = ordered.size - 1L
+        return ordered.mapIndexed { index, entry -> entry.copy(sequence = oldest - index) }
     }
 
     /** The document holding a device's kept history. One per device, rewritten in place. */
