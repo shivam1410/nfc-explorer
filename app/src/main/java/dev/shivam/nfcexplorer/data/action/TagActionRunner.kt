@@ -57,7 +57,7 @@ class TagActionRunner @Inject constructor(
             is IntentSpec.Drag -> gestures.perform(spec).getOrThrow()
             is IntentSpec.TapNode -> gestures.tap(spec).getOrThrow()
             is IntentSpec.TogglTimer ->
-                toggl.toggle(spec.workspaceId, spec.description, spec.projectId).getOrThrow()
+                toggl.toggle(spec.description, spec.projectId).getOrThrow()
             is IntentSpec.Sequence -> runSequence(spec)
         }
         Unit

@@ -19,6 +19,7 @@ import dev.shivam.nfcexplorer.domain.update.ReleaseSource
 import dev.shivam.nfcexplorer.data.sync.Authorization
 import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
+import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
 import dev.shivam.nfcexplorer.domain.update.UpdateStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Whether the saved Toggl token actually works. */
+sealed interface TogglCheck {
+    data object Idle : TogglCheck
+    data object Checking : TogglCheck
+
+    /** [workspaceId] was discovered from the token; the user never types it. */
+    data class Connected(val name: String, val workspaceId: Long?) : TogglCheck
+    data class Failed(val reason: String) : TogglCheck
+}
 
 /** Where a Drive sync has got to. */
 sealed interface SyncUiState {
@@ -72,6 +83,7 @@ data class SettingsUiState(
      */
     val togglTokenTail: String? = null,
     val sync: SyncUiState = SyncUiState.Idle,
+    val togglCheck: TogglCheck = TogglCheck.Idle,
     val install: InstallStatus = InstallStatus.Idle,
 )
 
@@ -91,6 +103,7 @@ class SettingsViewModel @Inject constructor(
     private val tokens: AccessTokens,
     private val cloudSync: CloudSync,
     private val installer: UpdateInstaller,
+    private val toggl: TogglSession,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -110,6 +123,25 @@ class SettingsViewModel @Inject constructor(
                 togglTokenSet = stored != null,
                 togglTokenTail = stored?.takeLast(TOKEN_TAIL_LENGTH),
             )
+        }
+    }
+
+    /**
+     * Asks Toggl who the saved token belongs to.
+     *
+     * Doubles as the workspace lookup: `/me` carries the default workspace, so a working token is
+     * all the configuration this needs. It also turns a typo into an error you see now rather than
+     * a tag that silently does nothing at bedtime.
+     */
+    fun onCheckToggl() {
+        if (!secrets.has(SecretStore.TOGGL_TOKEN)) return
+        backing.update { it.copy(togglCheck = TogglCheck.Checking) }
+        viewModelScope.launch {
+            val status = toggl.account().fold(
+                onSuccess = { TogglCheck.Connected(it.fullName, it.workspaceId) },
+                onFailure = { TogglCheck.Failed("${it::class.simpleName}: ${it.message}") },
+            )
+            backing.update { it.copy(togglCheck = status) }
         }
     }
 
@@ -136,12 +168,21 @@ class SettingsViewModel @Inject constructor(
         secrets.write(SecretStore.TOGGL_TOKEN, token)
         backing.update { it.copy(togglDraft = "", togglTokenVisible = false, togglEditing = false) }
         refreshTogglToken()
+        // Verify immediately: a token is worth nothing until it has answered once.
+        onCheckToggl()
     }
 
     fun onClearTogglToken() {
         secrets.clear(SecretStore.TOGGL_TOKEN)
         // Straight into the field: clearing is almost always the first half of replacing.
-        backing.update { it.copy(togglDraft = "", togglTokenVisible = false, togglEditing = true) }
+        backing.update {
+            it.copy(
+                togglDraft = "",
+                togglTokenVisible = false,
+                togglEditing = true,
+                togglCheck = TogglCheck.Idle,
+            )
+        }
         refreshTogglToken()
     }
 

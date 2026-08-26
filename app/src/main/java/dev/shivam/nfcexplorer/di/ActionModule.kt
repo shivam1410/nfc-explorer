@@ -12,6 +12,7 @@ import dev.shivam.nfcexplorer.data.sync.AccessTokens
 import dev.shivam.nfcexplorer.data.sync.CloudSyncService
 import dev.shivam.nfcexplorer.data.sync.DriveAppDataStore
 import dev.shivam.nfcexplorer.data.sync.GoogleAccessTokens
+import dev.shivam.nfcexplorer.data.toggl.PreferencesTogglConfig
 import dev.shivam.nfcexplorer.data.toggl.TogglHttpSession
 import dev.shivam.nfcexplorer.data.update.ApkInstaller
 import dev.shivam.nfcexplorer.data.update.GitHubReleaseSource
@@ -24,6 +25,7 @@ import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.sync.CloudStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
+import dev.shivam.nfcexplorer.domain.toggl.TogglConfig
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
 import dev.shivam.nfcexplorer.domain.update.ReleaseSource
@@ -77,6 +79,9 @@ abstract class ActionBindingsModule {
 
     @Binds
     abstract fun bindTogglSession(impl: TogglHttpSession): TogglSession
+
+    @Binds
+    abstract fun bindTogglConfig(impl: PreferencesTogglConfig): TogglConfig
 
     @Binds
     abstract fun bindInstalledVersion(impl: PackageInstalledVersion): InstalledVersion

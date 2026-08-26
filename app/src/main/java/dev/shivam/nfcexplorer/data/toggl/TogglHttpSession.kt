@@ -2,7 +2,9 @@ package dev.shivam.nfcexplorer.data.toggl
 
 import dev.shivam.nfcexplorer.di.IoDispatcher
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
+import dev.shivam.nfcexplorer.domain.toggl.TogglAccount
 import dev.shivam.nfcexplorer.domain.toggl.TogglOutcome
+import dev.shivam.nfcexplorer.domain.toggl.TogglConfig
 import dev.shivam.nfcexplorer.domain.toggl.TogglProtocol
 import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,11 +30,11 @@ import javax.inject.Singleton
 @Singleton
 class TogglHttpSession @Inject constructor(
     private val secrets: SecretStore,
+    private val config: TogglConfig,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) : TogglSession {
 
     override suspend fun toggle(
-        workspaceId: Long,
         description: String,
         projectId: Long?,
     ): Result<TogglOutcome> = withContext(io) {
@@ -40,6 +42,10 @@ class TogglHttpSession @Inject constructor(
             val token = secrets.read(SecretStore.TOGGL_TOKEN)
                 ?: error("No Toggl API token saved. Add one in Settings.")
             val auth = TogglProtocol.authHeader(token)
+            // Discovered from the token on first use and cached, so the user never types it.
+            val workspaceId = config.workspaceId()
+                ?: fetchAccount(auth).workspaceId
+                ?: error("Your Toggl account reports no default workspace.")
 
             val current = currentEntry(auth)
             if (current != null && current.id != null) {
@@ -50,6 +56,25 @@ class TogglHttpSession @Inject constructor(
                 TogglOutcome.Started(description)
             }
         }
+    }
+
+    override suspend fun account(): Result<TogglAccount> = withContext(io) {
+        runCatching {
+            val token = secrets.read(SecretStore.TOGGL_TOKEN)
+                ?: error("No Toggl API token saved.")
+            fetchAccount(TogglProtocol.authHeader(token))
+        }
+    }
+
+    /** Reads `/me` and remembers the default workspace, so this happens once rather than per tap. */
+    private fun fetchAccount(auth: String): TogglAccount {
+        val body = request("GET", TogglProtocol.ME_PATH, auth, null)
+        val dto = json.decodeFromString(MeDto.serializer(), body)
+        dto.defaultWorkspaceId?.let(config::setWorkspaceId)
+        return TogglAccount(
+            fullName = dto.fullName?.takeIf { it.isNotBlank() } ?: dto.email.orEmpty(),
+            workspaceId = dto.defaultWorkspaceId,
+        )
     }
 
     /** Null when nothing is running -- Toggl answers `null` rather than 404. */
@@ -104,6 +129,13 @@ class TogglHttpSession @Inject constructor(
             connection.disconnect()
         }
     }
+
+    @Serializable
+    private data class MeDto(
+        @SerialName("fullname") val fullName: String? = null,
+        @SerialName("email") val email: String? = null,
+        @SerialName("default_workspace_id") val defaultWorkspaceId: Long? = null,
+    )
 
     @Serializable
     private data class EntryDto(

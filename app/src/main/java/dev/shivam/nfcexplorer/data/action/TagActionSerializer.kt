@@ -102,7 +102,6 @@ object TagActionSerializer {
         )
         is TagAction.TogglToggle -> ActionDto(
             type = TYPE_TOGGL,
-            workspaceId = action.workspaceId,
             // Reused rather than a new column: the description is the human label of the entry.
             intentAction = action.description,
             projectId = action.projectId,
@@ -180,13 +179,12 @@ object TagActionSerializer {
                 contentDescription = dto.intentAction,
                 requireForegroundPackage = dto.channelId,
             )
-            TYPE_TOGGL -> dto.workspaceId?.let { workspace ->
-                TagAction.TogglToggle(
-                    workspaceId = workspace,
-                    description = dto.intentAction.orEmpty(),
-                    projectId = dto.projectId,
-                )
-            }
+            // workspaceId is still read from older documents and discarded: the workspace moved to
+            // settings, so an action that carries one is simply out of date, not unusable.
+            TYPE_TOGGL -> TagAction.TogglToggle(
+                description = dto.intentAction.orEmpty(),
+                projectId = dto.projectId,
+            )
             TYPE_DRAG -> dto.drag?.let { drag ->
                 TagAction.DragGesture(
                     startXRatio = drag.startXRatio,

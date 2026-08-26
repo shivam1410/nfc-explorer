@@ -10,6 +10,9 @@ import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.action.TagAction
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
+import dev.shivam.nfcexplorer.domain.toggl.TogglAccount
+import dev.shivam.nfcexplorer.domain.toggl.TogglOutcome
+import dev.shivam.nfcexplorer.domain.toggl.TogglSession
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
 import dev.shivam.nfcexplorer.domain.update.AppRelease
 import dev.shivam.nfcexplorer.domain.update.InstalledVersion
@@ -85,6 +88,17 @@ class SettingsViewModelTest {
 
     private val installer = FakeInstaller()
 
+    /** Answers as Toggl would, without a network. */
+    private class FakeToggl(
+        var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
+    ) : TogglSession {
+        override suspend fun toggle(description: String, projectId: Long?) =
+            Result.success<TogglOutcome>(TogglOutcome.Started(description))
+        override suspend fun account(): Result<TogglAccount> = account
+    }
+
+    private val toggl = FakeToggl()
+
     private fun viewModel(
         releases: ReleaseSource = ReleaseSource { Result.success(null) },
         tokens: AccessTokens = AccessTokens { Authorization.Token("t") },
@@ -99,6 +113,7 @@ class SettingsViewModelTest {
         cloudSync = sync,
         installedVersion = InstalledVersion { version },
         installer = installer,
+        toggl = toggl,
     )
 
     // --- Permissions ---
@@ -318,6 +333,46 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertTrue(model.state.value.install is InstallStatus.Failed)
+    }
+
+
+    /** The workspace is discovered from the token, so the user never has to look it up. */
+    @Test
+    fun `saving a token immediately verifies it and reports the account`() = runTest {
+        val model = viewModel()
+
+        model.onTogglDraftChange("good-token")
+        model.onSaveTogglToken()
+        advanceUntilIdle()
+
+        val check = model.state.value.togglCheck
+        assertTrue(check is TogglCheck.Connected, "got $check")
+        assertEquals("Ada", check.name)
+        assertEquals(42, check.workspaceId)
+    }
+
+    /** A typo must surface now, not as a tag that silently does nothing at bedtime. */
+    @Test
+    fun `a token Toggl rejects is reported as failed`() = runTest {
+        toggl.account = Result.failure(IllegalStateException("HTTP 403"))
+        val model = viewModel()
+
+        model.onTogglDraftChange("bad-token")
+        model.onSaveTogglToken()
+        advanceUntilIdle()
+
+        val check = model.state.value.togglCheck
+        assertTrue(check is TogglCheck.Failed && check.reason.contains("403"), "got $check")
+    }
+
+    @Test
+    fun `checking with no token saved does nothing`() = runTest {
+        val model = viewModel()
+
+        model.onCheckToggl()
+        advanceUntilIdle()
+
+        assertEquals(TogglCheck.Idle, model.state.value.togglCheck)
     }
 
     // --- Sync ---
