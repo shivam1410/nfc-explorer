@@ -45,6 +45,7 @@ import dev.shivam.nfcexplorer.ui.actions.TagEditorScreen
 import dev.shivam.nfcexplorer.ui.actions.TagActionsScreen
 import dev.shivam.nfcexplorer.ui.discovery.DiscoveryScreen
 import dev.shivam.nfcexplorer.ui.discovery.DiscoverySection
+import dev.shivam.nfcexplorer.ui.settings.DeletedTagsScreen
 import dev.shivam.nfcexplorer.ui.settings.SettingsScreen
 import dev.shivam.nfcexplorer.ui.settings.SettingsViewModel
 import dev.shivam.nfcexplorer.ui.settings.SyncUiState
@@ -55,6 +56,9 @@ import dev.shivam.nfcexplorer.ui.write.WriteViewModel
 
 /** The add/edit page. Not a bottom-nav peer: it is pushed over one, and popped when done. */
 private const val EDITOR_ROUTE = "editor"
+
+/** The deleted-tags list, pushed over Settings. */
+private const val DELETED_ROUTE = "deleted"
 
 private enum class Destination(
     val route: String,
@@ -138,6 +142,7 @@ fun NfcExplorerNavHost(
                             if (navController.popBackStack(EDITOR_ROUTE, inclusive = true)) {
                                 actionsViewModel.onLeaveAddFlow()
                             }
+                            navController.popBackStack(DELETED_ROUTE, inclusive = true)
                             navController.navigate(destination.route) {
                                 // Single instance per destination and no growing back stack:
                                 // these are peers the user moves between repeatedly.
@@ -208,7 +213,9 @@ fun NfcExplorerNavHost(
                 }
             }
             composable(Destination.SETTINGS.route) {
-                val settingsViewModel: SettingsViewModel = hiltViewModel()
+                // Activity-scoped, so the deleted-tags page pushed over this one sees the same
+                // state rather than constructing a second view model with its own copy.
+                val settingsViewModel: SettingsViewModel = hiltViewModel(actionsOwner)
                 val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
                 LifecycleResumeEffect(settingsViewModel) {
                     settingsViewModel.refreshGrants()
@@ -275,6 +282,7 @@ fun NfcExplorerNavHost(
                     onEditTogglToken = settingsViewModel::onEditTogglToken,
                     onCancelTogglEdit = settingsViewModel::onCancelTogglEdit,
                     onCheckToggl = settingsViewModel::onCheckToggl,
+                    onOpenDeleted = { navController.navigate(DELETED_ROUTE) },
                 )
             }
             composable(Destination.ACTIONS.route) {
@@ -286,6 +294,14 @@ fun NfcExplorerNavHost(
                     },
                     onDelete = actionsViewModel::onDelete,
                     onTest = actionsViewModel::onTest,
+                )
+            }
+            composable(DELETED_ROUTE) {
+                val settingsViewModel: SettingsViewModel = hiltViewModel(actionsOwner)
+                val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+                DeletedTagsScreen(
+                    deleted = settingsState.deleted,
+                    onRestore = settingsViewModel::onRestore,
                 )
             }
             composable(EDITOR_ROUTE) {

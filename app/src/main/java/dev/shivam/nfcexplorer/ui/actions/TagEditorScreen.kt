@@ -163,6 +163,7 @@ private fun AlreadyAssigned(
     SectionCard(
         title = stringResource(R.string.actions_add_taken_title),
         subtitle = assignment.uid.toString(),
+        collapsible = false,
     ) {
         Text(
             text = stringResource(R.string.actions_add_taken, assignment.label),

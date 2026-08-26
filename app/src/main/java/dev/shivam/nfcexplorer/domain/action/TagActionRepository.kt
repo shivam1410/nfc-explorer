@@ -25,6 +25,18 @@ interface TagActionRepository {
      */
     suspend fun snapshotForSync(): List<TagAssignment>
 
+    /**
+     * Tags that were deleted but are still recorded as tombstones.
+     *
+     * Worth surfacing because the record is already there: everything needed to bring one back --
+     * its UID, label and action -- is kept, so a deletion can be undone without the physical card,
+     * which is otherwise the only way to recreate an assignment.
+     */
+    fun observeDeleted(): Flow<List<TagAssignment>>
+
+    /** Brings a deleted tag back, stamped now so the restore wins the next merge. */
+    suspend fun restore(uid: ByteBlock)
+
     suspend fun find(uid: ByteBlock): TagAssignment?
 
     suspend fun save(assignment: TagAssignment)

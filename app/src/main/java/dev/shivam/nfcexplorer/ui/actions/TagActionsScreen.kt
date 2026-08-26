@@ -216,6 +216,8 @@ internal fun DraftEditor(
             if (draft.isExisting) R.string.actions_edit_title else R.string.actions_new_title,
         ),
         subtitle = draft.uid?.toString(),
+        // A form you can collapse is a form that can hide the field you are filling in.
+        collapsible = false,
     ) {
         OutlinedTextField(
             value = draft.label,
