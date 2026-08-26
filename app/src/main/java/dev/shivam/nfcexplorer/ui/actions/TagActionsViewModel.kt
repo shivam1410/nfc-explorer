@@ -56,7 +56,6 @@ data class ActionDraft(
     val intentAction: String = "",
     val mediaKey: MediaKey = MediaKey.PLAY_PAUSE,
     /** Toggl workspace, as typed. A raw string because a half-typed number is not a Long. */
-    val togglWorkspaceId: String = "",
     val phoneNumber: String = "",
     val messageText: String = "",
     val autoSend: Boolean = false,
@@ -367,10 +366,9 @@ class TagActionsViewModel @Inject constructor(
                     message = draft.messageText.trim(),
                     autoSend = draft.autoSend,
                 )
-                ActionType.TOGGL -> TagAction.TogglToggle(
-                    workspaceId = draft.togglWorkspaceId.trim().toLong(),
-                    description = draft.label.trim(),
-                )
+                // No fields: the workspace comes from settings and the description is the tag's
+                // own label, so there is nothing left to ask for.
+                ActionType.TOGGL -> TagAction.TogglToggle(description = draft.label.trim())
             }
         }.getOrNull()
     }
@@ -386,8 +384,6 @@ class TagActionsViewModel @Inject constructor(
             DraftProblem.MISSING_TARGET
         draft.type == ActionType.OPEN_URI && draft.uri.isBlank() -> DraftProblem.MISSING_TARGET
         draft.type == ActionType.SEND_INTENT && draft.intentAction.isBlank() ->
-            DraftProblem.MISSING_TARGET
-        draft.type == ActionType.TOGGL && draft.togglWorkspaceId.isBlank() ->
             DraftProblem.MISSING_TARGET
         draft.type == ActionType.WHATSAPP && draft.phoneNumber.none(Char::isDigit) ->
             DraftProblem.MISSING_TARGET
@@ -441,7 +437,6 @@ class TagActionsViewModel @Inject constructor(
             uid = uid,
             label = label,
             type = ActionType.TOGGL,
-            togglWorkspaceId = current.workspaceId.toString(),
             isExisting = true,
         )
         is TagAction.DragGesture,

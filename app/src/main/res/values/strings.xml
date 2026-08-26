@@ -176,6 +176,10 @@
     <string name="settings_toggl_token">API token</string>
     <string name="settings_toggl_save">Save</string>
     <string name="settings_toggl_edit">Edit</string>
+    <string name="settings_toggl_check">Check connection</string>
+    <string name="settings_toggl_checking">Asking Toggl…</string>
+    <string name="settings_toggl_connected">✓ Connected as %1$s — workspace found automatically</string>
+    <string name="settings_toggl_check_failed">Could not connect: %1$s</string>
     <string name="settings_toggl_cancel">Cancel</string>
     <string name="settings_toggl_clear">Clear</string>
     <string name="settings_toggl_explainer">Encrypted with a key held in this device&#8217;s secure hardware. It is never written to a tag, never exported, and cannot be restored onto another phone — you will enter it once per device.</string>
@@ -220,7 +224,6 @@
     <string name="actions_add_scan_another">Scan a different tag</string>
     <string name="actions_add_cancel">Cancel</string>
     <string name="actions_editor_gone">Nothing to edit. Go back and pick a tag.</string>
-    <string name="actions_toggl_workspace">Toggl workspace ID</string>
     <string name="actions_toggl_explainer">One tap starts a timer; tapping again stops whatever is running. The entry is named after this tag&#8217;s label. Add your API token in Settings — it is stored encrypted on this device and never written to the tag.</string>
     <string name="actions_summary_toggl">Toggl — %1$s</string>
     <string name="actions_grant_notifications">Notification access — to see if a session is running</string>

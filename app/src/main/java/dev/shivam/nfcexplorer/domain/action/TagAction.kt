@@ -160,18 +160,19 @@ sealed interface TagAction {
      * authoritatively what is running, so a timer stopped from the web app is simply not running the
      * next time a tag is tapped — no local state to drift.
      *
+     * The workspace is absent too, for a different reason: it belongs to the account rather than to
+     * a tag, so it lives in settings and one change retargets every Toggl tag at once.
+     *
      * The credential is deliberately absent from this type. It lives in the encrypted secret store,
      * never in an action, never in the assignment document, and never on the tag: an Ultralight page
      * has no read authentication, so a token written there is readable by any phone that touches the
      * card.
      */
     data class TogglToggle(
-        val workspaceId: Long,
         val description: String,
         val projectId: Long? = null,
     ) : Leaf {
         init {
-            require(workspaceId > 0) { "workspaceId must be positive" }
             require(projectId == null || projectId > 0) { "projectId, when present, must be positive" }
         }
     }

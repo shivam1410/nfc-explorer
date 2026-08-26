@@ -19,6 +19,14 @@ object TogglProtocol {
     /** Where the running entry lives, or `null` in the body when nothing is running. */
     const val CURRENT_ENTRY_PATH = "/me/time_entries/current"
 
+    /**
+     * The account, including `default_workspace_id`.
+     *
+     * Asking for the workspace was the last thing this feature made the user look up by hand, and
+     * the token already implies it -- so it is fetched rather than typed.
+     */
+    const val ME_PATH = "/me"
+
     /** Identifies this client to Toggl, which is good manners and aids their rate limiting. */
     const val USER_AGENT = "NfcExplorer"
 
@@ -90,8 +98,24 @@ sealed interface TogglOutcome {
     data class Stopped(val entryId: Long) : TogglOutcome
 }
 
+/** Who the token belongs to, and where its timers go. */
+data class TogglAccount(val fullName: String, val workspaceId: Long?)
+
 /** Talks to Toggl. Implemented in `data/`. */
 interface TogglSession {
-    /** Stops the running entry if there is one, otherwise starts a new one. */
-    suspend fun toggle(workspaceId: Long, description: String, projectId: Long?): Result<TogglOutcome>
+    /**
+     * Stops the running entry if there is one, otherwise starts a new one.
+     *
+     * The workspace comes from settings rather than from the caller, so every tag targets the same
+     * account and changing it is a single edit.
+     */
+    suspend fun toggle(description: String, projectId: Long?): Result<TogglOutcome>
+
+    /**
+     * Reads the account the saved token belongs to, caching its default workspace.
+     *
+     * Doubles as the check that a pasted token actually works: the alternative is discovering a
+     * typo at bedtime, as a tag that silently does nothing.
+     */
+    suspend fun account(): Result<TogglAccount>
 }

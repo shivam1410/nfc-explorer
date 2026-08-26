@@ -56,6 +56,7 @@ fun SettingsScreen(
     onToggleTokenVisibility: () -> Unit,
     onEditTogglToken: () -> Unit,
     onCancelTogglEdit: () -> Unit,
+    onCheckToggl: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -178,8 +179,28 @@ fun SettingsScreen(
             // A stored token gets no input box. An empty field next to "saved" reads as a
             // contradiction, and the common case here is looking, not changing.
             if (state.togglTokenSet && !state.togglEditing) {
+                when (val check = state.togglCheck) {
+                    TogglCheck.Idle -> Unit
+                    TogglCheck.Checking -> Text(
+                        text = stringResource(R.string.settings_toggl_checking),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    is TogglCheck.Connected -> Text(
+                        text = stringResource(R.string.settings_toggl_connected, check.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    is TogglCheck.Failed -> Text(
+                        text = stringResource(R.string.settings_toggl_check_failed, check.reason),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onEditTogglToken) {
+                    Button(onClick = onCheckToggl) {
+                        Text(stringResource(R.string.settings_toggl_check))
+                    }
+                    TextButton(onClick = onEditTogglToken) {
                         Text(stringResource(R.string.settings_toggl_edit))
                     }
                     TextButton(onClick = onClearTogglToken) {
