@@ -65,10 +65,22 @@ class GestureDispatchService : AccessibilityService() {
      */
     internal fun clickNode(viewIds: List<String>, contentDescription: String?): Boolean {
         val root = runCatching { rootInActiveWindow }.getOrNull() ?: return false
-        val match = viewIds.firstNotNullOfOrNull { findById(root, it) }
-            ?: contentDescription?.let { findByDescription(root, it) }
-            ?: return false
-        return clickable(match)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+
+        // Every candidate in priority order, and the first that is actually pressable wins.
+        //
+        // Taking the first *match* instead was a trap, and a live one: enabling flagReportViewIds
+        // made the id route resolve for the first time, so an id landing on a node with no clickable
+        // ancestor would have returned false and never tried the description -- breaking the
+        // fallback that every send had in fact been going through until now. Lazy, so the extra
+        // tree walk only happens when the ids do not produce something pressable.
+        return sequence {
+            viewIds.forEach { yield(findById(root, it)) }
+            yield(contentDescription?.let { findByDescription(root, it) })
+        }
+            .filterNotNull()
+            .mapNotNull(::clickable)
+            .firstOrNull()
+            ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
     }
 
     private fun findById(root: AccessibilityNodeInfo, viewId: String): AccessibilityNodeInfo? =
