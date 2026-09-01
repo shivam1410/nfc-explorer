@@ -16,3 +16,6 @@ local.properties
 
 # Symlink to the local agentic workspace. Machine-specific and not part of the project.
 .aw
+
+# Release artefacts: the APK handed to a GitHub release, built fresh each time.
+/dist/
