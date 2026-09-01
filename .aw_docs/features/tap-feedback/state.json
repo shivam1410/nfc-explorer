@@ -1,14 +1,15 @@
 {
   "feature_slug": "tap-feedback",
-  "stage": "plan",
+  "stage": "build",
   "mode": "full",
-  "status": "planned_awaiting_build",
+  "status": "phases_1_to_5_complete_device_verification_outstanding",
   "created_utc": "2026-09-01",
   "artifacts": {
     "prd": ".aw_docs/features/tap-feedback/prd.md",
     "spec": ".aw_docs/features/tap-feedback/spec.md",
     "tasks": ".aw_docs/features/tap-feedback/tasks.md",
-    "state": ".aw_docs/features/tap-feedback/state.json"
+    "state": ".aw_docs/features/tap-feedback/state.json",
+    "verification": ".aw_docs/features/tap-feedback/verification.md"
   },
   "builds_on": "tag-actions (trigger activity, assignment store), nfc-explorer-mvp (406 tests, Detekt gating, ADR 0001)",
   "user_decisions": {
@@ -83,8 +84,40 @@
     "note": "every phase consumes types the previous one creates, and phase 4 edits the same ViewModel as phase 2"
   },
   "recommended_next_commands": [
-    "/aw:build  (Phase 1, Task 1.1)"
+    "/aw:test  (device verification: a phone, an assigned card and an unassigned one)"
   ],
-  "test_count_before": 406,
-  "test_count_expected": 423
+  "test_count_before": 570,
+  "test_count_expected": 423,
+  "completed_phases": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "current_phase": null,
+  "test_count_after": 591,
+  "validation_commands": [
+    "./gradlew :app:testDebugUnitTest  (591 tests, 0 failures)",
+    "./gradlew :app:detekt  (16 weighted issues, ALL pre-existing - see verification.md)",
+    "./gradlew :app:assembleDebug"
+  ],
+  "save_point_commits": [
+    "docs: plan tap feedback",
+    "feat: decide what a tap should say, in the domain",
+    "feat: persist tap feedback preferences",
+    "feat: announce a tap with a tone and a toast",
+    "feat: choose the tap sound and toast in settings",
+    "fix: a tone whose file has gone no longer reads as Silent",
+    "docs: tap feedback verified as far as an emulator can"
+  ],
+  "defects_found_during_build": [
+    "the first draft put English prose in domain/, contradicting the rule Labels.kt states; replaced with a TapFailure code resolved in the announcer",
+    "a refused non-NFC launch would have announced itself, handing an exported activity a toast-spam vector and a way to learn which UIDs are assigned; onDispatch now returns Ignored unless the launch was a genuine dispatch",
+    "a tone whose file had been deleted rendered as \"Silent\", claiming no sound was set when one was. getTitle does not return null for a dead media row - it falls back to the last path segment, so the first fix rendered \"38\". Fixed by asking whether the URI opens"
+  ],
+  "blockers": [
+    "AC1, AC2, AC3 and AC5 are only partially verified: no NFC in the emulator and no card available, so no tap was ever dispatched. The preview path exercises the same announce() with the same TapOutcome but not TagActionActivity, TagPresence, or the platform dispatch.",
+    "the README claims Detekt gating; :app:detekt has been failing on this branch with 16 pre-existing findings since before this feature. Out of scope here."
+  ]
 }

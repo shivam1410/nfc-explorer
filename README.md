@@ -10,7 +10,7 @@ refuse to read it?* — and generalised from there. See
 
 ## Status
 
-Phase 1 MVP complete. **406 unit tests, 0 failures.**
+Phase 1 MVP complete. **591 unit tests, 0 failures.**
 
 | Feature | State |
 |---|---|
@@ -23,6 +23,7 @@ Phase 1 MVP complete. **406 unit tests, 0 failures.**
 | Session log and JSON/TXT export via the system file picker | done |
 | Tag actions: launch, link, intent, media | done |
 | Sleep Cycle start/stop toggle on one tag | done, verified on device |
+| Tap feedback: chosen tone, volume, toast naming the action and UID | done |
 | MIFARE Classic, DESFire, NTAG21x, IsoDep | not started |
 | NDEF decode, raw transceive console, hex editor | not started |
 
@@ -38,7 +39,7 @@ in behind `ChipProfileResolver` and the transport interface without reshaping th
 
 ```bash
 ./gradlew :app:assembleDebug        # build
-./gradlew :app:testDebugUnitTest    # 406 unit tests, no device needed
+./gradlew :app:testDebugUnitTest    # 591 unit tests, no device needed
 ./gradlew :app:installDebug         # install on a connected device
 ```
 
@@ -64,6 +65,23 @@ page, UID pages reject writes, lock bytes and OTP are OR-ed so bits set but neve
 NAK. A permissive stub would let tests pass while real hardware failed; that is the failure mode the
 seam exists to prevent. Full reasoning in
 [ADR 0001](docs/adr/0001-fakeable-tag-transport.md).
+
+## The tap beep is not this app's
+
+A second thing worth stating plainly, because it is the first question anyone asks: **the loud beep
+when you tap a tag is played by Android, and this app cannot silence it.**
+
+The platform's `NfcService` plays it when it dispatches the tag — before this app's process exists,
+so there is nothing here to intercept. `FLAG_READER_NO_PLATFORM_SOUNDS` suppresses it only in
+foreground reader mode, which is exactly why scanning *inside* the app is silent and tapping a
+trigger with the app closed is not. The beep follows the device's **notification volume**, and
+turning that down is the only lever — a system-wide one, not ours.
+
+What Settings → Tap feedback controls is this app's own response on top of that: a notification tone
+of your choosing for a tap that ran an action and another for one that failed, a volume for them,
+and a toast naming the action and the tag's UID. Both tones default to Silent, on the grounds that
+the complaint this answers is "a tap is too loud" and a second sound by default would make it worse.
+An unassigned tag stays completely silent, as it always has.
 
 ## ⚠️ Write safety
 
