@@ -135,30 +135,7 @@ object IntentSpecMapper {
             awaitForegroundMillis = action.awaitForegroundMillis,
         )
 
-        is TagAction.WhatsAppMessage -> {
-            val open = IntentSpec.ActivityIntent(
-                action = ACTION_VIEW,
-                uri = WhatsApp.linkFor(action.phoneNumber, action.message),
-            )
-            if (!action.autoSend) {
-                open
-            } else {
-                // Open the chat, let it settle, then press send. The gap is not decoration: the
-                // button does not exist until WhatsApp has drawn the conversation.
-                IntentSpec.Sequence(
-                    specs = listOf(
-                        open,
-                        IntentSpec.TapNode(
-                            viewIds = WhatsApp.SEND_BUTTON_IDS,
-                            contentDescription = WhatsApp.SEND_BUTTON_DESCRIPTION,
-                            requireForegroundPackages = WhatsApp.PACKAGES,
-                            awaitForegroundMillis = TagAction.DEFAULT_AWAIT_FOREGROUND_MILLIS,
-                        ),
-                    ),
-                    gapMillis = TagAction.DEFAULT_GAP_MILLIS,
-                )
-            }
-        }
+        is TagAction.WhatsAppMessage -> whatsApp(action)
 
         is TagAction.TogglToggle -> IntentSpec.TogglTimer(
             description = action.description,
@@ -170,6 +147,35 @@ object IntentSpecMapper {
         is TagAction.Steps -> IntentSpec.Sequence(
             specs = action.steps.map(::map),
             gapMillis = action.gapMillis,
+        )
+    }
+
+    /**
+     * Open the chat, and press send only if the user asked for it.
+     *
+     * Extracted from [map] when that passed the `LongMethod` threshold — and it is the right branch
+     * to lift out, because it is the only one that is a decision rather than a translation.
+     *
+     * The gap before the tap is not decoration: the send button does not exist until WhatsApp has
+     * drawn the conversation, so pressing immediately presses nothing.
+     */
+    private fun whatsApp(action: TagAction.WhatsAppMessage): IntentSpec {
+        val open = IntentSpec.ActivityIntent(
+            action = ACTION_VIEW,
+            uri = WhatsApp.linkFor(action.phoneNumber, action.message),
+        )
+        if (!action.autoSend) return open
+        return IntentSpec.Sequence(
+            specs = listOf(
+                open,
+                IntentSpec.TapNode(
+                    viewIds = WhatsApp.SEND_BUTTON_IDS,
+                    contentDescription = WhatsApp.SEND_BUTTON_DESCRIPTION,
+                    requireForegroundPackages = WhatsApp.PACKAGES,
+                    awaitForegroundMillis = TagAction.DEFAULT_AWAIT_FOREGROUND_MILLIS,
+                ),
+            ),
+            gapMillis = TagAction.DEFAULT_GAP_MILLIS,
         )
     }
 }

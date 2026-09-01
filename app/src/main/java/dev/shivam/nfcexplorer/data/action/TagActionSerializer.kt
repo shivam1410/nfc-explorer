@@ -169,14 +169,7 @@ object TagActionSerializer {
             TYPE_MEDIA -> dto.mediaKey
                 ?.let { name -> MediaKey.entries.firstOrNull { it.name == name } }
                 ?.let(TagAction::MediaCommand)
-            TYPE_WHATSAPP -> dto.packageName?.let { number ->
-                TagAction.WhatsAppMessage(
-                    phoneNumber = number,
-                    contactName = dto.contactName?.takeIf { it.isNotBlank() },
-                    message = dto.intentAction.orEmpty(),
-                    autoSend = dto.autoSend,
-                )
-            }
+            TYPE_WHATSAPP -> whatsAppOrNull(dto)
             TYPE_TAP_NODE -> TagAction.TapNode(
                 viewId = dto.packageName,
                 contentDescription = dto.intentAction,
@@ -189,27 +182,55 @@ object TagActionSerializer {
                 tags = dto.togglTags,
                 projectId = dto.projectId,
             )
-            TYPE_DRAG -> dto.drag?.let { drag ->
-                TagAction.DragGesture(
-                    startXRatio = drag.startXRatio,
-                    startYRatio = drag.startYRatio,
-                    endXRatio = drag.endXRatio,
-                    endYRatio = drag.endYRatio,
-                    holdMillis = drag.holdMillis,
-                    travelMillis = drag.travelMillis,
-                    steps = drag.steps,
-                    requireForegroundPackage = drag.requireForegroundPackage,
-                )
-            }
-            TYPE_STEPS -> dto.steps
-                ?.map { child -> toLeafOrNull(child) ?: return@runCatching null }
-                ?.let { children ->
-                    TagAction.Steps(steps = children, gapMillis = dto.gapMillis ?: 0L)
-                }
+            TYPE_DRAG -> dragOrNull(dto)
+            TYPE_STEPS -> stepsOrNull(dto)
             // Written by a newer build. Skip this entry, keep the rest.
             else -> null
         }
     }.getOrNull()
+
+    /**
+     * One decoder per type that needs more than a constructor call.
+     *
+     * Split out of [toLeafOrNull]'s `when` when it passed the cyclomatic-complexity threshold.
+     * Only the branches that were themselves multi-step: a single `?.let` chain stayed inline,
+     * because lifting it out bought no complexity and cost this object a function it does not have
+     * room for.
+     */
+    private fun whatsAppOrNull(dto: ActionDto): TagAction.WhatsAppMessage? =
+        dto.packageName?.let { number ->
+            TagAction.WhatsAppMessage(
+                phoneNumber = number,
+                contactName = dto.contactName?.takeIf { it.isNotBlank() },
+                message = dto.intentAction.orEmpty(),
+                autoSend = dto.autoSend,
+            )
+        }
+
+    private fun dragOrNull(dto: ActionDto): TagAction.DragGesture? = dto.drag?.let { drag ->
+        TagAction.DragGesture(
+            startXRatio = drag.startXRatio,
+            startYRatio = drag.startYRatio,
+            endXRatio = drag.endXRatio,
+            endYRatio = drag.endYRatio,
+            holdMillis = drag.holdMillis,
+            travelMillis = drag.travelMillis,
+            steps = drag.steps,
+            requireForegroundPackage = drag.requireForegroundPackage,
+        )
+    }
+
+    /**
+     * A composite, or null if any child fails to decode.
+     *
+     * All-or-nothing on purpose: a Steps action that quietly lost one of its steps would still run,
+     * and would do something the user never configured. Losing the whole assignment is the visible
+     * failure, and the recoverable one.
+     */
+    private fun stepsOrNull(dto: ActionDto): TagAction.Steps? {
+        val children = dto.steps?.map { child -> toLeafOrNull(child) ?: return null } ?: return null
+        return TagAction.Steps(steps = children, gapMillis = dto.gapMillis ?: 0L)
+    }
 
     private const val TYPE_LAUNCH_APP = "launchApp"
     private const val TYPE_OPEN_URI = "openUri"

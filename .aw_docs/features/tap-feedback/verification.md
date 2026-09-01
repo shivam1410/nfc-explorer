@@ -4,7 +4,7 @@
 
 - Android 16 (API 36) emulator, `sketchseed-test`, production build (no root).
 - `./gradlew :app:testDebugUnitTest` — 591 tests, 0 failures.
-- `./gradlew :app:detekt` — **16 weighted issues, all pre-existing.** See "Detekt" below.
+- `./gradlew :app:detekt` — **green.** The 16 pre-existing findings were fixed after the feature landed; see "Detekt" below.
 
 ## The gap in this verification
 
@@ -39,19 +39,32 @@ What that leaves genuinely unproven, and what a phone and two cards would settle
 
 ## Detekt
 
-`:app:detekt` fails with 16 weighted issues. **All 16 are pre-existing**, in files this feature never
-opened: `ActionBindingsModule` (17 functions vs a threshold of 16), `TagActionSerializer.toLeafOrNull`
-(complexity 18 vs 15), `IntentSpec.map` (64 lines vs 60), an unused `ACTION_ICON_SIZE` and an unused
-`CloudSyncService.toDto`, a `LongParameterList` in `TagActionGestureTest`, and eight `MaxLineLength`
-hits. Confirmed pre-existing by the working tree containing nothing but new, untracked files at the
-time detekt was first run.
+`:app:detekt` had been failing on this branch with **16 findings, none of them from this feature** —
+confirmed at the time by the working tree containing nothing but new, untracked files. The count
+stayed at 16 through all five phases.
 
-No new finding was introduced by any of the five phases; the count stayed at 16 throughout. The two
-findings that name `SettingsScreen.kt` and `SettingsViewModel.kt` are the sync date-format line and
-the unknown-sources intent line, both untouched, renumbered by insertions above them.
+They were fixed afterwards, in their own commit, so the feature diff and the cleanup stay separately
+reviewable:
 
-The README's claim of "Detekt gating" is therefore currently untrue on this branch. Fixing those 16
-is out of scope here and wants its own change.
+- nine over-length lines wrapped, in five files
+- two genuinely dead members deleted: `TagActionsScreen.ACTION_ICON_SIZE`, and
+  `CloudSyncService.toDto` together with the `LogEntryDto` only it built
+- `ActionBindingsModule` split into `SyncModule` and `UpdateModule`. It had passed
+  `TooManyFunctions` for the second time, and raising the threshold again would have been the third
+  consecutive time a rule moved rather than the code — while the seam was obvious once looked for,
+  since none of the sync or update bindings has anything to do with what a tag does when tapped
+- `TagActionSerializer.toLeafOrNull` had its three multi-step branches extracted as named decoders,
+  dropping cyclomatic complexity from 18. Its single-`let` branch stayed inline: lifting that one out
+  bought no complexity and pushed the object over `TooManyFunctions` instead
+- `IntentSpec.map` had its WhatsApp branch extracted, which was the only branch that is a decision
+  rather than a translation
+- `TagActionGestureTest.drag` keeps its eight parameters under a site-local `@Suppress`, with the
+  reason written down. Every parameter has a default and it is called as `drag(startX = 1080f)`; a
+  parameter object would satisfy the rule by making every call site build one, which is the shape the
+  builder exists to avoid. Suppressed at the site rather than excluding all of `**/test/**`, so the
+  next eight-parameter test function still has to argue for itself.
+
+`./gradlew :app:testDebugUnitTest :app:detekt :app:assembleDebug` is green.
 
 ## Defects found and fixed during the build
 

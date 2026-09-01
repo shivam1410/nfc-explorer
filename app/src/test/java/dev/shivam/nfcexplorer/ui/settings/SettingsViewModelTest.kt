@@ -89,7 +89,8 @@ class SettingsViewModelTest {
     ) : UpdateInstaller {
         var installed: java.io.File? = null
         override fun canInstall() = allowed
-        override fun unknownSourcesIntent() = android.content.Intent("android.settings.MANAGE_UNKNOWN_APP_SOURCES")
+        override fun unknownSourcesIntent() =
+            android.content.Intent("android.settings.MANAGE_UNKNOWN_APP_SOURCES")
         override suspend fun download(url: String, version: String) = downloadResult
         override fun install(apk: java.io.File): Result<Unit> {
             installed = apk
@@ -349,7 +350,13 @@ class SettingsViewModelTest {
 
     // --- Installing an update ---
 
-    private val release = AppRelease("v0.3.0", "0.3.0", "https://example.test", "https://example.test/a.apk", true)
+    private val release = AppRelease(
+        "v0.3.0",
+        "0.3.0",
+        "https://example.test",
+        "https://example.test/a.apk",
+        true,
+    )
 
     @Test
     fun `a downloaded update is handed to the installer`() = runTest {

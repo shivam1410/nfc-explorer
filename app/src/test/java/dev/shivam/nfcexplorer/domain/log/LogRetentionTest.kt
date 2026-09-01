@@ -113,7 +113,8 @@ class LogRetentionTest {
     fun `the history is bounded and drops the oldest`() {
         var history = emptyList<LogEntry>()
         repeat(5) { index ->
-            history = LogRetention.append(history, listOf(entry(0, index.toLong(), "entry $index")), tapLimit = 3)
+            val incoming = listOf(entry(0, index.toLong(), "entry $index"))
+            history = LogRetention.append(history, incoming, tapLimit = 3)
         }
 
         assertEquals(listOf("entry 4", "entry 3", "entry 2"), history.map { it.message })
@@ -182,7 +183,10 @@ class LogRetentionTest {
         )
         history = LogRetention.append(
             history,
-            listOf(entry(1, 400, "scan again", category = "read"), entry(0, 300, "tap again", category = "trigger")),
+            listOf(
+                entry(1, 400, "scan again", category = "read"),
+                entry(0, 300, "tap again", category = "trigger"),
+            ),
         )
 
         val sequences = history.map { it.sequence }
@@ -271,7 +275,8 @@ class LogRetentionTest {
 
         assertEquals(6, restored.size)
         assertTrue(
-            restored.take(5).map { it.message } == held.sortedByDescending { it.timestampMillis }.map { it.message },
+            restored.take(5).map { it.message } ==
+                held.sortedByDescending { it.timestampMillis }.map { it.message },
             "the newest entries must be the ones that survive, got ${restored.map { it.message }}",
         )
     }

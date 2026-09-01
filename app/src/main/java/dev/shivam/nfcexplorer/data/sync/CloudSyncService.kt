@@ -9,10 +9,7 @@ import dev.shivam.nfcexplorer.domain.sync.CloudStore
 import dev.shivam.nfcexplorer.domain.sync.CloudSync
 import dev.shivam.nfcexplorer.domain.sync.SyncMerge
 import dev.shivam.nfcexplorer.domain.sync.SyncReport
-import dev.shivam.nfcexplorer.logging.LogEntry
 import dev.shivam.nfcexplorer.logging.SessionLogger
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -74,7 +71,7 @@ class CloudSyncService @Inject constructor(
             message = "merged assignments",
             payload = mapOf(
                 "local" to local.size.toString(),
-                "remoteDocument" to if (remoteDocument == null) "absent" else "${remoteDocument.length} chars",
+                "remoteDocument" to (remoteDocument?.let { "${it.length} chars" } ?: "absent"),
                 "remote" to remote.size.toString(),
                 "pull" to merged.fromCloud.size.toString(),
                 "push" to merged.fromLocal.size.toString(),
@@ -228,32 +225,14 @@ class CloudSyncService @Inject constructor(
             cloud.delete(name)
                 .onSuccess { removed++ }
                 .onFailure { failure ->
-                    logger.warn(CATEGORY, "could not remove old log", mapOf("name" to name, "error" to describe(failure)))
+                    val why = mapOf("name" to name, "error" to describe(failure))
+                    logger.warn(CATEGORY, "could not remove old log", why)
                 }
         }
         logger.info(CATEGORY, "removed old logs", mapOf("count" to removed.toString()))
     }
 
     private fun describe(failure: Throwable): String = failure.message ?: failure::class.java.simpleName
-
-    private fun toDto(entry: LogEntry) = LogEntryDto(
-        sequence = entry.sequence,
-        timestampMillis = entry.timestampMillis,
-        level = entry.level.name,
-        category = entry.category,
-        message = entry.message,
-        payload = entry.payload,
-    )
-
-    @Serializable
-    private data class LogEntryDto(
-        @SerialName("sequence") val sequence: Long,
-        @SerialName("timestampMillis") val timestampMillis: Long,
-        @SerialName("level") val level: String,
-        @SerialName("category") val category: String,
-        @SerialName("message") val message: String,
-        @SerialName("payload") val payload: Map<String, String>,
-    )
 
     private companion object {
         const val CATEGORY = "sync"

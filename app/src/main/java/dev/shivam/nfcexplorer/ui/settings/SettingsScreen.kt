@@ -172,7 +172,10 @@ fun SettingsScreen(
             )
             Text(
                 text = state.lastSyncedAtMillis
-                    ?.let { stringResource(R.string.settings_sync_last, LAST_SYNC_FORMAT.format(java.util.Date(it))) }
+                    ?.let {
+                        val at = LAST_SYNC_FORMAT.format(java.util.Date(it))
+                        stringResource(R.string.settings_sync_last, at)
+                    }
                     ?: stringResource(R.string.settings_sync_never),
                 style = MaterialTheme.typography.bodySmall,
             )

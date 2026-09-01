@@ -14,6 +14,15 @@ import kotlin.test.assertTrue
  */
 class TagActionGestureTest {
 
+    /**
+     * A valid drag, with one field overridden per test.
+     *
+     * `LongParameterList` is suppressed rather than obeyed. The rule exists to catch functions whose
+     * callers must remember an argument order; this has a default for every parameter and is called
+     * as `drag(startX = 1080f)`. A parameter object would satisfy the rule by making every call site
+     * construct one — which is the shape the builder exists to avoid.
+     */
+    @Suppress("LongParameterList")
     private fun drag(
         startX: Float = 0.5f,
         startY: Float = 0.8f,

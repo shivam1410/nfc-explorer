@@ -413,7 +413,11 @@ class SettingsViewModel @Inject constructor(
     fun onAllowInstalls() {
         viewModelScope.launch {
             runCatching { installer.unknownSourcesIntent() }
-                .onSuccess { intent -> performer.perform(TagAction.SendIntent(intent.action.orEmpty(), intent.data?.toString())) }
+                .onSuccess { intent ->
+                    performer.perform(
+                        TagAction.SendIntent(intent.action.orEmpty(), intent.data?.toString()),
+                    )
+                }
         }
     }
 

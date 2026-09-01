@@ -648,8 +648,6 @@ private const val ICON_PIXELS = 96
 
 private val ICON_SIZE = 28.dp
 
-private val ACTION_ICON_SIZE = 18.dp
-
 /**
  * How many apps the picker builds at once.
  *
