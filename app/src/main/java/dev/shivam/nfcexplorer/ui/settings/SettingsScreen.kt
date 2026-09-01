@@ -538,23 +538,23 @@ private fun ToneRow(
 }
 
 /**
- * The tone's name as the system knows it, or "Silent".
+ * The tone's name as the system knows it, "Silent", or a warning that it has gone.
+ *
+ * The three cases are kept apart deliberately. A stored tone whose file has since been deleted, or
+ * which lived on media that is no longer mounted, resolves to no title — and reporting that as
+ * "Silent" would tell the user no sound is set when one is, sending them away from the setting that
+ * needs their attention. The announcer logs the same failure when it tries to play it, but only
+ * during the session it happens in; this row is where someone actually looks.
  *
  * Resolving a title is a media-store lookup, so it is remembered against the URI rather than run on
- * every recomposition. A tone whose file has gone resolves to null and reads as Silent here — the
- * announcer is where that case is logged, since this screen cannot tell the two apart anyway.
+ * every recomposition.
  */
 @Composable
 private fun toneTitle(tone: String?): String {
     val context = LocalContext.current
-    val resolved = remember(tone) {
-        tone?.let {
-            runCatching {
-                RingtoneManager.getRingtone(context, Uri.parse(it))?.getTitle(context)
-            }.getOrNull()
-        }
-    }
-    return resolved ?: stringResource(R.string.settings_feedback_silent)
+    if (tone == null) return stringResource(R.string.settings_feedback_silent)
+    val resolved = remember(tone) { resolveToneTitle(context, tone) }
+    return resolved ?: stringResource(R.string.settings_feedback_tone_missing)
 }
 
 /**
@@ -624,4 +624,22 @@ private fun VolumeRow(percent: Int, onVolumeChange: (Int) -> Unit) {
             style = MaterialTheme.typography.labelSmall,
         )
     }
+}
+
+/**
+ * The stored tone's display name, or null when the URI no longer resolves.
+ *
+ * The open is the load-bearing half. `RingtoneManager.getRingtone(...).getTitle(...)` does not
+ * return null for a tone whose media row has been deleted — it falls back to the URI's last path
+ * segment, so a deleted tone rendered as a bare id like "38". Asking the content resolver whether
+ * the URI can actually be opened is the same question `MediaPlayer` will ask a moment later, which
+ * is exactly why it is the right one to ask here.
+ */
+private fun resolveToneTitle(context: android.content.Context, tone: String): String? {
+    val uri = Uri.parse(tone)
+    val opens = runCatching {
+        context.contentResolver.openAssetFileDescriptor(uri, "r")?.also { it.close() } != null
+    }.getOrDefault(false)
+    if (!opens) return null
+    return runCatching { RingtoneManager.getRingtone(context, uri)?.getTitle(context) }.getOrNull()
 }

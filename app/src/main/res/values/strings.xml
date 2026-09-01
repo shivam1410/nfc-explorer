@@ -293,6 +293,7 @@
     <string name="settings_feedback_ran">Sound when an action runs</string>
     <string name="settings_feedback_failed">Sound when a tap fails</string>
     <string name="settings_feedback_silent">Silent</string>
+    <string name="settings_feedback_tone_missing">Sound no longer on this phone — choose another</string>
     <string name="settings_feedback_choose">Choose</string>
     <string name="settings_feedback_preview">Preview</string>
     <string name="settings_feedback_volume">Volume</string>
