@@ -9,6 +9,8 @@ import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.SystemGrantState
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackSettings
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackVolume
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import kotlinx.coroutines.flow.Flow
@@ -116,6 +118,24 @@ class SettingsViewModelTest {
 
     private val syncState = FakeSyncState()
 
+    /** The four tap-feedback preferences, in memory. */
+    private class FakeFeedbackSettings : FeedbackSettings {
+        var ran: String? = null
+        var failed: String? = null
+        var volume: Int = FeedbackVolume.DEFAULT_PERCENT
+        var toasts: Boolean = true
+        override fun ranTone(): String? = ran
+        override fun setRanTone(uri: String?) { ran = uri }
+        override fun failedTone(): String? = failed
+        override fun setFailedTone(uri: String?) { failed = uri }
+        override fun volumePercent(): Int = volume
+        override fun setVolumePercent(percent: Int) { volume = FeedbackVolume.clamp(percent) }
+        override fun toastsEnabled(): Boolean = toasts
+        override fun setToastsEnabled(enabled: Boolean) { toasts = enabled }
+    }
+
+    private val feedback = FakeFeedbackSettings()
+
     /** Answers as Toggl would, without a network. */
     private class FakeToggl(
         var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
@@ -145,6 +165,7 @@ class SettingsViewModelTest {
         toggl = toggl,
         assignments = assignments,
         syncState = syncState,
+        feedback = feedback,
     )
 
     // --- Permissions ---
@@ -517,5 +538,72 @@ class SettingsViewModelTest {
 
         assertTrue(model.state.value.sync is SyncUiState.Failed)
         assertFalse(synced, "a sync must not run without authorization")
+    }
+
+    // --- Tap feedback ---
+
+    @Test
+    fun `the stored tap feedback preferences are on screen from the start`() = runTest {
+        feedback.ran = "content://media/ran"
+        feedback.failed = "content://media/failed"
+        feedback.volume = 30
+        feedback.toasts = false
+
+        val model = viewModel()
+        advanceUntilIdle()
+
+        val state = model.state.value
+        assertEquals("content://media/ran", state.ranTone)
+        assertEquals("content://media/failed", state.failedTone)
+        assertEquals(30, state.volumePercent)
+        assertFalse(state.toastsEnabled)
+    }
+
+    @Test
+    fun `choosing a tone persists it and shows it`() = runTest {
+        val model = viewModel()
+
+        model.onRanToneChosen("content://media/chime")
+        model.onFailedToneChosen("content://media/buzz")
+
+        assertEquals("content://media/chime", feedback.ran)
+        assertEquals("content://media/chime", model.state.value.ranTone)
+        assertEquals("content://media/buzz", feedback.failed)
+        assertEquals("content://media/buzz", model.state.value.failedTone)
+    }
+
+    @Test
+    fun `picking Silent clears the tone rather than storing a blank`() = runTest {
+        feedback.ran = "content://media/chime"
+        val model = viewModel()
+
+        // The system picker returns a null URI for Silent, and null has to survive the whole way
+        // down. A blank string here would come back as a tone that fails to resolve.
+        model.onRanToneChosen(null)
+
+        assertEquals(null, feedback.ran)
+        assertEquals(null, model.state.value.ranTone)
+    }
+
+    @Test
+    fun `a volume beyond the slider is clamped before it is stored`() = runTest {
+        val model = viewModel()
+
+        model.onVolumeChange(140)
+
+        assertEquals(100, feedback.volume)
+        assertEquals(100, model.state.value.volumePercent)
+    }
+
+    @Test
+    fun `toasts can be switched off without touching the tones`() = runTest {
+        feedback.ran = "content://media/chime"
+        val model = viewModel()
+
+        model.onToastsChange(false)
+
+        assertFalse(feedback.toasts)
+        assertFalse(model.state.value.toastsEnabled)
+        assertEquals("content://media/chime", feedback.ran, "the tone is a separate setting")
     }
 }

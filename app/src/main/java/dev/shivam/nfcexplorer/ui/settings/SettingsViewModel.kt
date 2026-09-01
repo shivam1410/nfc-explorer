@@ -12,6 +12,8 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackSettings
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackVolume
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.update.AppVersion
 import dev.shivam.nfcexplorer.data.sync.SyncState
@@ -93,6 +95,18 @@ data class SettingsUiState(
     val install: InstallStatus = InstallStatus.Idle,
     /** Tags deleted but still recorded, and therefore restorable without the card. */
     val deleted: List<TagAssignment> = emptyList(),
+    /**
+     * Content URI of the tone played when a tapped tag runs its action, or null for silent.
+     *
+     * The URI rather than a resolved title: resolving one needs a `Context`, which belongs to the
+     * composable that displays it, not to state that also has to survive a configuration change.
+     */
+    val ranTone: String? = null,
+    /** Content URI of the tone played when an assigned tap fails, or null for silent. */
+    val failedTone: String? = null,
+    /** 0..100, applied to whichever tone plays. Android's own discovery beep is beyond its reach. */
+    val volumePercent: Int = FeedbackVolume.DEFAULT_PERCENT,
+    val toastsEnabled: Boolean = true,
 )
 
 /**
@@ -114,6 +128,7 @@ class SettingsViewModel @Inject constructor(
     private val toggl: TogglSession,
     private val assignments: TagActionRepository,
     private val syncState: SyncState,
+    private val feedback: FeedbackSettings,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -128,6 +143,46 @@ class SettingsViewModel @Inject constructor(
         }
         refreshGrants()
         refreshTogglToken()
+        refreshFeedback()
+    }
+
+    /** Reads the four tap-feedback preferences into state. Cheap, synchronous, no I/O worth naming. */
+    private fun refreshFeedback() {
+        backing.update {
+            it.copy(
+                ranTone = feedback.ranTone(),
+                failedTone = feedback.failedTone(),
+                volumePercent = feedback.volumePercent(),
+                toastsEnabled = feedback.toastsEnabled(),
+            )
+        }
+    }
+
+    /**
+     * A tone the user picked, or null for Silent.
+     *
+     * Null survives the whole way down to the store, which removes the key rather than writing a
+     * blank. Silent and "a tone that no longer resolves" must stay distinguishable.
+     */
+    fun onRanToneChosen(uri: String?) {
+        feedback.setRanTone(uri)
+        refreshFeedback()
+    }
+
+    fun onFailedToneChosen(uri: String?) {
+        feedback.setFailedTone(uri)
+        refreshFeedback()
+    }
+
+    /** Clamped by the store, and read back from it, so state can never hold a value it rejected. */
+    fun onVolumeChange(percent: Int) {
+        feedback.setVolumePercent(percent)
+        refreshFeedback()
+    }
+
+    fun onToastsChange(enabled: Boolean) {
+        feedback.setToastsEnabled(enabled)
+        refreshFeedback()
     }
 
     /** Reads only whether a token exists and its last few characters, never the whole value. */
