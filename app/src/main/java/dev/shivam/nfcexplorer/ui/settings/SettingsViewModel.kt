@@ -12,8 +12,11 @@ import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.action.SystemSettings
 import dev.shivam.nfcexplorer.domain.action.TagAction
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackAnnouncer
 import dev.shivam.nfcexplorer.domain.feedback.FeedbackSettings
 import dev.shivam.nfcexplorer.domain.feedback.FeedbackVolume
+import dev.shivam.nfcexplorer.domain.feedback.TapFailure
+import dev.shivam.nfcexplorer.domain.feedback.TapOutcome
 import dev.shivam.nfcexplorer.domain.secret.SecretStore
 import dev.shivam.nfcexplorer.domain.update.AppVersion
 import dev.shivam.nfcexplorer.data.sync.SyncState
@@ -129,6 +132,7 @@ class SettingsViewModel @Inject constructor(
     private val assignments: TagActionRepository,
     private val syncState: SyncState,
     private val feedback: FeedbackSettings,
+    private val announcer: FeedbackAnnouncer,
     installedVersion: InstalledVersion,
 ) : ViewModel() {
 
@@ -183,6 +187,27 @@ class SettingsViewModel @Inject constructor(
     fun onToastsChange(enabled: Boolean) {
         feedback.setToastsEnabled(enabled)
         refreshFeedback()
+    }
+
+    /**
+     * Plays a tone and shows a toast exactly as a real tap would.
+     *
+     * Through the announcer rather than a private player, so the preview honours every setting the
+     * real thing honours. A preview that ignored the toast switch, or that played at full volume,
+     * would be answering a different question from the one the user is asking -- and the question
+     * is "what will this sound like when I tap the card".
+     *
+     * [label] is passed in because it is display copy, and resolving a string resource is the
+     * composable's job, not this one's.
+     */
+    fun onPreviewRan(label: String) {
+        announcer.announce(TapOutcome.Ran(label, PREVIEW_UID))
+    }
+
+    fun onPreviewFailed(label: String) {
+        announcer.announce(
+            TapOutcome.Failed(label, PREVIEW_UID, TapFailure.CARD_LEFT_FIELD),
+        )
     }
 
     /** Reads only whether a token exists and its last few characters, never the whole value. */
@@ -397,6 +422,9 @@ class SettingsViewModel @Inject constructor(
 
     private companion object {
         const val TOKEN_TAIL_LENGTH = 4
+
+        /** Shaped like a real UID so the preview shows the width the toast will actually take. */
+        const val PREVIEW_UID = "041c4e52ce7c80"
     }
 
     private fun openSettings(action: TagAction) {

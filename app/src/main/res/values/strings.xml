@@ -302,7 +302,7 @@
     <string name="feedback_toast_failed">%1$s didn\'t run — %2$s</string>
     <string name="feedback_reason_left_field">the card left the field before it could answer</string>
     <string name="feedback_reason_unreadable">this card speaks nothing the app can open</string>
-    <string name="feedback_preview_label">Preview</string>
+    <string name="settings_feedback_preview_label">Preview</string>
 
     <!-- Log -->
     <string name="log_title">Session log</string>

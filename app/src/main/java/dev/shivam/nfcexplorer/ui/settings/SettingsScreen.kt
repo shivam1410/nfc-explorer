@@ -1,5 +1,12 @@
 package dev.shivam.nfcexplorer.ui.settings
 
+import android.app.Activity
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,8 +24,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -59,6 +73,12 @@ fun SettingsScreen(
     onCancelTogglEdit: () -> Unit,
     onCheckToggl: () -> Unit,
     onOpenDeleted: () -> Unit,
+    onRanToneChosen: (String?) -> Unit,
+    onFailedToneChosen: (String?) -> Unit,
+    onVolumeChange: (Int) -> Unit,
+    onToastsChange: (Boolean) -> Unit,
+    onPreviewRan: (String) -> Unit,
+    onPreviewFailed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -84,6 +104,16 @@ fun SettingsScreen(
                 onOpen = onOpenAccessibilitySettings,
             )
         }
+
+        TapFeedbackSection(
+            state = state,
+            onRanToneChosen = onRanToneChosen,
+            onFailedToneChosen = onFailedToneChosen,
+            onVolumeChange = onVolumeChange,
+            onToastsChange = onToastsChange,
+            onPreviewRan = onPreviewRan,
+            onPreviewFailed = onPreviewFailed,
+        )
 
         // Only when there is something to restore, and the card is the control: a section that
         // exists to be opened does not need a button inside it saying so.
@@ -399,5 +429,199 @@ private fun GrantRow(granted: Boolean, labelRes: Int, onOpen: () -> Unit) {
                 ),
             )
         }
+    }
+}
+
+/**
+ * Tap feedback: two tones, a volume, and whether a tap names itself on screen.
+ *
+ * The subtitle says, in words, that Android's own discovery beep is not this app's. Without it the
+ * whole section reads as broken the first time someone sets a quiet tone, taps a card, and still
+ * hears the loud one — which is the exact complaint that produced this feature.
+ */
+@Composable
+private fun TapFeedbackSection(
+    state: SettingsUiState,
+    onRanToneChosen: (String?) -> Unit,
+    onFailedToneChosen: (String?) -> Unit,
+    onVolumeChange: (Int) -> Unit,
+    onToastsChange: (Boolean) -> Unit,
+    onPreviewRan: (String) -> Unit,
+    onPreviewFailed: (String) -> Unit,
+) {
+    val previewLabel = stringResource(R.string.settings_feedback_preview_label)
+
+    SectionCard(
+        title = stringResource(R.string.settings_feedback_title),
+        subtitle = stringResource(R.string.settings_feedback_subtitle),
+        collapsible = false,
+    ) {
+        ToneRow(
+            labelRes = R.string.settings_feedback_ran,
+            tone = state.ranTone,
+            onChosen = onRanToneChosen,
+            onPreview = { onPreviewRan(previewLabel) },
+        )
+        ToneRow(
+            labelRes = R.string.settings_feedback_failed,
+            tone = state.failedTone,
+            onChosen = onFailedToneChosen,
+            onPreview = { onPreviewFailed(previewLabel) },
+        )
+
+        VolumeRow(percent = state.volumePercent, onVolumeChange = onVolumeChange)
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_feedback_toast),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(checked = state.toastsEnabled, onCheckedChange = onToastsChange)
+        }
+    }
+}
+
+/**
+ * One tone: what it is now, a way to change it, and a way to hear it.
+ *
+ * Preview earns its place next to the volume slider. Judging a notification tone by name is
+ * guesswork, and the alternative way to hear it is to go and find a card.
+ */
+@Composable
+private fun ToneRow(
+    @androidx.annotation.StringRes labelRes: Int,
+    tone: String?,
+    onChosen: (String?) -> Unit,
+    onPreview: () -> Unit,
+) {
+    val title = stringResource(labelRes)
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        // A cancelled picker must not clear the tone. Only RESULT_OK carries a decision, and within
+        // it a null URI is the user choosing Silent — which is why null is passed straight through
+        // rather than being treated as "nothing came back".
+        if (result.resultCode == Activity.RESULT_OK) {
+            onChosen(pickedTone(result.data)?.toString())
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = toneTitle(tone),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Nothing to preview when the tone is Silent, and a button that is guaranteed to do nothing
+        // is worse than no button.
+        if (tone != null) {
+            TextButton(onClick = onPreview) {
+                Text(stringResource(R.string.settings_feedback_preview))
+            }
+        }
+        TextButton(onClick = { picker.launch(tonePickerIntent(tone, title)) }) {
+            Text(stringResource(R.string.settings_feedback_choose))
+        }
+    }
+}
+
+/**
+ * The tone's name as the system knows it, or "Silent".
+ *
+ * Resolving a title is a media-store lookup, so it is remembered against the URI rather than run on
+ * every recomposition. A tone whose file has gone resolves to null and reads as Silent here — the
+ * announcer is where that case is logged, since this screen cannot tell the two apart anyway.
+ */
+@Composable
+private fun toneTitle(tone: String?): String {
+    val context = LocalContext.current
+    val resolved = remember(tone) {
+        tone?.let {
+            runCatching {
+                RingtoneManager.getRingtone(context, Uri.parse(it))?.getTitle(context)
+            }.getOrNull()
+        }
+    }
+    return resolved ?: stringResource(R.string.settings_feedback_silent)
+}
+
+/**
+ * Android's own notification-tone picker, opened on whatever is currently chosen.
+ *
+ * `SHOW_SILENT` is what makes "no sound" reachable, and it is the default for both tones.
+ * `SHOW_DEFAULT` is off deliberately: "Default notification sound" is a moving target that follows
+ * a system setting, and a tap tone that changes when an unrelated setting does would be baffling.
+ */
+private fun tonePickerIntent(tone: String?, title: String) =
+    Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, false)
+        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, title)
+        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, tone?.let(Uri::parse))
+    }
+
+/** The typed accessor arrived in API 33; `minSdk` is 26, so the deprecated form is still needed. */
+private fun pickedTone(data: Intent?): Uri? = when {
+    data == null -> null
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+        data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+    else -> {
+        @Suppress("DEPRECATION")
+        data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+    }
+}
+
+/**
+ * The tone volume, written when the drag ends rather than while it moves.
+ *
+ * The slider holds its own position mid-drag: routing every frame through the view model would be
+ * a preference write per pixel, and the store clamps and reads back on each one. On release the
+ * local position is dropped and the stored value takes over again, so what is on screen is always
+ * what was actually saved.
+ *
+ * This is the app's tone only. Android's discovery beep follows the device notification volume and
+ * this slider cannot reach it.
+ */
+@Composable
+private fun VolumeRow(percent: Int, onVolumeChange: (Int) -> Unit) {
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: percent.toFloat()
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_feedback_volume),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Slider(
+            value = shown,
+            onValueChange = { dragging = it },
+            onValueChangeFinished = {
+                dragging?.let { onVolumeChange(it.toInt()) }
+                dragging = null
+            },
+            valueRange = 0f..100f,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.settings_feedback_volume_value, shown.toInt()),
+            style = MaterialTheme.typography.labelSmall,
+        )
     }
 }

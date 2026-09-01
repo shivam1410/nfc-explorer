@@ -283,6 +283,12 @@ fun NfcExplorerNavHost(
                     onCancelTogglEdit = settingsViewModel::onCancelTogglEdit,
                     onCheckToggl = settingsViewModel::onCheckToggl,
                     onOpenDeleted = { navController.navigate(DELETED_ROUTE) },
+                    onRanToneChosen = settingsViewModel::onRanToneChosen,
+                    onFailedToneChosen = settingsViewModel::onFailedToneChosen,
+                    onVolumeChange = settingsViewModel::onVolumeChange,
+                    onToastsChange = settingsViewModel::onToastsChange,
+                    onPreviewRan = settingsViewModel::onPreviewRan,
+                    onPreviewFailed = settingsViewModel::onPreviewFailed,
                 )
             }
             composable(Destination.ACTIONS.route) {

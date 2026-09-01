@@ -9,8 +9,11 @@ import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.SystemGrantState
 import dev.shivam.nfcexplorer.domain.action.SystemGrants
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackAnnouncer
 import dev.shivam.nfcexplorer.domain.feedback.FeedbackSettings
 import dev.shivam.nfcexplorer.domain.feedback.FeedbackVolume
+import dev.shivam.nfcexplorer.domain.feedback.TapFailure
+import dev.shivam.nfcexplorer.domain.feedback.TapOutcome
 import dev.shivam.nfcexplorer.domain.action.TagAssignment
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import kotlinx.coroutines.flow.Flow
@@ -136,6 +139,14 @@ class SettingsViewModelTest {
 
     private val feedback = FakeFeedbackSettings()
 
+    /** Records what the user would have been told, without a Looper or a MediaPlayer. */
+    private class RecordingAnnouncer : FeedbackAnnouncer {
+        val announced = mutableListOf<TapOutcome>()
+        override fun announce(outcome: TapOutcome) { announced += outcome }
+    }
+
+    private val announcer = RecordingAnnouncer()
+
     /** Answers as Toggl would, without a network. */
     private class FakeToggl(
         var account: Result<TogglAccount> = Result.success(TogglAccount("Ada", 42)),
@@ -166,6 +177,7 @@ class SettingsViewModelTest {
         assignments = assignments,
         syncState = syncState,
         feedback = feedback,
+        announcer = announcer,
     )
 
     // --- Permissions ---
@@ -606,4 +618,24 @@ class SettingsViewModelTest {
         assertFalse(model.state.value.toastsEnabled)
         assertEquals("content://media/chime", feedback.ran, "the tone is a separate setting")
     }
+
+    @Test
+    fun `previewing goes through the announcer, so it obeys the same settings a real tap does`() =
+        runTest {
+            val model = viewModel()
+
+            model.onPreviewRan("Preview")
+            model.onPreviewFailed("Preview")
+
+            assertEquals(2, announcer.announced.size)
+            val ran = announcer.announced[0] as TapOutcome.Ran
+            assertEquals("Preview", ran.label)
+            val failed = announcer.announced[1] as TapOutcome.Failed
+            assertEquals(TapFailure.CARD_LEFT_FIELD, failed.failure)
+            assertEquals(
+                ran.uidKey,
+                failed.uidKey,
+                "both previews should show the same specimen uid",
+            )
+        }
 }
