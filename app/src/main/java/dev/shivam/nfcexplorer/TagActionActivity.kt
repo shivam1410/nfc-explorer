@@ -19,6 +19,8 @@ import dev.shivam.nfcexplorer.domain.action.ActionPerformer
 import dev.shivam.nfcexplorer.domain.action.TagActionDispatch
 import dev.shivam.nfcexplorer.domain.action.TagActionRepository
 import dev.shivam.nfcexplorer.domain.action.TagPresence
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackAnnouncer
+import dev.shivam.nfcexplorer.domain.feedback.TapFeedback
 import dev.shivam.nfcexplorer.domain.model.ByteBlock
 import dev.shivam.nfcexplorer.domain.transport.TagConnection
 import dev.shivam.nfcexplorer.logging.SessionLogger
@@ -54,6 +56,8 @@ class TagActionActivity : ComponentActivity() {
     @Inject lateinit var performer: ActionPerformer
 
     @Inject lateinit var logger: SessionLogger
+
+    @Inject lateinit var announcer: FeedbackAnnouncer
 
     /**
      * Actions run here, not in `lifecycleScope`.
@@ -106,6 +110,17 @@ class TagActionActivity : ComponentActivity() {
             assignment = assignment,
         )
 
+        // One call for all three branches below rather than one per branch. TapFeedback reads the
+        // same three inputs as shouldAct, in the same order, so the two cannot drift into disagreeing
+        // about what just happened -- and it is the log that gets believed when they do.
+        announcer.announce(
+            TapFeedback.onDispatch(
+                intentAction = intent?.action,
+                presence = presence,
+                assignment = assignment,
+            ),
+        )
+
         when {
             permitted && assignment != null -> {
                 logger.info(
@@ -126,6 +141,11 @@ class TagActionActivity : ComponentActivity() {
                                 "message" to (failure.message ?: ""),
                             ),
                         )
+                        // A second announcement, deliberately. The first said the tap was accepted,
+                        // which was true; this says the action it accepted did not work. It arrives
+                        // from ApplicationScope, long after this activity has finished, which is
+                        // exactly why the announcer never holds an Activity context.
+                        announcer.announce(TapFeedback.onActionFailure(assignment, failure))
                     }
                 }
             }

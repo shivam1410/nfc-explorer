@@ -287,6 +287,23 @@
     <string name="actions_whatsapp_autosend_no_grant">Auto-send needs the accessibility service, and it is currently off. Android turns it off whenever the app is reinstalled or updated, so this needs granting again. Until then a tap opens the chat but sends nothing.</string>
     <string name="actions_problem_invalid_uri">Include a scheme, e.g. https:// or myapp://</string>
 
+    <!-- Tap feedback -->
+    <string name="settings_feedback_title">Tap feedback</string>
+    <string name="settings_feedback_subtitle">What this app does when you tap a tag that has an action. Android plays its own discovery beep first, before this app is even started — that one follows your notification volume and cannot be switched off from here.</string>
+    <string name="settings_feedback_ran">Sound when an action runs</string>
+    <string name="settings_feedback_failed">Sound when a tap fails</string>
+    <string name="settings_feedback_silent">Silent</string>
+    <string name="settings_feedback_choose">Choose</string>
+    <string name="settings_feedback_preview">Preview</string>
+    <string name="settings_feedback_volume">Volume</string>
+    <string name="settings_feedback_volume_value">%1$d%%</string>
+    <string name="settings_feedback_toast">Name the action on screen</string>
+    <string name="feedback_toast_ran">%1$s — %2$s</string>
+    <string name="feedback_toast_failed">%1$s didn\'t run — %2$s</string>
+    <string name="feedback_reason_left_field">the card left the field before it could answer</string>
+    <string name="feedback_reason_unreadable">this card speaks nothing the app can open</string>
+    <string name="feedback_preview_label">Preview</string>
+
     <!-- Log -->
     <string name="log_title">Session log</string>
     <string name="log_empty">Nothing logged yet.</string>

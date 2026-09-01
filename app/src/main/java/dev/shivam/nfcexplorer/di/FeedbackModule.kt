@@ -4,7 +4,9 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dev.shivam.nfcexplorer.data.feedback.AndroidFeedbackAnnouncer
 import dev.shivam.nfcexplorer.data.feedback.PreferencesFeedbackSettings
+import dev.shivam.nfcexplorer.domain.feedback.FeedbackAnnouncer
 import dev.shivam.nfcexplorer.domain.feedback.FeedbackSettings
 import javax.inject.Singleton
 
@@ -22,4 +24,8 @@ abstract class FeedbackModule {
     @Binds
     @Singleton
     abstract fun bindFeedbackSettings(impl: PreferencesFeedbackSettings): FeedbackSettings
+
+    @Binds
+    @Singleton
+    abstract fun bindFeedbackAnnouncer(impl: AndroidFeedbackAnnouncer): FeedbackAnnouncer
 }
