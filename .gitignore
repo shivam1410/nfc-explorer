@@ -11,8 +11,13 @@ local.properties
 **/build/
 *.apk
 *.aab
+# Signing keys, without exception. There is deliberately no negation here: this
+# repository is public, and the debug keystore is not a throwaway — it is the key
+# every published build has been signed with, so anyone holding it could sign an
+# APK that Android accepts as an update to an existing install. Its password being
+# the well-known "android" does not make the key pair inside it any less unique.
 *.keystore
-!debug.keystore
+*.jks
 
 # Symlink to the local agentic workspace. Machine-specific and not part of the project.
 .aw
