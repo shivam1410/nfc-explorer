@@ -10,7 +10,7 @@ refuse to read it?* — and generalised from there. See
 
 ## Status
 
-Phase 1 MVP complete. **591 unit tests, 0 failures.**
+**v0.20.0** — Phase 1 MVP complete. **591 unit tests, 0 failures.** Detekt green.
 
 | Feature | State |
 |---|---|
@@ -29,6 +29,16 @@ Phase 1 MVP complete. **591 unit tests, 0 failures.**
 
 Currently models **MIFARE Ultralight MF0ICU1** in full. The type system is built so other chips slot
 in behind `ChipProfileResolver` and the transport interface without reshaping the domain.
+
+## Install
+
+[**Latest release**](https://github.com/shivam1410/nfc-explorer/releases/latest) — download the APK
+and open it. Settings → About also checks GitHub and can install an update in place.
+
+Every published build is **debug-signed**, which is worth knowing rather than discovering: Play
+Protect will warn about an unknown developer, and a build signed with any other key cannot update one
+of these in place — Android refuses the install, and the only way through is an uninstall, which
+takes your assignments with it. Sync to Drive first if that ever comes up.
 
 ## Requirements
 
