@@ -1,0 +1,90 @@
+{
+  "feature_slug": "tap-feedback",
+  "stage": "plan",
+  "mode": "full",
+  "status": "planned_awaiting_build",
+  "created_utc": "2026-09-01",
+  "artifacts": {
+    "prd": ".aw_docs/features/tap-feedback/prd.md",
+    "spec": ".aw_docs/features/tap-feedback/spec.md",
+    "tasks": ".aw_docs/features/tap-feedback/tasks.md",
+    "state": ".aw_docs/features/tap-feedback/state.json"
+  },
+  "builds_on": "tag-actions (trigger activity, assignment store), nfc-explorer-mvp (406 tests, Detekt gating, ADR 0001)",
+  "user_decisions": {
+    "sound_source": "Android's own ringtone picker, TYPE_NOTIFICATION, silent entry shown. No bundled audio.",
+    "scope": "tag action triggers only. The in-app scan screen keeps ScanHaptics and gains nothing.",
+    "failure_case": "an assigned tag whose tap fails gets its own toast and its own tone; today it is log-only",
+    "unknown_tags": "ignored entirely, as now"
+  },
+  "key_constraints": [
+    "Android's NFC discovery beep on a background tap is played by the platform's NfcService before this app is started; FLAG_READER_NO_PLATFORM_SOUNDS only covers foreground reader mode, so there is no app-side way to silence it. It rides the notification volume stream.",
+    "both tones default to Silent: the complaint that prompted this feature is that a tap is too loud, so a second sound on by default would make it worse",
+    "ActionPerformer.perform is not awaited, so an action failure arrives after the activity has finished; that toast must use the application context on Dispatchers.Main from ApplicationScope",
+    "minSdk 26, and Ringtone.setVolume is API 28, so playback is MediaPlayer",
+    "domain/ stays framework-free; every android.media and Toast reference lives in data/feedback",
+    "no new permission, and specifically not VIBRATE"
+  ],
+  "phases": [
+    {
+      "id": 1,
+      "title": "The pure decision",
+      "outcome": "what a tap should say is decided in framework-free Kotlin and proven by tests"
+    },
+    {
+      "id": 2,
+      "title": "Preferences",
+      "outcome": "four settings persist across restart and reach the settings ViewModel"
+    },
+    {
+      "id": 3,
+      "title": "Making the sound and the toast",
+      "outcome": "an assigned tap announces itself; an unassigned one still does nothing"
+    },
+    {
+      "id": 4,
+      "title": "Settings UI",
+      "outcome": "the four preferences are reachable, and the section says what the app cannot control"
+    },
+    {
+      "id": 5,
+      "title": "Docs and device verification",
+      "outcome": "AC1-AC8 evidenced on hardware, README states what cannot be silenced"
+    }
+  ],
+  "acceptance_criteria_ids": [
+    "AC1",
+    "AC2",
+    "AC3",
+    "AC4",
+    "AC5",
+    "AC6",
+    "AC7",
+    "AC8",
+    "AC9"
+  ],
+  "notable_decisions": [
+    "MediaPlayer rather than Ringtone: Ringtone.setVolume is API 28 and minSdk is 26, so the volume slider would silently do nothing on the two oldest supported releases - a setting that appears to work and does not is worse than no setting",
+    "SharedPreferences rather than DataStore, unlike the assignment store: these are read synchronously on a tap, on a path that must not suspend before the action fires, and nothing observes them as a flow. Matches PreferencesTogglConfig",
+    "not synced to Drive: a tone content URI is device-local and a volume is a property of this phone, so pushing either to another device would be wrong",
+    "the toast and the tone are decided by one pure TapFeedback.onDispatch rather than three call sites in the activity, so the announcement cannot drift out of step with the log",
+    "the failure reason shown to the user is prose, not the exception, on the presence path - presenceDetail already produces the diagnostic form for the log, and that is a different audience. On the action path the exception IS the useful thing, because an action that fails is a configuration problem the user has to fix",
+    "the section subtitle states that the platform beep is not ours. Without it the feature reads as broken the first time a user sets a quiet tone and still hears the loud one"
+  ],
+  "known_tradeoffs": [
+    "the loud beep the user actually complained about is not fixable from the app; the only lever is the device notification volume, and it is system-wide",
+    "no unit test covers AndroidFeedbackAnnouncer or PreferencesFeedbackSettings, consistent with TagActionRunner and DataStoreAssignmentDocuments - the logic worth testing was hoisted into domain/feedback and everything left is adapter",
+    "the toast is not rate-limited, so a card tapped repeatedly toasts repeatedly. Suppressing a toast after a real tap is worse than repeating one, and the preference turns it off in one tap",
+    "one pair of tones for the whole app rather than per-assignment tones"
+  ],
+  "parallel_execution": {
+    "used": false,
+    "cap": 1,
+    "note": "every phase consumes types the previous one creates, and phase 4 edits the same ViewModel as phase 2"
+  },
+  "recommended_next_commands": [
+    "/aw:build  (Phase 1, Task 1.1)"
+  ],
+  "test_count_before": 406,
+  "test_count_expected": 423
+}
