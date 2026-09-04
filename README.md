@@ -187,6 +187,8 @@ suite could not see**, recorded in
 - [docs/adr/0001-fakeable-tag-transport.md](docs/adr/0001-fakeable-tag-transport.md) — the transport seam
 - [docs/sleep-cycle-automation.md](docs/sleep-cycle-automation.md) — what is reachable in Sleep Cycle,
   what is not, and why stopping a session needs a gesture
+- [docs/how-tag-actions-work.html](docs/how-tag-actions-work.html) — why nothing is written to the tag,
+  written to be handed to someone non-technical. Open it in a browser
 - [.aw_docs/features/nfc-explorer-mvp/](.aw_docs/features/nfc-explorer-mvp/) — PRD, spec, tasks,
   execution log, and device evidence
 

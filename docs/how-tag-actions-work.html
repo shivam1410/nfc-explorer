@@ -1,0 +1,726 @@
+<!doctype html>
+<!--
+  Why NFC Explorer keeps tag data in the app rather than on the tag.
+
+  Written for a non-technical reader: the question "does the tag carry the data, or do we?"
+  comes up every time someone new looks at the tag-actions feature, and the answer is a
+  design decision worth being able to hand over rather than re-explain.
+
+  The code this describes:
+    domain/action/TagAssignment.kt      — the UID-keyed record, and why it is keyed that way
+    data/action/TagActionStore.kt       — lookup and merge by lowercase-hex UID
+    domain/action/TagActionDispatch.kt  — the three-condition guard on the exported trigger
+    TagActionActivity.kt                — the tap path end to end
+
+  Self-contained: no build step, no local assets. Open it in a browser.
+  Hosted copy: https://claude.ai/code/artifact/5278b8f0-ab86-4ae8-bd81-30af8e5e0bea
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Why NFC Explorer keeps tag data in the app rather than on the tag, explained for a non-technical reader.">
+<title>The Tag Knows Nothing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+  :root {
+    --paper:      #f1f4f6;
+    --card:       #ffffff;
+    --ink:        #1b2430;
+    --ink-soft:   #4c5a68;
+    --muted:      #78868f;
+    --rule:       #d3dbe1;
+    --rule-soft:  #e4eaee;
+    --uid:        #96600d;
+    --uid-wash:   #f7ecd8;
+    --app:        #2c5c8a;
+    --app-wash:   #e2edf6;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+    --measure: 66ch;
+    --wide: 900px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #10161c;
+      --card:      #19212a;
+      --ink:       #e5ebf0;
+      --ink-soft:  #b0bcc7;
+      --muted:     #8493a0;
+      --rule:      #2c3743;
+      --rule-soft: #232d38;
+      --uid:       #e0a951;
+      --uid-wash:  #2e2415;
+      --app:       #82b4de;
+      --app-wash:  #172735;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #10161c;
+    --card:      #19212a;
+    --ink:       #e5ebf0;
+    --ink-soft:  #b0bcc7;
+    --muted:     #8493a0;
+    --rule:      #2c3743;
+    --rule-soft: #232d38;
+    --uid:       #e0a951;
+    --uid-wash:  #2e2415;
+    --app:       #82b4de;
+    --app-wash:  #172735;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 18px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: var(--wide);
+    margin: 0 auto;
+    padding: 72px 24px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 54px;
+  }
+
+  .measure { max-width: var(--measure); }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 20px; }
+
+  .kicker {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.02;
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 22ch;
+  }
+
+  .standfirst {
+    font-size: 1.24rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 52ch;
+    margin: 0;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.62rem;
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 30ch;
+  }
+
+  p { margin: 0; max-width: var(--measure); }
+
+  p + p { margin-top: -4px; }
+
+  strong { font-weight: 600; }
+
+  em { font-style: italic; color: var(--ink-soft); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.84em;
+    background: var(--uid-wash);
+    color: var(--uid);
+    padding: 0.12em 0.4em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  /* ---------- the answer ---------- */
+
+  .answer {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--app);
+    padding: 26px 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .answer .line {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.3rem;
+    line-height: 1.32;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .answer .line.dim { color: var(--muted); font-weight: 500; }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    padding: 22px;
+  }
+
+  .scroller svg {
+    display: block;
+    width: 100%;
+    min-width: 620px;
+    height: auto;
+    color: var(--ink);
+  }
+
+  figcaption {
+    font-size: 0.94rem;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 62ch;
+  }
+
+  .svg-title {
+    font-family: var(--display);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .svg-label { font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .svg-body { font-family: var(--body); }
+  .svg-mono { font-family: var(--mono); }
+
+  /* ---------- ledger table ---------- */
+
+  .ledger-wrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--card); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 0.95rem;
+  }
+
+  thead th {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 13px 20px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.uid {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--uid);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  td.label { font-weight: 600; white-space: nowrap; }
+
+  td.does { color: var(--ink-soft); font-size: 0.92rem; }
+
+  /* ---------- numbered sequence ---------- */
+
+  ol.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    counter-reset: step;
+  }
+
+  ol.steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 18px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-top: 1px solid var(--rule-soft);
+    max-width: calc(var(--measure) + 62px);
+  }
+
+  ol.steps li:first-child { border-top: 1px solid var(--rule); }
+
+  ol.steps li::before {
+    content: counter(step);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app);
+    background: var(--app-wash);
+    border-radius: 999px;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    justify-self: end;
+    transform: translateY(3px);
+  }
+
+  ol.steps .what { font-weight: 600; }
+
+  ol.steps .why { color: var(--ink-soft); }
+
+  /* ---------- reasons ---------- */
+
+  .reasons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+
+  .reason {
+    background: var(--card);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .reason h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    line-height: 1.3;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .reason p { font-size: 0.96rem; line-height: 1.52; color: var(--ink-soft); max-width: none; }
+
+  /* ---------- footnote ---------- */
+
+  .footnote {
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .footnote p { font-size: 0.98rem; color: var(--ink-soft); }
+
+  @media (max-width: 640px) {
+    body { font-size: 17px; }
+    .page { padding: 48px 18px 90px; gap: 44px; }
+    .answer { padding: 22px; }
+    .scroller { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="kicker">NFC Explorer &middot; how a tap becomes an action</p>
+    <h1>The tag knows nothing</h1>
+    <p class="standfirst">
+      A question worth settling before anything else gets built on top of it: when you tap
+      a tag, is the tag telling the phone what to do &mdash; or is the phone already the
+      one who knows?
+    </p>
+  </header>
+
+  <section>
+    <p class="eyebrow">The short answer</p>
+    <div class="answer">
+      <p class="line">We carry the data. The tag carries a serial number and nothing else.</p>
+      <p class="line dim">Nothing is ever written to the tag. It is a name, not a note.</p>
+    </div>
+    <p class="measure">
+      Every NFC tag ever made has a serial number burned into it at the factory. It cannot
+      be changed, and the tag announces it to any phone that comes near &mdash; before any
+      password, any handshake, any permission. That number is the only thing this app takes
+      from a tag. Everything else &mdash; the label, what should happen, which timer to start,
+      which message to open &mdash; is kept in the app, on your phone, filed under that number.
+    </p>
+  </section>
+
+  <section>
+    <p class="eyebrow">An everyday version of the same idea</p>
+    <h2>A barcode doesn&rsquo;t know the price</h2>
+    <p class="measure">
+      The barcode printed on a packet of biscuits contains no price. It is a number. The price
+      lives in the shop&rsquo;s computer, filed under that number. This is why a shop can change
+      a price in one afternoon without reprinting a single packet &mdash; and why the same biscuits
+      cost something different in a different shop, scanning the very same barcode.
+    </p>
+    <p class="measure">
+      Our tags work exactly like the barcode. The two possible designs, side by side:
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 258" role="img" aria-label="Two designs compared. On the left, instructions are written onto the tag itself, so changing them means physically re-writing the tag. On the right, the tag carries only a factory serial number and the phone holds a list matching numbers to actions, so changing behaviour means editing the app and never touching the tag.">
+          <defs>
+            <marker id="arrowA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- ============ PANEL A ============ -->
+          <text class="svg-label" x="8" y="14" font-size="11" fill="var(--muted)">Design A &mdash; data on the tag</text>
+          <line x1="8" y1="26" x2="424" y2="26" stroke="var(--rule)" stroke-width="1"/>
+
+          <rect x="8" y="56" width="156" height="104" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text class="svg-label" x="86" y="78" font-size="9.5" fill="var(--muted)" text-anchor="middle">The tag</text>
+          <text class="svg-mono" x="24" y="102" font-size="10.5" fill="currentColor">start work timer</text>
+          <text class="svg-mono" x="24" y="119" font-size="10.5" fill="currentColor">tags: reading</text>
+          <text class="svg-mono" x="24" y="136" font-size="10.5" fill="currentColor">project: 42</text>
+
+          <line x1="170" y1="108" x2="258" y2="108" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowA)"/>
+          <text class="svg-body" x="214" y="127" font-size="11" fill="var(--ink-soft)" text-anchor="middle">reads the</text>
+          <text class="svg-body" x="214" y="141" font-size="11" fill="var(--ink-soft)" text-anchor="middle">instructions</text>
+
+          <rect x="266" y="56" width="158" height="104" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text class="svg-label" x="345" y="78" font-size="9.5" fill="var(--muted)" text-anchor="middle">The phone</text>
+          <text class="svg-body" x="345" y="106" font-size="12" fill="currentColor" text-anchor="middle">does whatever</text>
+          <text class="svg-body" x="345" y="123" font-size="12" fill="currentColor" text-anchor="middle">the tag says</text>
+
+          <text class="svg-label" x="8" y="200" font-size="9.5" fill="var(--muted)">To change what it does</text>
+          <text class="svg-body" x="8" y="222" font-size="12.5" fill="currentColor">Find the bookmark. Re-write the tag.</text>
+          <text class="svg-body" x="8" y="240" font-size="12.5" fill="currentColor">Some cards refuse to be written at all.</text>
+
+          <!-- divider between panels -->
+          <line x1="452" y1="8" x2="452" y2="250" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"/>
+
+          <!-- ============ PANEL B ============ -->
+          <text class="svg-label" x="478" y="14" font-size="11" fill="var(--app)">Design B &mdash; data in the app &nbsp;&middot;&nbsp; ours</text>
+          <line x1="478" y1="26" x2="892" y2="26" stroke="var(--app)" stroke-width="1"/>
+
+          <rect x="478" y="56" width="142" height="104" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text class="svg-label" x="549" y="78" font-size="9.5" fill="var(--muted)" text-anchor="middle">The tag</text>
+          <rect x="494" y="90" width="110" height="38" rx="4" fill="var(--uid-wash)"/>
+          <text class="svg-mono" x="549" y="105" font-size="10.5" fill="var(--uid)" text-anchor="middle">04 1C 4E 52</text>
+          <text class="svg-mono" x="549" y="121" font-size="10.5" fill="var(--uid)" text-anchor="middle">CE 7C 80</text>
+          <text class="svg-body" x="549" y="146" font-size="10" fill="var(--muted)" text-anchor="middle" font-style="italic">serial number, and that is all</text>
+
+          <line x1="626" y1="108" x2="700" y2="108" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowA)"/>
+          <text class="svg-body" x="663" y="127" font-size="11" fill="var(--ink-soft)" text-anchor="middle">says only</text>
+          <text class="svg-body" x="663" y="141" font-size="11" fill="var(--ink-soft)" text-anchor="middle">its number</text>
+
+          <rect x="708" y="44" width="184" height="128" rx="7" fill="none" stroke="var(--app)" stroke-width="1.6"/>
+          <text class="svg-label" x="800" y="66" font-size="9.5" fill="var(--app)" text-anchor="middle">The phone &mdash; the list</text>
+          <line x1="722" y1="76" x2="878" y2="76" stroke="var(--rule)" stroke-width="1"/>
+          <text class="svg-mono" x="722" y="94" font-size="9" fill="currentColor"><tspan fill="var(--uid)">&hellip;CE 7C 80</tspan>  &#8594;  work timer</text>
+          <text class="svg-mono" x="722" y="112" font-size="9" fill="currentColor"><tspan fill="var(--uid)">&hellip;3B 11 04</tspan>  &#8594;  end sleep</text>
+          <text class="svg-mono" x="722" y="130" font-size="9" fill="currentColor"><tspan fill="var(--uid)">&hellip;9D 04 A2</tspan>  &#8594;  message home</text>
+          <text class="svg-mono" x="722" y="148" font-size="9" fill="currentColor"><tspan fill="var(--uid)">&hellip;77 1E 6B</tspan>  &#8594;  open playlist</text>
+
+          <text class="svg-label" x="478" y="200" font-size="9.5" fill="var(--app)">To change what it does</text>
+          <text class="svg-body" x="478" y="222" font-size="12.5" fill="currentColor">Edit one line in the app.</text>
+          <text class="svg-body" x="478" y="240" font-size="12.5" fill="currentColor">The tag is never touched, and never needs to be.</text>
+        </svg>
+      </div>
+      <figcaption>
+        The only real difference is who holds the meaning. In A the tag is a note and the
+        phone obeys it; in B the tag is a name and the phone already knows what that name
+        means. B is what this app does &mdash; which is why the same bookmark can mean a
+        different book next month without you going anywhere near it.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="eyebrow">What the app keeps</p>
+    <h2>One line per tag</h2>
+    <p class="measure">
+      The whole of the app&rsquo;s memory about your tags is a list like this one. A serial
+      number, a name you chose so you can recognise it, and one thing to do. A tag can only
+      ever have one entry &mdash; the serial number is the key, so saving a new action replaces
+      the old one rather than piling up beside it.
+    </p>
+    <div class="ledger-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Serial number (from the tag)</th>
+            <th scope="col">Your name for it</th>
+            <th scope="col">What a tap does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="uid">04 1C 4E 52 CE 7C 80</td>
+            <td class="label">Desk card</td>
+            <td class="does">Starts a work timer, or stops the one already running</td>
+          </tr>
+          <tr>
+            <td class="uid">04 8A 22 90 3B 11 04</td>
+            <td class="label">Bedside card</td>
+            <td class="does">Starts sleep tracking at night, ends it in the morning &mdash; same card, both ways</td>
+          </tr>
+          <tr>
+            <td class="uid">04 F2 61 3D 9D 04 A2</td>
+            <td class="label">Fridge magnet</td>
+            <td class="does">Opens a WhatsApp chat with a message ready to send</td>
+          </tr>
+          <tr>
+            <td class="uid">04 B7 09 CC 77 1E 6B</td>
+            <td class="label">Bookmark</td>
+            <td class="does">Opens the book&rsquo;s notes page</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="measure">
+      Note the second row. One card that starts <em>and</em> stops depends on knowing which
+      of the two you meant &mdash; and that is a thing the app works out on the phone at the
+      moment of the tap. A tag could never hold that, no matter what you wrote on it.
+    </p>
+  </section>
+
+  <section>
+    <p class="eyebrow">What happens when you tap &mdash; in order</p>
+    <h2>Five steps, about a second</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <span class="what">The phone wakes the tag up.</span>
+          <span class="why">The tag has no battery. The phone&rsquo;s radio powers it for as long as they are touching.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <span class="what">The tag says its serial number.</span>
+          <span class="why">That is the entire conversation with the tag. Nothing is read from it, nothing written to it.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <span class="what">The app checks that this is a real tap.</span>
+          <span class="why">Three things must all be true: the phone&rsquo;s own system reported a tag, the tag is genuinely there and answering, and that serial number is one we know. If any one fails, nothing happens at all &mdash; no screen, no sound.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <span class="what">The app looks the number up in its list.</span>
+          <span class="why">It finds one line: a name, and one thing to do.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <span class="what">The app does it.</span>
+          <span class="why">Opens an app, opens a link, presses a button, or &mdash; the case worth understanding next &mdash; calls a service over the internet.</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <p class="eyebrow">Where the password lives</p>
+    <h2>The tag is a public thing</h2>
+    <p class="measure">
+      Step five is the one you asked about. When a tap starts a work timer, the app makes a
+      call over the internet to the timer service &mdash; and that call needs a password. So
+      the natural question is where that password sits.
+    </p>
+    <p class="measure">
+      <strong>Not on the tag.</strong> A tag has no lock on reading: anyone who brushes a phone
+      against your bookmark can read every byte on it, and you would never know. So the password
+      lives in the phone&rsquo;s own encrypted store &mdash; the same kind of vault your banking
+      app uses. It is not in the list above. It is not in the action. It never goes near the card.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 286" role="img" aria-label="Three zones showing where each piece of information lives. The bookmark holds only a serial number. The phone holds the list of tags, the account settings, and the API password in an encrypted store. The internet holds the timer service. The serial number travels from tag to phone at a tap, and the phone calls the service over HTTPS using the password. A crossed-out arrow shows the password is never written back to the tag.">
+          <defs>
+            <marker id="arrowB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- ZONE 1 : the bookmark -->
+          <rect x="8" y="30" width="196" height="150" rx="8" fill="none" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <text class="svg-label" x="106" y="20" font-size="10" fill="var(--muted)" text-anchor="middle">On the bookmark</text>
+
+          <rect x="34" y="62" width="144" height="52" rx="5" fill="var(--uid-wash)" stroke="var(--uid)" stroke-width="1.2"/>
+          <text class="svg-mono" x="106" y="84" font-size="10.5" fill="var(--uid)" text-anchor="middle">04 1C 4E 52</text>
+          <text class="svg-mono" x="106" y="100" font-size="10.5" fill="var(--uid)" text-anchor="middle">CE 7C 80</text>
+          <text class="svg-body" x="106" y="134" font-size="11" fill="var(--muted)" text-anchor="middle" font-style="italic">a serial number,</text>
+          <text class="svg-body" x="106" y="149" font-size="11" fill="var(--muted)" text-anchor="middle" font-style="italic">and nothing else</text>
+
+          <!-- ZONE 2 : the phone -->
+          <rect x="252" y="30" width="356" height="230" rx="8" fill="none" stroke="var(--app)" stroke-width="1.4" stroke-dasharray="4 4"/>
+          <text class="svg-label" x="430" y="20" font-size="10" fill="var(--app)" text-anchor="middle">In the app, on your phone</text>
+
+          <rect x="276" y="52" width="308" height="56" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <text class="svg-label" x="292" y="72" font-size="9" fill="var(--muted)">The list of tags</text>
+          <text class="svg-mono" x="292" y="94" font-size="9.5" fill="currentColor"><tspan fill="var(--uid)">&hellip;CE 7C 80</tspan>  &#8594;  &ldquo;Desk card&rdquo;  &#8594;  work timer</text>
+
+          <rect x="276" y="120" width="308" height="50" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <text class="svg-label" x="292" y="140" font-size="9" fill="var(--muted)">Account settings</text>
+          <text class="svg-body" x="292" y="159" font-size="10.5" fill="currentColor">which workspace the timers go to</text>
+
+          <rect x="276" y="182" width="308" height="58" rx="5" fill="none" stroke="var(--app)" stroke-width="1.6"/>
+          <text class="svg-label" x="306" y="203" font-size="9" fill="var(--app)">Encrypted store</text>
+          <path d="M 292 190 v -5 a 5 5 0 0 1 10 0 v 5" fill="none" stroke="var(--app)" stroke-width="1.3"/>
+          <rect x="289" y="190" width="16" height="12" rx="2" fill="var(--app)"/>
+          <text class="svg-body" x="292" y="224" font-size="11.5" fill="currentColor">the password for the timer service</text>
+
+          <!-- ZONE 3 : the internet -->
+          <rect x="656" y="30" width="236" height="150" rx="8" fill="none" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <text class="svg-label" x="774" y="20" font-size="10" fill="var(--muted)" text-anchor="middle">Out on the internet</text>
+
+          <rect x="684" y="62" width="180" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <text class="svg-body" x="774" y="90" font-size="12.5" fill="currentColor" text-anchor="middle">The timer service</text>
+          <text class="svg-mono" x="774" y="110" font-size="9" fill="var(--muted)" text-anchor="middle">api.track.toggl.com</text>
+
+          <!-- arrow: tag -> phone -->
+          <line x1="206" y1="88" x2="272" y2="88" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowB)"/>
+          <text class="svg-body" x="239" y="72" font-size="10" fill="var(--ink-soft)" text-anchor="middle">at a tap</text>
+
+          <!-- arrow: phone -> internet -->
+          <line x1="612" y1="88" x2="678" y2="88" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowB)"/>
+          <text class="svg-body" x="645" y="72" font-size="10" fill="var(--ink-soft)" text-anchor="middle">start</text>
+          <text class="svg-body" x="645" y="112" font-size="10" fill="var(--ink-soft)" text-anchor="middle">timer</text>
+
+          <!-- the negative edge: password never goes to the tag -->
+          <path d="M 276 211 C 190 211 150 200 132 168" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <line x1="186" y1="196" x2="206" y2="216" stroke="var(--uid)" stroke-width="2"/>
+          <line x1="206" y1="196" x2="186" y2="216" stroke="var(--uid)" stroke-width="2"/>
+          <text class="svg-label" x="196" y="240" font-size="9.5" fill="var(--uid)" text-anchor="middle">never</text>
+          <text class="svg-body" x="196" y="258" font-size="10.5" fill="var(--muted)" text-anchor="middle">a card can be read by anyone</text>
+        </svg>
+      </div>
+      <figcaption>
+        Three separate places, and only one thing crosses from the bookmark into the phone:
+        the serial number. The crossed line is the important one &mdash; it is the arrow that
+        design A would have needed, and the reason design A was never an option here.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="eyebrow">Why it was built this way</p>
+    <h2>Three reasons, in order of how much they mattered</h2>
+    <div class="reasons">
+      <div class="reason">
+        <h3>It works on cards you cannot write to</h3>
+        <p>
+          A hotel key card, an old transit card, a card whose memory has been permanently
+          locked &mdash; none of them will accept anything you try to write. All of them
+          announce a serial number. So all of them work here, and a card you already own
+          becomes usable without buying anything.
+        </p>
+      </div>
+      <div class="reason">
+        <h3>Nothing private sits on something anyone can read</h3>
+        <p>
+          A card offers no way to require a password before being read. Anything written
+          there is public to every phone that passes it. Keeping the meaning on the phone
+          means a lost bookmark reveals a number, and a number reveals nothing.
+        </p>
+      </div>
+      <div class="reason">
+        <h3>Behaviour changes without the tag present</h3>
+        <p>
+          Renaming a tag, pointing it at a different book, changing what it does &mdash; all
+          of it happens in the app, and none of it needs the card in your hand. The same
+          edit then syncs to your other phone.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="footnote">
+    <p class="eyebrow" style="border-bottom:none; padding-bottom:0;">One thing to be clear about</p>
+    <p class="measure">
+      This app <em>can</em> write to tags. There is a whole screen for it &mdash; write text,
+      write raw bytes, wipe a card &mdash; because the app was originally built to inspect
+      cards and see what was on them. That is a separate tool for a separate job.
+    </p>
+    <p class="measure">
+      It is not how the tap actions work, and turning it off tomorrow would not break a single
+      one of them. Worth saying plainly, because &ldquo;the app writes to tags&rdquo; and
+      &ldquo;the tags carry the data&rdquo; sound like the same sentence, and only the first
+      one is true.
+    </p>
+  </section>
+
+  <footer style="border-top:1px solid var(--rule); margin-top:54px; padding-top:20px; font-size:.9rem; color:var(--muted); max-width:var(--measure);">
+    <p style="max-width:none;">
+      Hosted copy: <a href="https://claude.ai/code/artifact/5278b8f0-ab86-4ae8-bd81-30af8e5e0bea" style="color:var(--app);">https://claude.ai/code/artifact/5278b8f0-ab86-4ae8-bd81-30af8e5e0bea</a>.
+      Source of truth is this file &mdash; <code style="background:none; color:var(--muted); padding:0;">docs/how-tag-actions-work.html</code>
+      in the <a href="https://github.com/shivam1410/nfc-explorer" style="color:var(--app);">nfc-explorer</a> repository.
+    </p>
+  </footer>
+
+</div>
+
+</body>
+</html>
